@@ -1,8 +1,8 @@
 #pragma once
 
-#include "post.hpp"
-#include "post_summary.hpp"
-#include "types.hpp"
+#include "../domain/post.hpp"
+#include "../domain/post_summary.hpp"
+#include "../core/types.hpp"
 
 #include <vector>
 #include <optional>

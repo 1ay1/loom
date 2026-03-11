@@ -1,7 +1,7 @@
 #pragma once
 
-#include "content_source.hpp"
-#include "types.hpp"
+#include "../content/content_source.hpp"
+#include "../core/types.hpp"
 
 namespace loom
 {

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "post.hpp"
-#include "post_summary.hpp"
+#include "../domain/post.hpp"
+#include "../domain/post_summary.hpp"
 
 #include <concepts>
 #include <optional>

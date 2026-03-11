@@ -1,9 +1,9 @@
 #include <iostream>
 
-#include "../include/loom/post.hpp"
-#include "../include/loom/memory_source.hpp"
-#include "../include/loom/content_source.hpp"
-#include "../include/loom/blog_engine.hpp"
+#include "../include/loom/domain/post.hpp"
+#include "../include/loom/content/memory_source.hpp"
+#include "../include/loom/content/content_source.hpp"
+#include "../include/loom/engine/blog_engine.hpp"
 
 int main()
 {
