@@ -48,24 +48,17 @@ int main()
 
     loom::HttpServer server(8080);
 
-    server.set_handler([&](const std::string& path) -> std::string {
-        std::cout << path << "\n";
-        if(path == "/") {
-            auto posts = engine.list_posts();
-            return loom::render_index(posts);
-        }
-
-        if(path.starts_with("/post/")) {
-            std::string slug = path.substr(6);
-            auto post = engine.get_post(loom::Slug(slug));
-            if(post) {
-                return loom::render_post(*post);
-            }
-        }
-
-        return std::string("<h1>404: Not Found<h1>");
+    server.router().add("/", [&](const loom::Params&) {
+        auto posts = engine.list_posts();
+        return loom::render_index(posts);
     });
 
+    server.router().add("/post/:slug", [&](const loom::Params& params) {
+        auto post = engine.get_post(loom::Slug(params[0]));
+        if(post) return loom::render_post(*post);
+
+        return std::string("<h1>Post <b>**" + params[0] + "**</b> not found.<h1>" );
+    });
 
     server.run();
 }

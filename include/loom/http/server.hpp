@@ -1,5 +1,6 @@
 #pragma once
 
+#include "router.hpp"
 #include <string>
 #include <functional>
 
@@ -11,11 +12,11 @@ namespace loom
     {
       public:
       explicit HttpServer(int port);
-      void set_handler(Handler handler);
+      Router& router();
       void run();
 
       private:
       int port_;
-      Handler handler_;
+      Router router_;
     };
 }

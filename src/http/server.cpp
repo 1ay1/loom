@@ -1,4 +1,4 @@
-#include "../../include/loom/http/server.hpp"
+#include "../../include/loom/http/http.hpp"
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -13,9 +13,9 @@ namespace loom
     port_(port) {}
 
 
-    void HttpServer::set_handler(Handler handler)
+    Router& HttpServer::router()
     {
-        handler_ = std::move(handler);
+        return router_;
     }
 
     void HttpServer::run()
@@ -98,7 +98,7 @@ namespace loom
 
             if (method == "GET") {
                 try {
-                    body = handler_(path);
+                    body = router_.route(path);
                 } catch (const std::exception& e) {
                     std::cerr << "Handler exception: " << e.what() << std::endl;
                     status_line = "HTTP/1.1 500 Internal Server Error\r\n";
