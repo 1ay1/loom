@@ -31,8 +31,18 @@ int main()
         std::chrono::system_clock::now(),
     };
 
+    loom::Post post3 {
+        loom::PostId("3"),
+        loom::Title("Hello World3"),
+        loom::Slug("hello3"),
+        loom::Content("My first blog post3"),
+        {},
+        std::chrono::system_clock::now(),
+    };
+
     source.add(post);
     source.add(post2);
+    source.add(post3);
 
     loom::BlogEngine engine(source);
 
