@@ -1,3 +1,6 @@
+#include <atomic>
+#include <csignal> // for signal, SIGINT, SIGTERM
+
 #include "../../include/loom/http/http.hpp"
 
 #include <sys/socket.h>
@@ -6,6 +9,15 @@
 
 #include <cstring>
 #include <iostream>
+
+// Global flag to control the server loop
+std::atomic<bool> server_running_{true};
+
+// Signal handler function
+void signal_handler(int signum) {
+    std::cout << "\nInterrupt signal (" << signum << ") received. Shutting down gracefully...\n";
+    server_running_.store(false); // Set the flag to false to exit the loop
+}
 
 namespace loom
 {
@@ -39,14 +51,23 @@ namespace loom
             return;
         }
 
+        // Register signal handler for graceful shutdown
+        signal(SIGINT, signal_handler);
+        signal(SIGTERM, signal_handler);
+
         std::cout << "Server listening on port " << port_ << "\n";
 
-        while (true)
+        while (server_running_) // Check the running flag
         {
             int client = accept(server_fd, nullptr, nullptr);
             if (client < 0) {
-                perror("accept failed");
-                continue; // Try to accept next connection
+                // If accept fails but server_running_ is still true, it might be an error
+                // or a signal interruption that returned early from accept.
+                // If interrupted by signal, server_running_ will be false and loop will exit.
+                if (server_running_) {
+                    perror("accept failed");
+                }
+                continue; // Try to accept next connection or exit if server_running_ is false
             }
             char buffer[4096];
 
@@ -126,5 +147,8 @@ namespace loom
 
             close(client); // Ensure client socket is closed
         }
+
+        std::cout << "Server stopped. Closing socket.\n";
+        close(server_fd); // Cleanup the server socket
     }
 }
