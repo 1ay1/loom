@@ -1,9 +1,9 @@
 #include <iostream>
 
-#include "../include/loom/domain/post.hpp"
-#include "../include/loom/content/memory_source.hpp"
-#include "../include/loom/content/content_source.hpp"
-#include "../include/loom/engine/blog_engine.hpp"
+#include "../include/loom/domain/domain.hpp"
+#include "../include/loom/content/content.hpp"
+#include "../include/loom/engine/engine.hpp"
+#include "../include/loom/render/render.hpp"
 
 int main()
 {
@@ -33,14 +33,8 @@ int main()
     source.add(post2);
 
     loom::BlogEngine engine(source);
-
     auto posts = engine.list_posts();
+    auto html = loom::render_index(posts);
 
-    std::cout << "Posts: " << posts.size() << "\n";
-    for(auto& p: posts)
-    {
-        std::cout << engine.get_post(p.slug).value().content.get() << "\n";
-    }
-
-
+    std::cout << html;
 }
