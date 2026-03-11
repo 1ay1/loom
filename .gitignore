@@ -1,4 +1,4 @@
 build/
-posts/
 loom
 !include/loom/
+.clangd
