@@ -1,9 +1,11 @@
 #include <iostream>
+#include <string>
 
 #include "../include/loom/domain/domain.hpp"
 #include "../include/loom/content/content.hpp"
 #include "../include/loom/engine/engine.hpp"
 #include "../include/loom/render/render.hpp"
+#include "../include/loom/http/server.hpp"
 
 int main()
 {
@@ -33,8 +35,27 @@ int main()
     source.add(post2);
 
     loom::BlogEngine engine(source);
-    auto posts = engine.list_posts();
-    auto html = loom::render_index(posts);
 
-    std::cout << html;
+    loom::HttpServer server(8080);
+
+    server.set_handler([&](const std::string& path) -> std::string {
+        std::cout << path << "\n";
+        if(path == "/") {
+            auto posts = engine.list_posts();
+            return loom::render_index(posts);
+        }
+
+        if(path.starts_with("/post/")) {
+            std::string slug = path.substr(6);
+            auto post = engine.get_post(loom::Slug(slug));
+            if(post) {
+                return loom::render_post(*post);
+            }
+        }
+
+        return std::string("<h1>404: Not Found<h1>");
+    });
+
+
+    server.run();
 }
