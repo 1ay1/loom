@@ -33,6 +33,17 @@ namespace loom
     void HttpServer::run()
     {
         int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+        if (server_fd < 0) {
+            perror("socket creation failed");
+            return;
+        }
+
+        // Set SO_REUSEADDR option to allow restarting the server quickly
+        int optval = 1;
+        if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0) {
+            perror("setsockopt(SO_REUSEADDR) failed");
+            // This is not critical enough to stop startup, but good to log.
+        }
 
         sockaddr_in addr{};
         addr.sin_family  = AF_INET;

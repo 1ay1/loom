@@ -51,7 +51,7 @@ int main()
     loom::HttpServer server(8080);
 
     server.router().add("/", [&](const loom::Params&) {
-        std::cout << "Request Number: " << ++reqs << "\n";
+        //std::cout << "Request Number: " << ++reqs << "\n";
         auto posts = engine.list_posts();
         return loom::render_index(posts);
     });
