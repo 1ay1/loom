@@ -8,19 +8,17 @@ namespace  loom
     {
         std::string html;
 
-        html += "<html>";
-        html += "<body>";
+        html += "<article>";
 
         html += "<h1>";
         html += post.title.get();
         html += "</h1>";
 
-        html += "<div>";
+        html += "<div class='post-content'>";
         html += post.content.get();
         html += "</div>";
 
-        html += "</body>";
-        html += "</html>";
+        html += "</article>";
 
         return html;
     }
@@ -29,20 +27,19 @@ namespace  loom
     {
         std::string html;
 
-        html += "<html><body>";
-        html += "<h1>Blog</h1>";
+        html += "<section>";
+        html += "<h2>Recent Posts</h2>";
 
         for(const auto& post : posts)
         {
-            html += "<a href=\"/post/";
+            html += "<article>";
+            html += "<h3><a href=\"/post/";
             html += post.slug.get();
             html += "\">";
-
             html += post.title.get();
-            html += "</a><br>";
+            html += "</a></h3>";
+            html += "</article>";
         }
-
-        html += "</body></html>";
 
         return html;
     }
