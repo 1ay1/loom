@@ -67,6 +67,7 @@ namespace loom
         // Register signal handler for graceful shutdown
         signal(SIGINT, signal_handler);
         signal(SIGTERM, signal_handler);
+        signal(SIGPIPE, SIG_IGN); // Ignore SIGPIPE to prevent crash on broken connections
 
         std::cout << "Server listening on port " << port_ << "\n";
 
@@ -107,43 +108,54 @@ namespace loom
                         }
                         continue; // Try to accept next connection or exit if server_running_ is false
                     }
+                    std::string request_str;
                     char buffer[4096];
+                    bool headers_complete = false;
 
-                    int n = read(client, buffer, sizeof(buffer));
-                    if (n < 0) {
-                        perror("read failed");
-                        close(client);
-                        continue;
+                    while (!headers_complete) {
+                        ssize_t n = read(client, buffer, sizeof(buffer));
+                        if (n < 0) {
+                            if (errno == EINTR) continue;
+                            perror("read failed");
+                            break;
+                        }
+                        if (n == 0) break; // Client closed connection
+
+                        request_str.append(buffer, n);
+                        if (request_str.find("\r\n\r\n") != std::string::npos || request_str.size() > 8192) {
+                            headers_complete = true;
+                        }
                     }
-                    if (n == 0) {
-                        // Client closed connection gracefully
+
+                    if (request_str.empty()) {
                         close(client);
                         continue;
                     }
 
                     // Basic request parsing
-                    std::string request(buffer, n);
                     std::string path = "/"; // Default path
                     std::string method = "GET"; // Default method
 
-                    auto method_end = request.find(' ');
+                    auto method_end = request_str.find(' ');
                     if (method_end != std::string::npos) {
-                        method = request.substr(0, method_end);
+                        method = request_str.substr(0, method_end);
                         auto path_start = method_end + 1;
-                        auto path_end = request.find(' ', path_start);
+                        auto path_end = request_str.find(' ', path_start);
                         if (path_end != std::string::npos) {
-                            path = request.substr(path_start, path_end - path_start);
+                            path = request_str.substr(path_start, path_end - path_start);
                         } else {
                             // Malformed request (e.g., "GET /")
                             // Default to root path if path is not clearly delimited.
                         }
-                    } else {
+                    }
+ else {
                         // Could not parse method, malformed request. Send 400 Bad Request.
                         std::string error_body = "<html><body><h1>400 Bad Request</h1></body></html>";
                         std::string error_response =
                             "HTTP/1.1 400 Bad Request\r\n"
                             "Content-Type: text/html\r\n"
                             "Content-Length: " + std::to_string(error_body.size()) + "\r\n"
+                            "Connection: close\r\n"
                             "\r\n" +
                             error_body;
                         ssize_t written = write(client, error_response.c_str(), error_response.size());
@@ -171,8 +183,9 @@ namespace loom
 
                     std::string response =
                         status_line +
-                        "Content-Type: text/html\r\n" // Still hardcoded, could be dynamic
+                        "Content-Type: text/html\r\n"
                         "Content-Length: " + std::to_string(body.size()) + "\r\n"
+                        "Connection: close\r\n"
                         "\r\n" +
                         body;
 
