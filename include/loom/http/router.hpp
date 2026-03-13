@@ -1,32 +1,40 @@
 #pragma once
 
+#include "request.hpp"
+#include "response.hpp"
+
 #include <string>
 #include <functional>
 #include <vector>
+#include <unordered_map>
+#include <memory>
 
 namespace loom
 {
-    using Params = std::vector<std::string>;
-    using RouteHandler = std::function<std::string(const Params&)>;
+    using RouteHandler = std::function<HttpResponse(const HttpRequest&)>;
 
     class Router
     {
-        public:
-        void add(std::string pattern, RouteHandler handler);
-        std::string route(const std::string& path);
+    public:
+        void get(const std::string& pattern, RouteHandler handler);
+        void post(const std::string& pattern, RouteHandler handler);
+        void put(const std::string& pattern, RouteHandler handler);
+        void del(const std::string& pattern, RouteHandler handler);
 
-        private:
+        HttpResponse route(HttpRequest& request) const;
 
-        struct Route
+    private:
+        struct TrieNode
         {
-            std::string pattern;
-            RouteHandler handler;
+            std::unordered_map<std::string, std::unique_ptr<TrieNode>> children;
+            std::unique_ptr<TrieNode> param_child;
+            std::string param_name;
+            std::unordered_map<HttpMethod, RouteHandler> handlers;
         };
 
-        std::vector<Route> routes_;
+        TrieNode root_;
 
-        bool match(const std::string& pattern,
-        const std::string& path,
-        Params& params);
+        void add_route(HttpMethod method, const std::string& pattern, RouteHandler handler);
+        static std::vector<std::string> split_path(const std::string& path);
     };
 }

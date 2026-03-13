@@ -1,28 +1,40 @@
 #pragma once
 
-#include "../content/content_source.hpp"
+#include "../domain/site.hpp"
+#include "../domain/post_summary.hpp"
 #include "../core/types.hpp"
+
+#include <optional>
+#include <vector>
 
 namespace loom
 {
-    template<ContentSource Source>
     class BlogEngine
     {
         public:
-        explicit BlogEngine(Source source):
-            source_(std::move(source)) {}
+        explicit BlogEngine(const Site& site):
+            site_(site) {}
 
-        auto list_posts()
+        std::vector<PostSummary> list_posts() const
         {
-            return source_.list_posts();
+            std::vector<PostSummary> result;
+            for (const auto& p : site_.posts)
+                result.push_back(PostSummary{p.id, p.title, p.slug});
+            return result;
         }
 
-        auto get_post(Slug slug)
+        std::optional<Post> get_post(Slug slug) const
         {
-            return source_.get_post(slug);
+            for (const auto& p : site_.posts)
+            {
+                if (p.slug.get() == slug.get()) return p;
+            }
+            return std::nullopt;
         }
+
+        const Site& site() const { return site_; }
 
         private:
-        Source source_;
+        const Site& site_;
     };
 }

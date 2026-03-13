@@ -1,22 +1,28 @@
 #pragma once
 
 #include "router.hpp"
-#include <string>
-#include <functional>
+#include "thread_pool.hpp"
+
+#include <atomic>
+#include <cstddef>
 
 namespace loom
 {
-    using Handler = std::function<std::string(const std::string& path)>;
-
     class HttpServer
     {
-      public:
-      explicit HttpServer(int port);
-      Router& router();
-      void run();
+    public:
+        explicit HttpServer(int port, size_t num_threads = 4);
 
-      private:
-      int port_;
-      Router router_;
+        Router& router();
+        void run();
+        void stop();
+
+    private:
+        int port_;
+        Router router_;
+        ThreadPool pool_;
+        std::atomic<bool> running_{false};
+
+        void handle_connection(int client_fd);
     };
 }

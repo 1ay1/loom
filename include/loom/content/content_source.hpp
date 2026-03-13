@@ -1,19 +1,18 @@
 #pragma once
 
 #include "../domain/post.hpp"
-#include "../domain/post_summary.hpp"
+#include "../domain/page.hpp"
 
 #include <concepts>
-#include <optional>
 #include <vector>
 
 namespace loom
 {
     template<typename T>
     concept ContentSource =
-    requires(T source, Slug slug)
+    requires(T source)
     {
-        { source.list_posts() } -> std::same_as<std::vector<PostSummary>>;
-        { source.get_post(slug) } -> std::same_as<std::optional<Post>>;
+        { source.all_posts() } -> std::same_as<std::vector<Post>>;
+        { source.all_pages() } -> std::same_as<std::vector<Page>>;
     };
 }

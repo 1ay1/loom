@@ -1,208 +1,255 @@
-#include <atomic>
-#include <csignal> // for signal, SIGINT, SIGTERM
-#include <sys/select.h> // for select, fd_set, timeval
-#include <errno.h> // for EINTR
-
 #include "../../include/loom/http/server.hpp"
+#include "../../include/loom/http/request.hpp"
+#include "../../include/loom/http/response.hpp"
 
 #include <sys/socket.h>
+#include <sys/epoll.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <unistd.h>
-
-#include <cstring>
+#include <fcntl.h>
+#include <csignal>
+#include <cerrno>
 #include <iostream>
-
-// Global flag to control the server loop
-std::atomic<bool> server_running_{true};
-
-// Signal handler function
-void signal_handler(int signum) {
-    std::cout << "\nInterrupt signal (" << signum << ") received. Shutting down gracefully...\n";
-    server_running_.store(false); // Set the flag to false to exit the loop
-}
 
 namespace loom
 {
-    HttpServer::HttpServer(int port):
-    port_(port) {}
+    static std::atomic<bool> g_running{true};
 
+    static void signal_handler(int)
+    {
+        g_running.store(false);
+    }
+
+    static void set_nonblocking(int fd)
+    {
+        int flags = fcntl(fd, F_GETFL, 0);
+        fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+    }
+
+    HttpServer::HttpServer(int port, size_t num_threads)
+        : port_(port), pool_(num_threads) {}
 
     Router& HttpServer::router()
     {
         return router_;
     }
 
+    void HttpServer::stop()
+    {
+        running_.store(false);
+    }
+
+    void HttpServer::handle_connection(int client_fd)
+    {
+        int flag = 1;
+        setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+
+        timeval tv{.tv_sec = 1, .tv_usec = 0};
+        setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+        std::string buffer;
+        char read_buf[8192];
+        bool keep_alive = true;
+        int idle_rounds = 0;
+        constexpr int max_idle_rounds = 30; // 30 x 1s = 30s keep-alive timeout
+
+        while (keep_alive && running_.load())
+        {
+            buffer.clear();
+            bool request_complete = false;
+            size_t header_end_pos = std::string::npos;
+
+            while (!request_complete)
+            {
+                ssize_t n = read(client_fd, read_buf, sizeof(read_buf));
+                if (n < 0)
+                {
+                    if (errno == EAGAIN || errno == EWOULDBLOCK)
+                    {
+                        if (!running_.load() || ++idle_rounds >= max_idle_rounds)
+                        {
+                            close(client_fd);
+                            return;
+                        }
+                        continue;
+                    }
+                    if (errno == EINTR) continue;
+                    close(client_fd);
+                    return;
+                }
+                if (n == 0)
+                {
+                    close(client_fd);
+                    return;
+                }
+                idle_rounds = 0;
+
+                buffer.append(read_buf, static_cast<size_t>(n));
+
+                if (header_end_pos == std::string::npos)
+                    header_end_pos = buffer.find("\r\n\r\n");
+
+                if (header_end_pos != std::string::npos)
+                {
+                    auto cl_pos = buffer.find("content-length:");
+                    if (cl_pos == std::string::npos)
+                        cl_pos = buffer.find("Content-Length:");
+
+                    if (cl_pos != std::string::npos && cl_pos < header_end_pos)
+                    {
+                        auto val_start = cl_pos + 15;
+                        auto val_end = buffer.find("\r\n", val_start);
+                        size_t content_length = std::stoul(
+                            buffer.substr(val_start, val_end - val_start));
+                        size_t body_start = header_end_pos + 4;
+
+                        if (buffer.size() - body_start >= content_length)
+                            request_complete = true;
+                    }
+                    else
+                    {
+                        request_complete = true;
+                    }
+                }
+
+                if (buffer.size() > 1024 * 1024)
+                {
+                    auto resp = HttpResponse::bad_request().serialize(false);
+                    write(client_fd, resp.c_str(), resp.size());
+                    close(client_fd);
+                    return;
+                }
+            }
+
+            HttpRequest request;
+            if (!parse_request(buffer, request))
+            {
+                auto resp = HttpResponse::bad_request().serialize(false);
+                write(client_fd, resp.c_str(), resp.size());
+                close(client_fd);
+                return;
+            }
+
+            keep_alive = request.keep_alive();
+
+            auto response = router_.route(request);
+            auto raw = response.serialize(keep_alive);
+
+            size_t total = 0;
+            while (total < raw.size())
+            {
+                ssize_t written = write(client_fd,
+                    raw.c_str() + total, raw.size() - total);
+                if (written <= 0)
+                {
+                    close(client_fd);
+                    return;
+                }
+                total += static_cast<size_t>(written);
+            }
+        }
+
+        close(client_fd);
+    }
+
     void HttpServer::run()
     {
         int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-        if (server_fd < 0) {
-            perror("socket creation failed");
+        if (server_fd < 0)
+        {
+            perror("socket");
             return;
         }
 
-        // Set SO_REUSEADDR option to allow restarting the server quickly
-        int optval = 1;
-        if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0) {
-            perror("setsockopt(SO_REUSEADDR) failed");
-            // This is not critical enough to stop startup, but good to log.
-        }
+        int opt = 1;
+        setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
         sockaddr_in addr{};
-        addr.sin_family  = AF_INET;
-        addr.sin_port = htons(port_);
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(static_cast<uint16_t>(port_));
         addr.sin_addr.s_addr = INADDR_ANY;
 
-        if (bind(server_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-            perror("bind failed");
-            close(server_fd); // Ensure socket is closed on error
-            return;
-        }
-
-        if (listen(server_fd, 100) < 0) {
-            perror("listen failed");
+        if (bind(server_fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0)
+        {
+            perror("bind");
             close(server_fd);
             return;
         }
 
-        // Register signal handler for graceful shutdown
-        signal(SIGINT, signal_handler);
-        signal(SIGTERM, signal_handler);
-        signal(SIGPIPE, SIG_IGN); // Ignore SIGPIPE to prevent crash on broken connections
-
-        std::cout << "Server listening on port " << port_ << "\n";
-
-        while (server_running_) // Check the running flag
+        if (listen(server_fd, SOMAXCONN) < 0)
         {
-            fd_set readfds;
-            FD_ZERO(&readfds);
-            FD_SET(server_fd, &readfds); // Add server socket to the set
-
-            // Timeout for select. Set to a short duration to make shutdown responsive.
-            timeval tv;
-            tv.tv_sec = 1; // Check every second
-            tv.tv_usec = 0;
-
-            // Wait for activity on server_fd or timeout
-            int activity = select(server_fd + 1, &readfds, NULL, NULL, &tv);
-
-            if (activity < 0) {
-                // Error in select
-                if (errno != EINTR) { // EINTR is expected if interrupted by a signal
-                    perror("select failed");
-                }
-                // If EINTR, it means a signal was received, and server_running_ should be false.
-                // The loop condition will handle termination.
-                continue;
-            }
-
-            if (activity > 0) {
-                if (FD_ISSET(server_fd, &readfds)) {
-                    // A new connection is ready to be accepted
-                    int client = accept(server_fd, nullptr, nullptr);
-                    if (client < 0) {
-                        // If accept fails but server_running_ is still true, it might be an error
-                        // or a signal interruption that returned early from accept.
-                        // If interrupted by signal, server_running_ will be false and loop will exit.
-                        if (server_running_) {
-                            perror("accept failed");
-                        }
-                        continue; // Try to accept next connection or exit if server_running_ is false
-                    }
-                    std::string request_str;
-                    char buffer[4096];
-                    bool headers_complete = false;
-
-                    while (!headers_complete) {
-                        ssize_t n = read(client, buffer, sizeof(buffer));
-                        if (n < 0) {
-                            if (errno == EINTR) continue;
-                            perror("read failed");
-                            break;
-                        }
-                        if (n == 0) break; // Client closed connection
-
-                        request_str.append(buffer, n);
-                        if (request_str.find("\r\n\r\n") != std::string::npos || request_str.size() > 8192) {
-                            headers_complete = true;
-                        }
-                    }
-
-                    if (request_str.empty()) {
-                        close(client);
-                        continue;
-                    }
-
-                    // Basic request parsing
-                    std::string path = "/"; // Default path
-                    std::string method = "GET"; // Default method
-
-                    auto method_end = request_str.find(' ');
-                    if (method_end != std::string::npos) {
-                        method = request_str.substr(0, method_end);
-                        auto path_start = method_end + 1;
-                        auto path_end = request_str.find(' ', path_start);
-                        if (path_end != std::string::npos) {
-                            path = request_str.substr(path_start, path_end - path_start);
-                        } else {
-                            // Malformed request (e.g., "GET /")
-                            // Default to root path if path is not clearly delimited.
-                        }
-                    }
- else {
-                        // Could not parse method, malformed request. Send 400 Bad Request.
-                        std::string error_body = "<html><body><h1>400 Bad Request</h1></body></html>";
-                        std::string error_response =
-                            "HTTP/1.1 400 Bad Request\r\n"
-                            "Content-Type: text/html\r\n"
-                            "Content-Length: " + std::to_string(error_body.size()) + "\r\n"
-                            "Connection: close\r\n"
-                            "\r\n" +
-                            error_body;
-                        ssize_t written = write(client, error_response.c_str(), error_response.size());
-                        if (written < 0) perror("write failed");
-                        close(client);
-                        continue;
-                    }
-
-                    std::string body;
-                    std::string status_line = "HTTP/1.1 200 OK\r\n"; // Default success
-
-                    if (method == "GET") {
-                        try {
-                            body = router_.route(path);
-                        } catch (const std::exception& e) {
-                            std::cerr << "Handler exception: " << e.what() << std::endl;
-                            status_line = "HTTP/1.1 500 Internal Server Error\r\n";
-                            body = "<html><body><h1>500 Internal Server Error</h1></body></html>";
-                        }
-                    } else {
-                        // Unsupported method
-                        status_line = "HTTP/1.1 405 Method Not Allowed\r\n";
-                        body = "<html><body><h1>405 Method Not Allowed</h1></body></html>";
-                    }
-
-                    std::string response =
-                        status_line +
-                        "Content-Type: text/html\r\n"
-                        "Content-Length: " + std::to_string(body.size()) + "\r\n"
-                        "Connection: close\r\n"
-                        "\r\n" +
-                        body;
-
-                    ssize_t bytes_written = write(client, response.c_str(), response.size());
-                    if (bytes_written < 0) {
-                        perror("write failed");
-                    } else if (static_cast<size_t>(bytes_written) != response.size()) {
-                        std::cerr << "Warning: Not all data written to client. Expected " << response.size() << ", wrote " << bytes_written << std::endl;
-                    }
-
-                    close(client); // Ensure client socket is closed
-                }
-            }
-            // If activity == 0 (timeout), the loop just continues and re-checks server_running_
+            perror("listen");
+            close(server_fd);
+            return;
         }
 
-        std::cout << "Server stopped. Closing socket.\n";
-        close(server_fd); // Cleanup the server socket
+        set_nonblocking(server_fd);
+
+        signal(SIGINT, signal_handler);
+        signal(SIGTERM, signal_handler);
+        signal(SIGPIPE, SIG_IGN);
+
+        int epoll_fd = epoll_create1(0);
+        if (epoll_fd < 0)
+        {
+            perror("epoll_create1");
+            close(server_fd);
+            return;
+        }
+
+        epoll_event ev{};
+        ev.events = EPOLLIN;
+        ev.data.fd = server_fd;
+        epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_fd, &ev);
+
+        running_.store(true);
+        g_running.store(true);
+
+        std::cout << "Listening on port " << port_
+                  << " (" << pool_.size() << " workers)\n";
+
+        epoll_event events[64];
+
+        while (running_.load() && g_running.load())
+        {
+            int nfds = epoll_wait(epoll_fd, events, 64, 500);
+
+            if (nfds < 0)
+            {
+                if (errno == EINTR) continue;
+                perror("epoll_wait");
+                break;
+            }
+
+            for (int i = 0; i < nfds; ++i)
+            {
+                if (events[i].data.fd == server_fd)
+                {
+                    while (true)
+                    {
+                        int client_fd = accept(server_fd, nullptr, nullptr);
+                        if (client_fd < 0)
+                        {
+                            if (errno == EAGAIN || errno == EWOULDBLOCK)
+                                break;
+                            if (errno == EINTR)
+                                continue;
+                            perror("accept");
+                            break;
+                        }
+
+                        pool_.enqueue([this, client_fd] {
+                            handle_connection(client_fd);
+                        });
+                    }
+                }
+            }
+        }
+
+        std::cout << "Shutting down...\n";
+        pool_.shutdown();
+        close(epoll_fd);
+        close(server_fd);
     }
 }

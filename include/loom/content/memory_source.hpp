@@ -1,47 +1,37 @@
 #pragma once
 
 #include "../domain/post.hpp"
-#include "../domain/post_summary.hpp"
-#include "../core/types.hpp"
+#include "../domain/page.hpp"
 
 #include <vector>
-#include <optional>
 
 namespace loom
 {
     class MemorySource
     {
         public:
-        void add(Post post)
+        void add_post(Post post)
         {
             posts_.push_back(std::move(post));
         }
 
-        std::vector<PostSummary> list_posts()
+        void add_page(Page page)
         {
-            std::vector<PostSummary> result;
-
-            for(auto& p: posts_)
-            {
-                result.push_back(
-                    PostSummary{p.id, p.title, p.slug}
-                );
-            }
-
-            return result;
+            pages_.push_back(std::move(page));
         }
 
-        std::optional<Post> get_post(Slug slug)
+        std::vector<Post> all_posts()
         {
-            for(auto& p: posts_)
-            {
-                if(p.slug.get() == slug.get()) return p;
-            }
+            return posts_;
+        }
 
-            return std::nullopt;
+        std::vector<Page> all_pages()
+        {
+            return pages_;
         }
 
         private:
         std::vector<Post> posts_;
+        std::vector<Page> pages_;
     };
 }
