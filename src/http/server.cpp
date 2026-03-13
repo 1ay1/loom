@@ -3,7 +3,7 @@
 #include <sys/select.h> // for select, fd_set, timeval
 #include <errno.h> // for EINTR
 
-#include "../../include/loom/http/http.hpp"
+#include "../../include/loom/http/server.hpp"
 
 #include <sys/socket.h>
 #include <netinet/in.h>

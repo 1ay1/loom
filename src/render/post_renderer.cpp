@@ -1,4 +1,5 @@
-#include "../../include/loom/render/render.hpp"
+#include "../../include/loom/domain/post.hpp"
+#include "../../include/loom/domain/post_summary.hpp"
 #include <string>
 #include <vector>
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../domain/domain.hpp"
+#include "../domain/post.hpp"
 
 #include <string>
 #include <vector>
