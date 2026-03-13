@@ -38,6 +38,15 @@ namespace loom
             return std::nullopt;
         }
 
+        std::optional<Page> get_page(Slug slug) const
+        {
+            for (const auto& p : site_.pages)
+            {
+                if (p.slug.get() == slug.get()) return p;
+            }
+            return std::nullopt;
+        }
+
         const Site& site() const { return site_; }
 
         private:

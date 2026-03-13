@@ -1,12 +1,14 @@
 #pragma once
 
+#include "../domain/site.hpp"
+
 #include <string>
 
 namespace loom
 {
 
 std::string render_layout(
-    const std::string& title,
+    const Site& site,
     const std::string& navigation,
     const std::string& content
 );

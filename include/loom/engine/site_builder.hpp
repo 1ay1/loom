@@ -12,6 +12,7 @@ namespace loom
         std::string author;
         Navigation navigation;
         Theme theme;
+        Footer footer;
     };
 
     template<ContentSource Source>
@@ -25,6 +26,7 @@ namespace loom
             .pages = source.all_pages(),
             .navigation = std::move(config.navigation),
             .theme = std::move(config.theme),
+            .footer = std::move(config.footer),
         };
     }
 }

@@ -1,87 +1,73 @@
 #include <iostream>
 #include <string>
 
-#include "loom/domain/post.hpp"
 #include "loom/content/content_source.hpp"
-#include "loom/content/memory_source.hpp"
+#include "loom/content/filesystem_source.hpp"
 #include "loom/engine/site_builder.hpp"
 #include "loom/engine/blog_engine.hpp"
 #include "loom/render/layout.hpp"
 #include "loom/render/navigation.hpp"
 #include "loom/render/post_renderer.hpp"
+#include "loom/render/page_renderer.hpp"
 #include "loom/http/server.hpp"
 
-int main()
+int main(int argc, char* argv[])
 {
-    static_assert(loom::ContentSource<loom::MemorySource>);
+    std::string content_dir = "content";
+    if (argc > 1)
+        content_dir = argv[1];
 
-    loom::MemorySource source;
+    std::cout << "Loading content from: " << content_dir << std::endl;
 
-    source.add_post({
-        loom::PostId("1"),
-        loom::Title("Hello World"),
-        loom::Slug("hello"),
-        loom::Content("My first blog post"),
-        {},
-        std::chrono::system_clock::now(),
-    });
+    loom::FileSystemSource source(content_dir);
 
-    source.add_post({
-        loom::PostId("2"),
-        loom::Title("Oksana Hello World2"),
-        loom::Slug("hello2"),
-        loom::Content("My second blog post"),
-        {},
-        std::chrono::system_clock::now(),
-    });
-
-    source.add_post({
-        loom::PostId("3"),
-        loom::Title("Hello World3"),
-        loom::Slug("hello3"),
-        loom::Content("My third blog post"),
-        {},
-        std::chrono::system_clock::now(),
-    });
-
-    auto site = loom::build_site(source, {
-        .title = "My Blog",
-        .description = "A simple blog engine",
-        .author = "John Doe",
-        .navigation = {{
-            {"Home", "/"},
-            {"Blog", "/"},
-            {"About", "/about"},
-            {"Projects", "/projects"},
-        }},
-        .theme = {"default"},
-    });
+    auto config = source.site_config();
+    auto site = loom::build_site(source, std::move(config));
 
     loom::BlogEngine engine(site);
 
     loom::HttpServer server(8080);
 
+    // Index: list posts
     server.router().get("/", [&](const loom::HttpRequest&)
     {
         auto posts = engine.list_posts();
-        auto content = render_index(posts);
-        auto nav_html = render_navigation(site.navigation);
+        auto content = loom::render_index(posts);
+        auto nav = loom::render_navigation(site.navigation);
 
-        return loom::HttpResponse::ok(loom::render_layout(site.title, nav_html, content));
+        return loom::HttpResponse::ok(loom::render_layout(site, nav, content));
     });
 
-    server.router().get("/post/:slug", [&](const loom::HttpRequest& req) {
+    // Single post
+    server.router().get("/post/:slug", [&](const loom::HttpRequest& req)
+    {
         auto post = engine.get_post(loom::Slug(req.params[0]));
 
-        if(!post)
+        if (!post)
             return loom::HttpResponse::not_found(
                 "<h1>Post <b>" + req.params[0] + "</b> not found.</h1>");
 
         auto content = loom::render_post(*post);
         auto nav = loom::render_navigation(site.navigation);
 
-        return loom::HttpResponse::ok(loom::render_layout(site.title, nav, content));
+        return loom::HttpResponse::ok(loom::render_layout(site, nav, content));
     });
 
+    // Pages (e.g. /about, /projects)
+    server.router().get("/:slug", [&](const loom::HttpRequest& req)
+    {
+        auto page = engine.get_page(loom::Slug(req.params[0]));
+
+        if (!page)
+            return loom::HttpResponse::not_found(
+                "<h1>Page <b>" + req.params[0] + "</b> not found.</h1>");
+
+        auto content = loom::render_page(*page);
+        auto nav = loom::render_navigation(site.navigation);
+
+        return loom::HttpResponse::ok(loom::render_layout(site, nav, content));
+    });
+
+    std::cout << "Serving " << site.title << " at http://localhost:8080" << std::endl;
     server.run();
 }

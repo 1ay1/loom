@@ -3,23 +3,7 @@
 namespace loom
 {
 
-std::string render_layout(
-    const std::string& title,
-    const std::string& navigation,
-    const std::string& content)
-{
-    std::string html;
-
-    html += "<!DOCTYPE html>";
-    html += "<html>";
-    html += "<head>";
-    html += "<meta charset=\"utf-8\">";
-    html += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
-    html += "<title>" + title + "</title>";
-
-    html += "<style>";
-    html += R"CSS(
-
+static const char* DEFAULT_CSS = R"CSS(
 :root {
   --bg: #ffffff;
   --text: #0f172a;
@@ -50,15 +34,11 @@ body {
   font-size: 17px;
 }
 
-/* layout */
-
 .container {
   max-width: 720px;
   margin: auto;
   padding: 40px 20px;
 }
-
-/* header */
 
 header {
   border-bottom: 1px solid var(--border);
@@ -80,7 +60,10 @@ header h1 {
   font-weight: 700;
 }
 
-/* nav */
+header h1 a {
+  text-decoration: none;
+  color: inherit;
+}
 
 nav {
   margin-top: 10px;
@@ -101,8 +84,6 @@ nav a {
 nav a:hover {
   color: var(--accent);
 }
-
-/* posts */
 
 h2 {
   margin-top: 35px;
@@ -125,7 +106,58 @@ article a:hover {
   color: var(--accent);
 }
 
-/* footer */
+.post-content, .page-content {
+  margin-top: 20px;
+  line-height: 1.8;
+}
+
+.post-content h2, .page-content h2 {
+  margin-top: 28px;
+  margin-bottom: 10px;
+}
+
+.post-content h3, .page-content h3 {
+  margin-top: 22px;
+  margin-bottom: 8px;
+}
+
+.post-content p, .page-content p {
+  margin-bottom: 14px;
+}
+
+.post-content ul, .page-content ul {
+  margin-left: 24px;
+  margin-bottom: 14px;
+}
+
+.post-content pre, .page-content pre {
+  background: var(--border);
+  padding: 16px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin-bottom: 14px;
+  font-size: 15px;
+}
+
+.post-content code, .page-content code {
+  font-family: ui-monospace, monospace;
+}
+
+.post-content a, .page-content a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+time {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.date {
+  color: var(--muted);
+  font-size: 14px;
+  font-family: ui-monospace, monospace;
+}
 
 footer {
   margin-top: 70px;
@@ -135,7 +167,20 @@ footer {
   color: var(--muted);
 }
 
-/* theme toggle */
+.footer-links {
+  margin-top: 8px;
+  display: flex;
+  gap: 16px;
+}
+
+.footer-links a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.footer-links a:hover {
+  color: var(--accent);
+}
 
 .theme-toggle {
   cursor: pointer;
@@ -151,57 +196,27 @@ footer {
 .theme-toggle:hover {
   background: var(--border);
 }
+)CSS";
 
-    )CSS";
-
-    html += "</style>";
-
-    html += "</head>";
-    html += "<body>";
-
-    html += "<header>";
-    html += "<div class='container header-bar'>";
-    html += "<div class='header-left'>";
-    html += "<h1>" + title + "</h1>";
-    html += navigation;
-    html += "</div>";
-    html += "<button class='theme-toggle' id='themeToggle' onclick='toggleTheme()'>🌙</button>";
-    html += "</div>";
-    html += "</header>";
-
-    html += "<div class='container'>";
-    html += content;
-    html += "</div>";
-
-    html += "<footer>";
-    html += "<div class='container'>";
-    html += "<p>Powered by Loom</p>";
-    html += "</div>";
-    html += "</footer>";
-
-    html += "<script>";
-    html += R"JS(
-
+static const char* THEME_JS = R"JS(
     function applyTheme(theme) {
       document.documentElement.setAttribute("data-theme", theme);
-      const btn = document.getElementById("themeToggle");
-      if (btn) btn.textContent = theme === "dark" ? "☀" : "🌙";
+      var btn = document.getElementById("themeToggle");
+      if (btn) btn.textContent = theme === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19";
     }
 
     function toggleTheme() {
-      const current = document.documentElement.getAttribute("data-theme");
-      const next = current === "dark" ? "light" : "dark";
-
+      var current = document.documentElement.getAttribute("data-theme");
+      var next = current === "dark" ? "light" : "dark";
       applyTheme(next);
       localStorage.setItem("theme", next);
     }
 
-    const saved = localStorage.getItem("theme");
-
+    var saved = localStorage.getItem("theme");
     if (saved) {
       applyTheme(saved);
     } else {
-      const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      var systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
       applyTheme(systemDark ? "dark" : "light");
     }
 
@@ -211,8 +226,70 @@ footer {
           applyTheme(e.matches ? "dark" : "light");
         }
       });
+)JS";
 
-    )JS";
+std::string render_layout(
+    const Site& site,
+    const std::string& navigation,
+    const std::string& content)
+{
+    std::string html;
+
+    html += "<!DOCTYPE html>";
+    html += "<html>";
+    html += "<head>";
+    html += "<meta charset=\"utf-8\">";
+    html += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
+    html += "<title>" + site.title + "</title>";
+    html += "<meta name=\"description\" content=\"" + site.description + "\">";
+
+    html += "<style>";
+    if (site.theme.css.empty())
+        html += DEFAULT_CSS;
+    else
+        html += site.theme.css;
+    html += "</style>";
+
+    html += "</head>";
+    html += "<body>";
+
+    // Header
+    html += "<header>";
+    html += "<div class='container header-bar'>";
+    html += "<div class='header-left'>";
+    html += "<h1><a href='/'>" + site.title + "</a></h1>";
+    html += navigation;
+    html += "</div>";
+    html += "<button class='theme-toggle' id='themeToggle' onclick='toggleTheme()'>\xF0\x9F\x8C\x99</button>";
+    html += "</div>";
+    html += "</header>";
+
+    // Main content
+    html += "<div class='container'>";
+    html += content;
+    html += "</div>";
+
+    // Footer
+    html += "<footer>";
+    html += "<div class='container'>";
+    if (!site.footer.copyright.empty())
+        html += "<p>" + site.footer.copyright + "</p>";
+    else
+        html += "<p>Powered by Loom</p>";
+
+    if (!site.footer.links.empty())
+    {
+        html += "<div class='footer-links'>";
+        for (const auto& link : site.footer.links)
+            html += "<a href=\"" + link.url + "\">" + link.title + "</a>";
+        html += "</div>";
+    }
+    html += "</div>";
+    html += "</footer>";
+
+    // Theme toggle JS
+    html += "<script>";
+    html += THEME_JS;
     html += "</script>";
 
     html += "</body>";

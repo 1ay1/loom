@@ -6,6 +6,7 @@ namespace loom
 {
     struct Theme
     {
-        std::string name;
+        std::string name = "default";
+        std::string css;
     };
 }

@@ -4,6 +4,7 @@
 #include "page.hpp"
 #include "navigation.hpp"
 #include "theme.hpp"
+#include "footer.hpp"
 
 #include <string>
 #include <vector>
@@ -21,6 +22,7 @@ struct Site
     std::vector<Page> pages;
     Navigation navigation;
     Theme theme;
+    Footer footer;
 };
 
 }
