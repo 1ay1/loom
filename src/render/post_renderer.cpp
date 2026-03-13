@@ -1,10 +1,22 @@
 #include "../../include/loom/domain/post.hpp"
 #include "../../include/loom/domain/post_summary.hpp"
+#include <ctime>
 #include <string>
 #include <vector>
 
-namespace  loom
+namespace loom
 {
+    static std::string format_date(std::chrono::system_clock::time_point tp)
+    {
+        auto time = std::chrono::system_clock::to_time_t(tp);
+        std::tm tm{};
+        gmtime_r(&time, &tm);
+
+        char buf[32];
+        std::strftime(buf, sizeof(buf), "%Y-%m-%d", &tm);
+        return buf;
+    }
+
     std::string render_post(const Post& post)
     {
         std::string html;
@@ -14,6 +26,10 @@ namespace  loom
         html += "<h1>";
         html += post.title.get();
         html += "</h1>";
+
+        html += "<time>";
+        html += format_date(post.published);
+        html += "</time>";
 
         html += "<div class='post-content'>";
         html += post.content.get();
@@ -34,11 +50,14 @@ namespace  loom
         for(const auto& post : posts)
         {
             html += "<article>";
-            html += "<h3><a href=\"/post/";
+            html += "<span class='date'>";
+            html += format_date(post.published);
+            html += "</span> ";
+            html += "<a href=\"/post/";
             html += post.slug.get();
             html += "\">";
             html += post.title.get();
-            html += "</a></h3>";
+            html += "</a>";
             html += "</article>";
         }
 

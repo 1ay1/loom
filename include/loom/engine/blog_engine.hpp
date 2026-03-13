@@ -4,6 +4,7 @@
 #include "../domain/post_summary.hpp"
 #include "../core/types.hpp"
 
+#include <algorithm>
 #include <optional>
 #include <vector>
 
@@ -19,7 +20,12 @@ namespace loom
         {
             std::vector<PostSummary> result;
             for (const auto& p : site_.posts)
-                result.push_back(PostSummary{p.id, p.title, p.slug});
+                result.push_back(PostSummary{p.id, p.title, p.slug, p.published});
+
+            std::sort(result.begin(), result.end(), [](const auto& a, const auto& b) {
+                return a.published > b.published;
+            });
+
             return result;
         }
 
