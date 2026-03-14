@@ -148,6 +148,59 @@ article a:hover {
   text-decoration: underline;
 }
 
+.post-content table, .page-content table {
+  border-collapse: collapse;
+  margin-bottom: 14px;
+  width: 100%;
+}
+
+.post-content th, .page-content th {
+  background: var(--border);
+  font-weight: 600;
+}
+
+.post-content th, .post-content td,
+.page-content th, .page-content td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.post-content blockquote, .page-content blockquote {
+  border-left: 4px solid var(--accent);
+  margin: 0 0 14px 0;
+  padding: 8px 16px;
+  color: var(--muted);
+}
+
+.post-content blockquote p {
+  margin-bottom: 4px;
+}
+
+.post-content ol, .page-content ol {
+  margin-left: 24px;
+  margin-bottom: 14px;
+}
+
+.post-content img, .page-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+
+.post-content del, .page-content del {
+  color: var(--muted);
+}
+
+.post-content .footnotes {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.post-content input[type="checkbox"] {
+  margin-right: 6px;
+}
+
 time {
   color: var(--muted);
   font-size: 14px;
