@@ -111,14 +111,42 @@ article a:hover {
   line-height: 1.8;
 }
 
+.post-content h1, .page-content h1 {
+  font-size: 1.8em;
+  margin-top: 36px;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
 .post-content h2, .page-content h2 {
+  font-size: 1.5em;
   margin-top: 28px;
   margin-bottom: 10px;
 }
 
 .post-content h3, .page-content h3 {
+  font-size: 1.25em;
   margin-top: 22px;
   margin-bottom: 8px;
+}
+
+.post-content h4, .page-content h4 {
+  font-size: 1.1em;
+  margin-top: 18px;
+  margin-bottom: 6px;
+}
+
+.post-content h5, .page-content h5 {
+  font-size: 1em;
+  margin-top: 16px;
+  margin-bottom: 6px;
+}
+
+.post-content h6, .page-content h6 {
+  font-size: 0.9em;
+  margin-top: 14px;
+  margin-bottom: 4px;
+  color: var(--muted);
 }
 
 .post-content p, .page-content p {
@@ -128,6 +156,17 @@ article a:hover {
 .post-content ul, .page-content ul {
   margin-left: 24px;
   margin-bottom: 14px;
+}
+
+.post-content ul ul, .post-content ul ol,
+.post-content ol ul, .post-content ol ol,
+.page-content ul ul, .page-content ul ol,
+.page-content ol ul, .page-content ol ol {
+  margin-bottom: 0;
+}
+
+.post-content li, .page-content li {
+  margin-bottom: 2px;
 }
 
 .post-content pre, .page-content pre {
@@ -141,6 +180,33 @@ article a:hover {
 
 .post-content code, .page-content code {
   font-family: ui-monospace, monospace;
+}
+
+.post-content :not(pre) > code, .page-content :not(pre) > code {
+  background: var(--border);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.post-content hr, .page-content hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 28px 0;
+}
+
+.post-content dl, .page-content dl {
+  margin-bottom: 14px;
+}
+
+.post-content dt, .page-content dt {
+  font-weight: 600;
+  margin-top: 10px;
+}
+
+.post-content dd, .page-content dd {
+  margin-left: 24px;
+  margin-bottom: 6px;
 }
 
 .post-content a, .page-content a {
@@ -195,6 +261,12 @@ article a:hover {
 .post-content .footnotes {
   font-size: 14px;
   color: var(--muted);
+}
+
+.post-content li:has(input[type="checkbox"]),
+.page-content li:has(input[type="checkbox"]) {
+  list-style: none;
+  margin-left: -20px;
 }
 
 .post-content input[type="checkbox"] {
