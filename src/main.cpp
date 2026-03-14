@@ -10,6 +10,7 @@
 #include "loom/render/navigation.hpp"
 #include "loom/render/post_renderer.hpp"
 #include "loom/render/page_renderer.hpp"
+#include "loom/render/sidebar.hpp"
 #include "loom/http/server.hpp"
 
 int main(int argc, char* argv[])
@@ -30,18 +31,31 @@ int main(int argc, char* argv[])
     // Pre-render all pages at startup
     auto nav = loom::render_navigation(site.navigation);
 
+    // Build sidebar
+    auto all_tags = engine.all_tags();
+    loom::SidebarData sidebar_data{engine.list_posts(), all_tags};
+    auto sidebar_html = loom::render_sidebar(site, sidebar_data);
+
     std::unordered_map<std::string, std::string> cache;
 
     // Pre-render index
-    cache["/"] = loom::render_layout(site, nav, loom::render_index(engine.list_posts()));
+    cache["/"] = loom::render_layout(site, nav, loom::render_index(engine.list_posts()), sidebar_html);
 
     // Pre-render all posts
     for (const auto& post : site.posts)
-        cache["/post/" + post.slug.get()] = loom::render_layout(site, nav, loom::render_post(post));
+        cache["/post/" + post.slug.get()] = loom::render_layout(site, nav, loom::render_post(post), sidebar_html);
+
+    // Pre-render tag pages
+    for (const auto& tag : all_tags)
+    {
+        auto tag_posts = engine.posts_by_tag(tag);
+        cache["/tag/" + tag.get()] = loom::render_layout(site, nav, loom::render_tag_page(tag, tag_posts), sidebar_html);
+    }
+    cache["/tags"] = loom::render_layout(site, nav, loom::render_tag_index(all_tags), sidebar_html);
 
     // Pre-render all pages
     for (const auto& page : site.pages)
-        cache["/" + page.slug.get()] = loom::render_layout(site, nav, loom::render_page(page));
+        cache["/" + page.slug.get()] = loom::render_layout(site, nav, loom::render_page(page), sidebar_html);
 
     std::cout << "Pre-rendered " << cache.size() << " pages" << std::endl;
 
@@ -60,6 +74,23 @@ int main(int argc, char* argv[])
         if (it == cache.end())
             return loom::HttpResponse::not_found(
                 "<h1>Post <b>" + req.params[0] + "</b> not found.</h1>");
+
+        return loom::HttpResponse::ok(it->second);
+    });
+
+    // Tag index
+    server.router().get("/tags", [&](const loom::HttpRequest&)
+    {
+        return loom::HttpResponse::ok(cache.at("/tags"));
+    });
+
+    // Tag page
+    server.router().get("/tag/:slug", [&](const loom::HttpRequest& req)
+    {
+        auto it = cache.find("/tag/" + req.params[0]);
+        if (it == cache.end())
+            return loom::HttpResponse::not_found(
+                "<h1>Tag <b>" + req.params[0] + "</b> not found.</h1>");
 
         return loom::HttpResponse::ok(it->second);
     });

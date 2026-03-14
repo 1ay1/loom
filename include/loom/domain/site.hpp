@@ -12,6 +12,13 @@
 namespace loom
 {
 
+struct SidebarConfig
+{
+    std::vector<std::string> widgets;
+    int recent_posts_count = 5;
+    std::string about_text;
+};
+
 struct Site
 {
     std::string title;
@@ -23,6 +30,7 @@ struct Site
     Navigation navigation;
     Theme theme;
     Footer footer;
+    SidebarConfig sidebar;
 };
 
 }

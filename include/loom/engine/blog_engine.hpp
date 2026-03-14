@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <optional>
+#include <set>
 #include <vector>
 
 namespace loom
@@ -20,12 +21,50 @@ namespace loom
         {
             std::vector<PostSummary> result;
             for (const auto& p : site_.posts)
-                result.push_back(PostSummary{p.id, p.title, p.slug, p.published});
+                result.push_back(PostSummary{p.id, p.title, p.slug, p.published, p.tags});
 
             std::sort(result.begin(), result.end(), [](const auto& a, const auto& b) {
                 return a.published > b.published;
             });
 
+            return result;
+        }
+
+        std::vector<PostSummary> posts_by_tag(const Tag& tag) const
+        {
+            std::vector<PostSummary> result;
+            for (const auto& p : site_.posts)
+            {
+                for (const auto& t : p.tags)
+                {
+                    if (t.get() == tag.get())
+                    {
+                        result.push_back(PostSummary{p.id, p.title, p.slug, p.published, p.tags});
+                        break;
+                    }
+                }
+            }
+            std::sort(result.begin(), result.end(), [](const auto& a, const auto& b) {
+                return a.published > b.published;
+            });
+            return result;
+        }
+
+        std::vector<Tag> all_tags() const
+        {
+            std::set<std::string> seen;
+            std::vector<Tag> result;
+            for (const auto& p : site_.posts)
+            {
+                for (const auto& t : p.tags)
+                {
+                    if (seen.insert(t.get()).second)
+                        result.push_back(t);
+                }
+            }
+            std::sort(result.begin(), result.end(), [](const auto& a, const auto& b) {
+                return a.get() < b.get();
+            });
             return result;
         }
 

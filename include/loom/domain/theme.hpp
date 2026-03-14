@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <string>
 
 namespace loom
@@ -8,5 +9,6 @@ namespace loom
     {
         std::string name = "default";
         std::string css;
+        std::map<std::string, std::string> variables;
     };
 }

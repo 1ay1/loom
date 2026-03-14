@@ -10,6 +10,9 @@ static const char* DEFAULT_CSS = R"CSS(
   --muted: #64748b;
   --border: #e5e7eb;
   --accent: #2563eb;
+  --font: system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  --max-width: 720px;
+  --font-size: 17px;
 }
 
 [data-theme="dark"] {
@@ -29,15 +32,19 @@ static const char* DEFAULT_CSS = R"CSS(
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  font-family: var(--font);
   line-height: 1.7;
-  font-size: 17px;
+  font-size: var(--font-size);
 }
 
 .container {
-  max-width: 720px;
+  max-width: var(--max-width);
   margin: auto;
   padding: 40px 20px;
+}
+
+.has-sidebar .container {
+  max-width: 1020px;
 }
 
 header {
@@ -307,6 +314,107 @@ footer {
   color: var(--accent);
 }
 
+.post-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.tag {
+  display: inline-block;
+  background: var(--border);
+  color: var(--muted);
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.tag:hover {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.with-sidebar {
+  display: grid;
+  grid-template-columns: 1fr 240px;
+  gap: 48px;
+  max-width: 1020px;
+}
+
+.sidebar {
+  font-size: 14px;
+  border-left: 1px solid var(--border);
+  padding-left: 32px;
+  padding-top: 8px;
+}
+
+.widget {
+  margin-bottom: 24px;
+}
+
+.widget h3 {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+}
+
+.widget ul {
+  list-style: none;
+}
+
+.widget li {
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.widget li a {
+  color: var(--text);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.widget li a:hover {
+  color: var(--accent);
+}
+
+.widget .date {
+  display: block;
+  font-size: 12px;
+}
+
+.widget p {
+  color: var(--muted);
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.widget .post-tags {
+  margin-top: 0;
+}
+
+@media (max-width: 860px) {
+  .with-sidebar {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    border-left: none;
+    border-top: 1px solid var(--border);
+    padding-left: 0;
+    padding-top: 24px;
+  }
+  .has-sidebar .container {
+    max-width: var(--max-width);
+  }
+}
+
 .theme-toggle {
   cursor: pointer;
   border: 1px solid var(--border);
@@ -356,7 +464,8 @@ static const char* THEME_JS = R"JS(
 std::string render_layout(
     const Site& site,
     const std::string& navigation,
-    const std::string& content)
+    const std::string& content,
+    const std::string& sidebar)
 {
     std::string html;
 
@@ -375,8 +484,28 @@ std::string render_layout(
         html += site.theme.css;
     html += "</style>";
 
+    // Emit theme variable overrides
+    if (!site.theme.variables.empty())
+    {
+        std::string light_vars, dark_vars;
+        for (const auto& [key, value] : site.theme.variables)
+        {
+            if (key.substr(0, 5) == "dark-")
+                dark_vars += "--" + key.substr(5) + ":" + value + ";";
+            else
+                light_vars += "--" + key + ":" + value + ";";
+        }
+        if (!light_vars.empty())
+            html += "<style>:root{" + light_vars + "}</style>";
+        if (!dark_vars.empty())
+            html += "<style>[data-theme=\"dark\"]{" + dark_vars + "}</style>";
+    }
+
     html += "</head>";
-    html += "<body>";
+    if (!sidebar.empty())
+        html += "<body class='has-sidebar'>";
+    else
+        html += "<body>";
 
     // Header
     html += "<header>";
@@ -390,9 +519,21 @@ std::string render_layout(
     html += "</header>";
 
     // Main content
-    html += "<div class='container'>";
-    html += content;
-    html += "</div>";
+    if (!sidebar.empty())
+    {
+        html += "<div class='container with-sidebar'>";
+        html += "<main>";
+        html += content;
+        html += "</main>";
+        html += sidebar;
+        html += "</div>";
+    }
+    else
+    {
+        html += "<div class='container'>";
+        html += content;
+        html += "</div>";
+    }
 
     // Footer
     html += "<footer>";

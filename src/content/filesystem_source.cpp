@@ -110,6 +110,36 @@ void FileSystemSource::load_config()
         }
     }
 
+    // Parse theme variables (theme_* keys)
+    for (const auto& [key, value] : cfg)
+    {
+        if (key.substr(0, 6) == "theme_")
+        {
+            std::string var_name = key.substr(6);
+            for (auto& c : var_name)
+                if (c == '_') c = '-';
+            theme_.variables[var_name] = value;
+        }
+    }
+
+    // Parse sidebar config
+    if (cfg.count("sidebar_widgets"))
+    {
+        std::istringstream ss(cfg["sidebar_widgets"]);
+        std::string widget;
+        while (std::getline(ss, widget, ','))
+        {
+            auto start = widget.find_first_not_of(" \t");
+            auto end = widget.find_last_not_of(" \t");
+            if (start != std::string::npos)
+                config_.sidebar.widgets.push_back(widget.substr(start, end - start + 1));
+        }
+    }
+    if (cfg.count("sidebar_recent_count"))
+        config_.sidebar.recent_posts_count = std::stoi(cfg["sidebar_recent_count"]);
+    if (cfg.count("sidebar_about"))
+        config_.sidebar.about_text = cfg["sidebar_about"];
+
     // Parse footer
     config_.footer.copyright = cfg["footer_copyright"];
 

@@ -13,6 +13,7 @@ namespace loom
         Navigation navigation;
         Theme theme;
         Footer footer;
+        SidebarConfig sidebar;
     };
 
     template<ContentSource Source>
@@ -27,6 +28,7 @@ namespace loom
             .navigation = std::move(config.navigation),
             .theme = std::move(config.theme),
             .footer = std::move(config.footer),
+            .sidebar = std::move(config.sidebar),
         };
     }
 }

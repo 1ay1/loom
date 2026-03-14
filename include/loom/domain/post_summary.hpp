@@ -3,6 +3,7 @@
 #include "../core/types.hpp"
 
 #include <chrono>
+#include <vector>
 
 namespace loom
 {
@@ -12,5 +13,6 @@ namespace loom
         Title title;
         Slug slug;
         std::chrono::system_clock::time_point published;
+        std::vector<Tag> tags;
     };
 }
