@@ -23,7 +23,7 @@ static const char* DEFAULT_CSS = R"CSS(
   --sidebar-width: 220px;
   --sidebar-gap: 32px;
   --nav-gap: 18px;
-  --header-size: 26px;
+  --header-size: 42px;
   --tag-radius: 12px;
   --tag-bg: var(--border);
   --tag-text: var(--muted);
@@ -548,7 +548,7 @@ footer {
   :root {
     --container-padding: 24px 16px;
     --font-size: 15px;
-    --header-size: 24px;
+    --header-size: 36px;
     --line-height: 1.65;
   }
 
@@ -645,9 +645,8 @@ footer {
 @media (max-width: 480px) {
   :root {
     --container-padding: 20px 12px;
-    --header-size: 20px;
     --font-size: 14.5px;
-    --header-size: 22px;
+    --header-size: 30px;
   }
 
   .post-content, .page-content {
@@ -694,6 +693,112 @@ footer {
 
 .theme-toggle:hover {
   background: var(--border);
+}
+
+.reading-time {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.excerpt {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+  margin-top: 6px;
+  margin-bottom: 0;
+}
+
+.post-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.post-nav a {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 14px;
+  max-width: 45%;
+}
+
+.post-nav a:hover {
+  text-decoration: underline;
+}
+
+.post-nav-next {
+  text-align: right;
+  margin-left: auto;
+}
+
+.related-posts {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.related-posts h2 {
+  font-size: 16px;
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.related-posts ul {
+  list-style: none;
+}
+
+.related-posts li {
+  margin-bottom: 6px;
+}
+
+.related-posts li a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.related-posts li a:hover {
+  color: var(--accent);
+}
+
+.series-nav {
+  margin: 20px 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius);
+  font-size: 14px;
+}
+
+.series-label {
+  margin-bottom: 8px;
+}
+
+.series-list {
+  margin-left: 20px;
+  margin-bottom: 0;
+}
+
+.series-list li {
+  margin-bottom: 4px;
+}
+
+.series-list a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.series-list a:hover {
+  text-decoration: underline;
+}
+
+.series-current {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.archive-year {
+  margin-top: 24px;
 }
 )CSS";
 

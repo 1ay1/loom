@@ -30,6 +30,8 @@ struct LayoutConfig
     std::string post_list_style = "list";   // list, cards
     bool show_post_dates = true;
     bool show_post_tags = true;
+    bool show_excerpts = true;
+    bool show_reading_time = true;
 
     // Sidebar
     std::string sidebar_position = "right"; // right, left, none

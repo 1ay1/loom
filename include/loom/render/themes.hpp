@@ -16,6 +16,9 @@ struct ThemeColors
 
     // Dark mode
     std::string dark_bg, dark_text, dark_muted, dark_border, dark_accent;
+
+    // Optional extra CSS appended after variable overrides
+    std::string extra_css;
 };
 
 const std::map<std::string, ThemeColors>& builtin_themes();

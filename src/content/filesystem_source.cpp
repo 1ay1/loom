@@ -162,6 +162,10 @@ void FileSystemSource::load_config()
         config_.layout.show_post_dates = (cfg["show_post_dates"] != "false");
     if (cfg.count("show_post_tags"))
         config_.layout.show_post_tags = (cfg["show_post_tags"] != "false");
+    if (cfg.count("show_excerpts"))
+        config_.layout.show_excerpts = (cfg["show_excerpts"] != "false");
+    if (cfg.count("show_reading_time"))
+        config_.layout.show_reading_time = (cfg["show_reading_time"] != "false");
     if (cfg.count("sidebar_position"))
         config_.layout.sidebar_position = cfg["sidebar_position"];
     if (cfg.count("date_format"))
@@ -247,13 +251,79 @@ void FileSystemSource::load_posts()
             }
         }
 
+        // Draft flag
+        bool draft = false;
+        if (doc.meta.count("draft"))
+            draft = (doc.meta["draft"] == "true");
+
+        // Series
+        std::string series;
+        int series_order = 0;
+        if (doc.meta.count("series"))
+            series = doc.meta["series"];
+        if (doc.meta.count("series_order"))
+            series_order = std::stoi(doc.meta["series_order"]);
+
+        auto html_content = markdown_to_html(doc.body);
+
+        // Reading time: count words in plain text
+        int reading_time = 0;
+        {
+            int words = 0;
+            bool in_word = false;
+            bool in_html_tag = false;
+            for (char c : html_content)
+            {
+                if (c == '<') { in_html_tag = true; continue; }
+                if (c == '>') { in_html_tag = false; continue; }
+                if (in_html_tag) continue;
+
+                bool is_space = (c == ' ' || c == '\n' || c == '\t' || c == '\r');
+                if (!is_space && !in_word) { ++words; in_word = true; }
+                else if (is_space) { in_word = false; }
+            }
+            reading_time = std::max(1, (words + 100) / 200);
+        }
+
+        // Excerpt: frontmatter > first paragraph of plain text
+        std::string excerpt;
+        if (doc.meta.count("excerpt"))
+        {
+            excerpt = doc.meta["excerpt"];
+        }
+        else
+        {
+            bool in_html_tag = false;
+            for (char c : html_content)
+            {
+                if (c == '<') { in_html_tag = true; continue; }
+                if (c == '>') { in_html_tag = false; continue; }
+                if (in_html_tag) continue;
+                if (c == '\n') c = ' ';
+                excerpt += c;
+                if (excerpt.size() >= 200) break;
+            }
+            // Trim to last word boundary
+            if (excerpt.size() >= 200)
+            {
+                auto last_space = excerpt.rfind(' ');
+                if (last_space != std::string::npos && last_space > 100)
+                    excerpt = excerpt.substr(0, last_space) + "...";
+            }
+        }
+
         posts_.push_back(Post{
             PostId(std::to_string(counter++)),
             Title(doc.meta.count("title") ? doc.meta["title"] : slug),
             Slug(slug),
-            Content(markdown_to_html(doc.body)),
+            Content(std::move(html_content)),
             std::move(tags),
             date,
+            draft,
+            std::move(excerpt),
+            reading_time,
+            std::move(series),
+            series_order,
         });
     }
 }

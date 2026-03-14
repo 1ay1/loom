@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <chrono>
+#include <string>
 
 namespace loom
 {
@@ -16,5 +17,11 @@ namespace loom
 
         std::vector<Tag> tags;
         std::chrono::system_clock::time_point published;
+
+        bool draft = false;
+        std::string excerpt;
+        int reading_time_minutes = 0;
+        std::string series;
+        int series_order = 0;
     };
 }

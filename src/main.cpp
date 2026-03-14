@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <unordered_map>
+#include <map>
 #include <ctime>
 #include <sstream>
 #include "loom/util/gzip.hpp"
@@ -142,9 +143,12 @@ int main(int argc, char* argv[])
         cache["/"] = make_cached(loom::render_layout(site, nav, loom::render_index(engine.list_posts(), site.layout), sidebar_html, meta));
     }
 
-    // Pre-render all posts
+    // Pre-render all posts (skip drafts and future posts)
     for (const auto& post : site.posts)
     {
+        if (post.draft || post.published > std::chrono::system_clock::now())
+            continue;
+
         loom::PageMeta meta;
         meta.title = post.title.get();
         meta.canonical_path = "/post/" + post.slug.get();
@@ -154,23 +158,41 @@ int main(int argc, char* argv[])
         for (const auto& t : post.tags)
             meta.tags.push_back(t.get());
 
-        // Use first 160 chars of content as description (strip HTML)
-        std::string plain;
-        bool in_tag = false;
-        for (char c : post.content.get())
+        // Use excerpt as description, or strip HTML from content
+        if (!post.excerpt.empty())
         {
-            if (c == '<') { in_tag = true; continue; }
-            if (c == '>') { in_tag = false; continue; }
-            if (!in_tag)
-            {
-                if (c == '\n') c = ' ';
-                plain += c;
-            }
-            if (plain.size() >= 160) break;
+            meta.description = post.excerpt.substr(0, 160);
         }
-        meta.description = plain;
+        else
+        {
+            std::string plain;
+            bool in_html_tag = false;
+            for (char c : post.content.get())
+            {
+                if (c == '<') { in_html_tag = true; continue; }
+                if (c == '>') { in_html_tag = false; continue; }
+                if (!in_html_tag)
+                {
+                    if (c == '\n') c = ' ';
+                    plain += c;
+                }
+                if (plain.size() >= 160) break;
+            }
+            meta.description = plain;
+        }
 
-        cache["/post/" + post.slug.get()] = make_cached(loom::render_layout(site, nav, loom::render_post(post, site.layout), sidebar_html, meta));
+        // Build post context
+        loom::PostContext ctx;
+        auto [prev, next] = engine.prev_next(post);
+        ctx.nav = {prev, next};
+        ctx.related = engine.related_posts(post, 3);
+        if (!post.series.empty())
+        {
+            ctx.series_name = post.series;
+            ctx.series_posts = engine.posts_in_series(post.series);
+        }
+
+        cache["/post/" + post.slug.get()] = make_cached(loom::render_layout(site, nav, loom::render_post(post, site.layout, ctx), sidebar_html, meta));
     }
 
     // Pre-render tag pages
@@ -189,6 +211,36 @@ int main(int argc, char* argv[])
         meta.canonical_path = "/tags";
         meta.description = "Browse all tags on " + site.title;
         cache["/tags"] = make_cached(loom::render_layout(site, nav, loom::render_tag_index(all_tags), sidebar_html, meta));
+    }
+
+    // Pre-render archives
+    {
+        auto by_year = engine.posts_by_year();
+        loom::PageMeta meta;
+        meta.title = "Archives";
+        meta.canonical_path = "/archives";
+        meta.description = "All posts on " + site.title;
+        cache["/archives"] = make_cached(loom::render_layout(site, nav, loom::render_archives(by_year, site.layout), sidebar_html, meta));
+    }
+
+    // Pre-render series pages
+    auto all_series = engine.all_series();
+    for (const auto& series : all_series)
+    {
+        auto series_posts = engine.posts_in_series(series);
+        loom::PageMeta meta;
+        meta.title = "Series: " + series;
+        meta.canonical_path = "/series/" + series;
+        meta.description = "Posts in the " + series + " series on " + site.title;
+        cache["/series/" + series] = make_cached(loom::render_layout(site, nav, loom::render_series_page(series, series_posts, site.layout), sidebar_html, meta));
+    }
+    if (!all_series.empty())
+    {
+        loom::PageMeta meta;
+        meta.title = "Series";
+        meta.canonical_path = "/series";
+        meta.description = "Browse all series on " + site.title;
+        cache["/series"] = make_cached(loom::render_layout(site, nav, loom::render_series_index(all_series), sidebar_html, meta));
     }
 
     // Pre-render all pages
@@ -233,6 +285,16 @@ int main(int argc, char* argv[])
             sitemap += "  <url><loc>" + site.base_url + "/tag/" + xml_escape(tag.get()) + "</loc><priority>0.4</priority></url>\n";
 
         sitemap += "  <url><loc>" + site.base_url + "/tags</loc><priority>0.3</priority></url>\n";
+
+        // Archives
+        sitemap += "  <url><loc>" + site.base_url + "/archives</loc><priority>0.5</priority></url>\n";
+
+        // Series
+        for (const auto& s : all_series)
+            sitemap += "  <url><loc>" + site.base_url + "/series/" + xml_escape(s) + "</loc><priority>0.5</priority></url>\n";
+        if (!all_series.empty())
+            sitemap += "  <url><loc>" + site.base_url + "/series</loc><priority>0.4</priority></url>\n";
+
         sitemap += "</urlset>\n";
     }
 
@@ -333,6 +395,30 @@ int main(int argc, char* argv[])
         if (it == cache.end())
             return serve_cached(not_found_page, req);
 
+        return serve_cached(it->second, req);
+    });
+
+    // Archives
+    server.router().get("/archives", [&](const loom::HttpRequest& req)
+    {
+        return serve_cached(cache.at("/archives"), req);
+    });
+
+    // Series index
+    server.router().get("/series", [&](const loom::HttpRequest& req)
+    {
+        auto it = cache.find("/series");
+        if (it == cache.end())
+            return serve_cached(not_found_page, req);
+        return serve_cached(it->second, req);
+    });
+
+    // Series page
+    server.router().get("/series/:slug", [&](const loom::HttpRequest& req)
+    {
+        auto it = cache.find("/series/" + req.params[0]);
+        if (it == cache.end())
+            return serve_cached(not_found_page, req);
         return serve_cached(it->second, req);
     });
 
