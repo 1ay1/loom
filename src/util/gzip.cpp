@@ -1,4 +1,4 @@
-#include "gzip.hpp"
+#include "../../include/loom/util/gzip.hpp"
 #include <zlib.h>
 
 namespace loom

@@ -3,7 +3,7 @@
 #include <unordered_map>
 #include <ctime>
 #include <sstream>
-#include "util/gzip.hpp"
+#include "loom/util/gzip.hpp"
 
 #include "loom/content/content_source.hpp"
 #include "loom/content/filesystem_source.hpp"
