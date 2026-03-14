@@ -45,14 +45,14 @@ namespace loom
         int flag = 1;
         setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
 
-        timeval tv{.tv_sec = 1, .tv_usec = 0};
+        timeval tv{.tv_sec = 0, .tv_usec = 500000}; // 500ms recv timeout
         setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
         std::string buffer;
         char read_buf[8192];
         bool keep_alive = true;
         int idle_rounds = 0;
-        constexpr int max_idle_rounds = 30; // 30 x 1s = 30s keep-alive timeout
+        constexpr int max_idle_rounds = 4; // 4 x 500ms = 2s keep-alive timeout
 
         while (keep_alive && running_.load())
         {

@@ -19,6 +19,29 @@ struct SidebarConfig
     std::string about_text;
 };
 
+struct LayoutConfig
+{
+    // Header
+    std::string header_style = "default";   // default, centered, minimal
+    bool show_description = false;
+    bool show_theme_toggle = true;
+
+    // Post listings
+    std::string post_list_style = "list";   // list, cards
+    bool show_post_dates = true;
+    bool show_post_tags = true;
+
+    // Sidebar
+    std::string sidebar_position = "right"; // right, left, none
+
+    // Date
+    std::string date_format = "%Y-%m-%d";
+
+    // Custom injections
+    std::string custom_css;
+    std::string custom_head_html;
+};
+
 struct Site
 {
     std::string title;
@@ -31,6 +54,7 @@ struct Site
     Theme theme;
     Footer footer;
     SidebarConfig sidebar;
+    LayoutConfig layout;
 };
 
 }

@@ -11,7 +11,7 @@ namespace loom
     class HttpServer
     {
     public:
-        explicit HttpServer(int port, size_t num_threads = 4);
+        explicit HttpServer(int port, size_t num_threads = 8);
 
         Router& router();
         void run();

@@ -39,23 +39,26 @@ int main(int argc, char* argv[])
     std::unordered_map<std::string, std::string> cache;
 
     // Pre-render index
-    cache["/"] = loom::render_layout(site, nav, loom::render_index(engine.list_posts()), sidebar_html);
+    cache["/"] = loom::render_layout(site, nav, loom::render_index(engine.list_posts(), site.layout), sidebar_html);
 
     // Pre-render all posts
     for (const auto& post : site.posts)
-        cache["/post/" + post.slug.get()] = loom::render_layout(site, nav, loom::render_post(post), sidebar_html);
+        cache["/post/" + post.slug.get()] = loom::render_layout(site, nav, loom::render_post(post, site.layout), sidebar_html);
 
     // Pre-render tag pages
     for (const auto& tag : all_tags)
     {
         auto tag_posts = engine.posts_by_tag(tag);
-        cache["/tag/" + tag.get()] = loom::render_layout(site, nav, loom::render_tag_page(tag, tag_posts), sidebar_html);
+        cache["/tag/" + tag.get()] = loom::render_layout(site, nav, loom::render_tag_page(tag, tag_posts, site.layout), sidebar_html);
     }
     cache["/tags"] = loom::render_layout(site, nav, loom::render_tag_index(all_tags), sidebar_html);
 
     // Pre-render all pages
     for (const auto& page : site.pages)
         cache["/" + page.slug.get()] = loom::render_layout(site, nav, loom::render_page(page), sidebar_html);
+
+    // Pre-render 404 page
+    auto not_found_html = loom::render_layout(site, nav, "<section><h2>404 — Not Found</h2><p>The page you're looking for doesn't exist.</p></section>", sidebar_html);
 
     std::cout << "Pre-rendered " << cache.size() << " pages" << std::endl;
 
@@ -72,8 +75,7 @@ int main(int argc, char* argv[])
     {
         auto it = cache.find("/post/" + req.params[0]);
         if (it == cache.end())
-            return loom::HttpResponse::not_found(
-                "<h1>Post <b>" + req.params[0] + "</b> not found.</h1>");
+            return loom::HttpResponse::not_found(not_found_html);
 
         return loom::HttpResponse::ok(it->second);
     });
@@ -89,8 +91,7 @@ int main(int argc, char* argv[])
     {
         auto it = cache.find("/tag/" + req.params[0]);
         if (it == cache.end())
-            return loom::HttpResponse::not_found(
-                "<h1>Tag <b>" + req.params[0] + "</b> not found.</h1>");
+            return loom::HttpResponse::not_found(not_found_html);
 
         return loom::HttpResponse::ok(it->second);
     });
@@ -100,8 +101,7 @@ int main(int argc, char* argv[])
     {
         auto it = cache.find("/" + req.params[0]);
         if (it == cache.end())
-            return loom::HttpResponse::not_found(
-                "<h1>Page <b>" + req.params[0] + "</b> not found.</h1>");
+            return loom::HttpResponse::not_found(not_found_html);
 
         return loom::HttpResponse::ok(it->second);
     });

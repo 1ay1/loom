@@ -144,6 +144,28 @@ void FileSystemSource::load_config()
     if (cfg.count("sidebar_about"))
         config_.sidebar.about_text = cfg["sidebar_about"];
 
+    // Parse layout config
+    if (cfg.count("header_style"))
+        config_.layout.header_style = cfg["header_style"];
+    if (cfg.count("show_description"))
+        config_.layout.show_description = (cfg["show_description"] == "true");
+    if (cfg.count("show_theme_toggle"))
+        config_.layout.show_theme_toggle = (cfg["show_theme_toggle"] != "false");
+    if (cfg.count("post_list_style"))
+        config_.layout.post_list_style = cfg["post_list_style"];
+    if (cfg.count("show_post_dates"))
+        config_.layout.show_post_dates = (cfg["show_post_dates"] != "false");
+    if (cfg.count("show_post_tags"))
+        config_.layout.show_post_tags = (cfg["show_post_tags"] != "false");
+    if (cfg.count("sidebar_position"))
+        config_.layout.sidebar_position = cfg["sidebar_position"];
+    if (cfg.count("date_format"))
+        config_.layout.date_format = cfg["date_format"];
+    if (cfg.count("custom_css"))
+        config_.layout.custom_css = cfg["custom_css"];
+    if (cfg.count("custom_head_html"))
+        config_.layout.custom_head_html = cfg["custom_head_html"];
+
     // Parse footer
     config_.footer.copyright = cfg["footer_copyright"];
 

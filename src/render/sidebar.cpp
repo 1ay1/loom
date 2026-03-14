@@ -5,14 +5,14 @@
 namespace loom
 {
 
-static std::string format_date_short(std::chrono::system_clock::time_point tp)
+static std::string format_date(std::chrono::system_clock::time_point tp, const std::string& fmt)
 {
     auto time = std::chrono::system_clock::to_time_t(tp);
     std::tm tm{};
     gmtime_r(&time, &tm);
 
-    char buf[32];
-    std::strftime(buf, sizeof(buf), "%b %d", &tm);
+    char buf[64];
+    std::strftime(buf, sizeof(buf), fmt.c_str(), &tm);
     return buf;
 }
 
@@ -28,7 +28,7 @@ static std::string render_recent_posts(const Site& site, const SidebarData& data
     {
         if (i++ >= count) break;
         html += "<li><a href='/post/" + post.slug.get() + "'>" + post.title.get() + "</a>";
-        html += " <span class='date'>" + format_date_short(post.published) + "</span></li>";
+        html += " <span class='date'>" + format_date(post.published, site.layout.date_format) + "</span></li>";
     }
     html += "</ul>";
     html += "</div>";
