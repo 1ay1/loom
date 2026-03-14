@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <unordered_map>
 
 #include "loom/content/content_source.hpp"
 #include "loom/content/filesystem_source.hpp"
@@ -26,46 +27,52 @@ int main(int argc, char* argv[])
 
     loom::BlogEngine engine(site);
 
+    // Pre-render all pages at startup
+    auto nav = loom::render_navigation(site.navigation);
+
+    std::unordered_map<std::string, std::string> cache;
+
+    // Pre-render index
+    cache["/"] = loom::render_layout(site, nav, loom::render_index(engine.list_posts()));
+
+    // Pre-render all posts
+    for (const auto& post : site.posts)
+        cache["/post/" + post.slug.get()] = loom::render_layout(site, nav, loom::render_post(post));
+
+    // Pre-render all pages
+    for (const auto& page : site.pages)
+        cache["/" + page.slug.get()] = loom::render_layout(site, nav, loom::render_page(page));
+
+    std::cout << "Pre-rendered " << cache.size() << " pages" << std::endl;
+
     loom::HttpServer server(8080);
 
-    // Index: list posts
+    // Index
     server.router().get("/", [&](const loom::HttpRequest&)
     {
-        auto posts = engine.list_posts();
-        auto content = loom::render_index(posts);
-        auto nav = loom::render_navigation(site.navigation);
-
-        return loom::HttpResponse::ok(loom::render_layout(site, nav, content));
+        return loom::HttpResponse::ok(cache.at("/"));
     });
 
     // Single post
     server.router().get("/post/:slug", [&](const loom::HttpRequest& req)
     {
-        auto post = engine.get_post(loom::Slug(req.params[0]));
-
-        if (!post)
+        auto it = cache.find("/post/" + req.params[0]);
+        if (it == cache.end())
             return loom::HttpResponse::not_found(
                 "<h1>Post <b>" + req.params[0] + "</b> not found.</h1>");
 
-        auto content = loom::render_post(*post);
-        auto nav = loom::render_navigation(site.navigation);
-
-        return loom::HttpResponse::ok(loom::render_layout(site, nav, content));
+        return loom::HttpResponse::ok(it->second);
     });
 
-    // Pages (e.g. /about, /projects)
+    // Pages
     server.router().get("/:slug", [&](const loom::HttpRequest& req)
     {
-        auto page = engine.get_page(loom::Slug(req.params[0]));
-
-        if (!page)
+        auto it = cache.find("/" + req.params[0]);
+        if (it == cache.end())
             return loom::HttpResponse::not_found(
                 "<h1>Page <b>" + req.params[0] + "</b> not found.</h1>");
 
-        auto content = loom::render_page(*page);
-        auto nav = loom::render_navigation(site.navigation);
-
-        return loom::HttpResponse::ok(loom::render_layout(site, nav, content));
+        return loom::HttpResponse::ok(it->second);
     });
 
     std::cout << "Serving " << site.title << " at http://localhost:8080" << std::endl;
