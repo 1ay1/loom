@@ -354,6 +354,28 @@ void FileSystemSource::load_pages()
     }
 }
 
+void FileSystemSource::reload(const ChangeSet& changes)
+{
+    if (changes.config)
+    {
+        config_ = {};
+        theme_ = {};
+        load_config();
+    }
+    if (changes.theme)
+        load_theme();
+    if (changes.posts)
+    {
+        posts_.clear();
+        load_posts();
+    }
+    if (changes.pages)
+    {
+        pages_.clear();
+        load_pages();
+    }
+}
+
 std::vector<Post> FileSystemSource::all_posts()
 {
     return posts_;

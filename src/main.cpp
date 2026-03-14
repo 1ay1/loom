@@ -18,6 +18,9 @@
 #include "loom/http/server.hpp"
 #include "loom/http/response.hpp"
 
+#include "loom/reload/hot_reloader.hpp"
+#include "loom/reload/inotify_watcher.hpp"
+
 struct CachedPage
 {
     std::string raw;
@@ -25,9 +28,19 @@ struct CachedPage
     std::string etag;
 };
 
+// The entire pre-rendered site lives in this struct.
+// Immutable once built — swapped atomically by the hot reloader.
+struct SiteCache
+{
+    std::unordered_map<std::string, CachedPage> pages;
+    CachedPage not_found;
+    CachedPage sitemap;
+    CachedPage robots;
+    CachedPage rss;
+};
+
 static CachedPage make_cached(std::string html)
 {
-    // Simple hash-based ETag
     auto hash = std::hash<std::string>{}(html);
     std::string etag = "\"" + std::to_string(hash) + "\"";
     auto gz = loom::gzip_compress(html);
@@ -43,7 +56,6 @@ static bool accepts_gzip(const loom::HttpRequest& req)
 static loom::HttpResponse serve_cached(const CachedPage& page, const loom::HttpRequest& req,
     const std::string& content_type = "text/html; charset=utf-8")
 {
-    // Check If-None-Match for 304
     auto inm = req.header("If-None-Match");
     if (!inm.empty() && inm == page.etag)
     {
@@ -111,39 +123,28 @@ static std::string xml_escape(const std::string& s)
     return out;
 }
 
-int main(int argc, char* argv[])
+// Build the entire SiteCache from a source. Pure function — no side effects.
+static std::shared_ptr<const SiteCache> build_cache(loom::FileSystemSource& source)
 {
-    std::string content_dir = "content";
-    if (argc > 1)
-        content_dir = argv[1];
-
-    std::cout << "Loading content from: " << content_dir << std::endl;
-
-    loom::FileSystemSource source(content_dir);
-
     auto config = source.site_config();
     auto site = loom::build_site(source, std::move(config));
-
     loom::BlogEngine engine(site);
 
-    // Pre-render all pages at startup
     auto nav = loom::render_navigation(site.navigation);
-
-    // Build sidebar
     auto all_tags = engine.all_tags();
     loom::SidebarData sidebar_data{engine.list_posts(), all_tags};
     auto sidebar_html = loom::render_sidebar(site, sidebar_data);
 
-    std::unordered_map<std::string, CachedPage> cache;
+    auto cache = std::make_shared<SiteCache>();
 
-    // Pre-render index
+    // Index
     {
         loom::PageMeta meta;
         meta.canonical_path = "/";
-        cache["/"] = make_cached(loom::render_layout(site, nav, loom::render_index(engine.list_posts(), site.layout), sidebar_html, meta));
+        cache->pages["/"] = make_cached(loom::render_layout(site, nav, loom::render_index(engine.list_posts(), site.layout), sidebar_html, meta));
     }
 
-    // Pre-render all posts (skip drafts and future posts)
+    // Posts
     for (const auto& post : site.posts)
     {
         if (post.draft || post.published > std::chrono::system_clock::now())
@@ -158,7 +159,6 @@ int main(int argc, char* argv[])
         for (const auto& t : post.tags)
             meta.tags.push_back(t.get());
 
-        // Use excerpt as description, or strip HTML from content
         if (!post.excerpt.empty())
         {
             meta.description = post.excerpt.substr(0, 160);
@@ -181,7 +181,6 @@ int main(int argc, char* argv[])
             meta.description = plain;
         }
 
-        // Build post context
         loom::PostContext ctx;
         auto [prev, next] = engine.prev_next(post);
         ctx.nav = {prev, next};
@@ -192,10 +191,10 @@ int main(int argc, char* argv[])
             ctx.series_posts = engine.posts_in_series(post.series);
         }
 
-        cache["/post/" + post.slug.get()] = make_cached(loom::render_layout(site, nav, loom::render_post(post, site.layout, ctx), sidebar_html, meta));
+        cache->pages["/post/" + post.slug.get()] = make_cached(loom::render_layout(site, nav, loom::render_post(post, site.layout, ctx), sidebar_html, meta));
     }
 
-    // Pre-render tag pages
+    // Tag pages
     for (const auto& tag : all_tags)
     {
         auto tag_posts = engine.posts_by_tag(tag);
@@ -203,27 +202,27 @@ int main(int argc, char* argv[])
         meta.title = "Posts tagged \"" + tag.get() + "\"";
         meta.canonical_path = "/tag/" + tag.get();
         meta.description = "All posts tagged with " + tag.get() + " on " + site.title;
-        cache["/tag/" + tag.get()] = make_cached(loom::render_layout(site, nav, loom::render_tag_page(tag, tag_posts, site.layout), sidebar_html, meta));
+        cache->pages["/tag/" + tag.get()] = make_cached(loom::render_layout(site, nav, loom::render_tag_page(tag, tag_posts, site.layout), sidebar_html, meta));
     }
     {
         loom::PageMeta meta;
         meta.title = "Tags";
         meta.canonical_path = "/tags";
         meta.description = "Browse all tags on " + site.title;
-        cache["/tags"] = make_cached(loom::render_layout(site, nav, loom::render_tag_index(all_tags), sidebar_html, meta));
+        cache->pages["/tags"] = make_cached(loom::render_layout(site, nav, loom::render_tag_index(all_tags), sidebar_html, meta));
     }
 
-    // Pre-render archives
+    // Archives
     {
         auto by_year = engine.posts_by_year();
         loom::PageMeta meta;
         meta.title = "Archives";
         meta.canonical_path = "/archives";
         meta.description = "All posts on " + site.title;
-        cache["/archives"] = make_cached(loom::render_layout(site, nav, loom::render_archives(by_year, site.layout), sidebar_html, meta));
+        cache->pages["/archives"] = make_cached(loom::render_layout(site, nav, loom::render_archives(by_year, site.layout), sidebar_html, meta));
     }
 
-    // Pre-render series pages
+    // Series
     auto all_series = engine.all_series();
     for (const auto& series : all_series)
     {
@@ -232,7 +231,7 @@ int main(int argc, char* argv[])
         meta.title = "Series: " + series;
         meta.canonical_path = "/series/" + series;
         meta.description = "Posts in the " + series + " series on " + site.title;
-        cache["/series/" + series] = make_cached(loom::render_layout(site, nav, loom::render_series_page(series, series_posts, site.layout), sidebar_html, meta));
+        cache->pages["/series/" + series] = make_cached(loom::render_layout(site, nav, loom::render_series_page(series, series_posts, site.layout), sidebar_html, meta));
     }
     if (!all_series.empty())
     {
@@ -240,34 +239,33 @@ int main(int argc, char* argv[])
         meta.title = "Series";
         meta.canonical_path = "/series";
         meta.description = "Browse all series on " + site.title;
-        cache["/series"] = make_cached(loom::render_layout(site, nav, loom::render_series_index(all_series), sidebar_html, meta));
+        cache->pages["/series"] = make_cached(loom::render_layout(site, nav, loom::render_series_index(all_series), sidebar_html, meta));
     }
 
-    // Pre-render all pages
+    // Static pages
     for (const auto& page : site.pages)
     {
         loom::PageMeta meta;
         meta.title = page.title.get();
         meta.canonical_path = "/" + page.slug.get();
-        cache["/" + page.slug.get()] = make_cached(loom::render_layout(site, nav, loom::render_page(page), sidebar_html, meta));
+        cache->pages["/" + page.slug.get()] = make_cached(loom::render_layout(site, nav, loom::render_page(page), sidebar_html, meta));
     }
 
-    // Pre-render 404 page (noindex)
-    loom::PageMeta not_found_meta;
-    not_found_meta.title = "404 — Not Found";
-    not_found_meta.noindex = true;
-    auto not_found_page = make_cached(loom::render_layout(site, nav, "<section><h2>404 — Not Found</h2><p>The page you're looking for doesn't exist.</p></section>", sidebar_html, not_found_meta));
-
-    // Generate sitemap.xml
-    std::string sitemap;
+    // 404
     {
+        loom::PageMeta meta;
+        meta.title = "404 — Not Found";
+        meta.noindex = true;
+        cache->not_found = make_cached(loom::render_layout(site, nav, "<section><h2>404 — Not Found</h2><p>The page you're looking for doesn't exist.</p></section>", sidebar_html, meta));
+    }
+
+    // Sitemap
+    {
+        std::string sitemap;
         sitemap += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
         sitemap += "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n";
-
-        // Homepage
         sitemap += "  <url><loc>" + site.base_url + "/</loc><priority>1.0</priority></url>\n";
 
-        // Posts
         auto posts = engine.list_posts();
         for (const auto& post : posts)
         {
@@ -275,42 +273,35 @@ int main(int argc, char* argv[])
             sitemap += "<lastmod>" + format_iso_date(post.published) + "</lastmod>";
             sitemap += "<priority>0.8</priority></url>\n";
         }
-
-        // Pages
         for (const auto& page : site.pages)
             sitemap += "  <url><loc>" + site.base_url + "/" + xml_escape(page.slug.get()) + "</loc><priority>0.6</priority></url>\n";
-
-        // Tag pages
         for (const auto& tag : all_tags)
             sitemap += "  <url><loc>" + site.base_url + "/tag/" + xml_escape(tag.get()) + "</loc><priority>0.4</priority></url>\n";
-
         sitemap += "  <url><loc>" + site.base_url + "/tags</loc><priority>0.3</priority></url>\n";
-
-        // Archives
         sitemap += "  <url><loc>" + site.base_url + "/archives</loc><priority>0.5</priority></url>\n";
-
-        // Series
         for (const auto& s : all_series)
             sitemap += "  <url><loc>" + site.base_url + "/series/" + xml_escape(s) + "</loc><priority>0.5</priority></url>\n";
         if (!all_series.empty())
             sitemap += "  <url><loc>" + site.base_url + "/series</loc><priority>0.4</priority></url>\n";
-
         sitemap += "</urlset>\n";
+
+        cache->sitemap = make_cached(sitemap);
     }
 
-    // Generate robots.txt
-    std::string robots;
+    // Robots
     {
+        std::string robots;
         robots += "User-agent: *\n";
         robots += "Allow: /\n";
         robots += "Disallow:\n\n";
         if (!site.base_url.empty())
             robots += "Sitemap: " + site.base_url + "/sitemap.xml\n";
+        cache->robots = make_cached(robots);
     }
 
-    // Generate RSS feed
-    std::string rss;
+    // RSS
     {
+        std::string rss;
         rss += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
         rss += "<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\">\n";
         rss += "<channel>\n";
@@ -338,100 +329,127 @@ int main(int argc, char* argv[])
 
         rss += "</channel>\n";
         rss += "</rss>\n";
+        cache->rss = make_cached(rss);
     }
 
-    auto sitemap_page = make_cached(sitemap);
-    auto robots_page = make_cached(robots);
-    auto rss_page = make_cached(rss);
+    return cache;
+}
 
-    std::cout << "Pre-rendered " << cache.size() << " pages" << std::endl;
+int main(int argc, char* argv[])
+{
+    std::string content_dir = "content";
+    if (argc > 1)
+        content_dir = argv[1];
+
+    std::cout << "Loading content from: " << content_dir << std::endl;
+
+    loom::FileSystemSource source(content_dir);
+
+    // Build initial cache
+    auto initial = build_cache(source);
+    std::cout << "Pre-rendered " << initial->pages.size() << " pages" << std::endl;
+
+    loom::AtomicCache<SiteCache> cache(std::move(initial));
+
+    // Set up hot reload: inotify watcher + background reloader
+    loom::InotifyWatcher watcher(content_dir);
+
+    loom::HotReloader<loom::FileSystemSource, loom::InotifyWatcher, SiteCache> reloader(
+        source, watcher, cache,
+        [](loom::FileSystemSource& src, const loom::ChangeSet&) {
+            return build_cache(src);
+        }
+    );
+    reloader.start();
+    std::cout << "[hot-reload] Watching " << content_dir << " for changes" << std::endl;
 
     loom::HttpServer server(8080);
 
-    // Index
+    // All route handlers grab a cache snapshot, then serve from it.
+    // The snapshot is a shared_ptr — stays valid even if the cache is swapped mid-request.
+
     server.router().get("/", [&](const loom::HttpRequest& req)
     {
-        return serve_cached(cache.at("/"), req);
+        auto snap = cache.load();
+        return serve_cached(snap->pages.at("/"), req);
     });
 
-    // Sitemap
     server.router().get("/sitemap.xml", [&](const loom::HttpRequest& req)
     {
-        return serve_cached(sitemap_page, req, "application/xml; charset=utf-8");
+        auto snap = cache.load();
+        return serve_cached(snap->sitemap, req, "application/xml; charset=utf-8");
     });
 
-    // Robots.txt
     server.router().get("/robots.txt", [&](const loom::HttpRequest& req)
     {
-        return serve_cached(robots_page, req, "text/plain; charset=utf-8");
+        auto snap = cache.load();
+        return serve_cached(snap->robots, req, "text/plain; charset=utf-8");
     });
 
-    // RSS feed
     server.router().get("/feed.xml", [&](const loom::HttpRequest& req)
     {
-        return serve_cached(rss_page, req, "application/rss+xml; charset=utf-8");
+        auto snap = cache.load();
+        return serve_cached(snap->rss, req, "application/rss+xml; charset=utf-8");
     });
 
-    // Single post
     server.router().get("/post/:slug", [&](const loom::HttpRequest& req)
     {
-        auto it = cache.find("/post/" + req.params[0]);
-        if (it == cache.end())
-            return serve_cached(not_found_page, req);
-
+        auto snap = cache.load();
+        auto it = snap->pages.find("/post/" + req.params[0]);
+        if (it == snap->pages.end())
+            return serve_cached(snap->not_found, req);
         return serve_cached(it->second, req);
     });
 
-    // Tag index
     server.router().get("/tags", [&](const loom::HttpRequest& req)
     {
-        return serve_cached(cache.at("/tags"), req);
+        auto snap = cache.load();
+        return serve_cached(snap->pages.at("/tags"), req);
     });
 
-    // Tag page
     server.router().get("/tag/:slug", [&](const loom::HttpRequest& req)
     {
-        auto it = cache.find("/tag/" + req.params[0]);
-        if (it == cache.end())
-            return serve_cached(not_found_page, req);
-
+        auto snap = cache.load();
+        auto it = snap->pages.find("/tag/" + req.params[0]);
+        if (it == snap->pages.end())
+            return serve_cached(snap->not_found, req);
         return serve_cached(it->second, req);
     });
 
-    // Archives
     server.router().get("/archives", [&](const loom::HttpRequest& req)
     {
-        return serve_cached(cache.at("/archives"), req);
+        auto snap = cache.load();
+        return serve_cached(snap->pages.at("/archives"), req);
     });
 
-    // Series index
     server.router().get("/series", [&](const loom::HttpRequest& req)
     {
-        auto it = cache.find("/series");
-        if (it == cache.end())
-            return serve_cached(not_found_page, req);
+        auto snap = cache.load();
+        auto it = snap->pages.find("/series");
+        if (it == snap->pages.end())
+            return serve_cached(snap->not_found, req);
         return serve_cached(it->second, req);
     });
 
-    // Series page
     server.router().get("/series/:slug", [&](const loom::HttpRequest& req)
     {
-        auto it = cache.find("/series/" + req.params[0]);
-        if (it == cache.end())
-            return serve_cached(not_found_page, req);
+        auto snap = cache.load();
+        auto it = snap->pages.find("/series/" + req.params[0]);
+        if (it == snap->pages.end())
+            return serve_cached(snap->not_found, req);
         return serve_cached(it->second, req);
     });
 
-    // Pages
     server.router().get("/:slug", [&](const loom::HttpRequest& req)
     {
-        auto it = cache.find("/" + req.params[0]);
-        if (it == cache.end())
-            return serve_cached(not_found_page, req);
-
+        auto snap = cache.load();
+        auto it = snap->pages.find("/" + req.params[0]);
+        if (it == snap->pages.end())
+            return serve_cached(snap->not_found, req);
         return serve_cached(it->second, req);
     });
 
-    std::cout << "Serving " << site.title << " at http://localhost:8080" << std::endl;
+    auto snap = cache.load();
+    std::cout << "Serving at http://localhost:8080" << std::endl;
     server.run();
 }

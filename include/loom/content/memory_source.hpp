@@ -2,6 +2,7 @@
 
 #include "../domain/post.hpp"
 #include "../domain/page.hpp"
+#include "../reload/change_event.hpp"
 
 #include <vector>
 
@@ -29,6 +30,9 @@ namespace loom
         {
             return pages_;
         }
+
+        // Reloadable: no-op for in-memory source (data is already in memory)
+        void reload(const ChangeSet&) {}
 
         private:
         std::vector<Post> posts_;

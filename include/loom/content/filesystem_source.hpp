@@ -4,6 +4,7 @@
 #include "../domain/page.hpp"
 #include "../domain/site.hpp"
 #include "../engine/site_builder.hpp"
+#include "../reload/change_event.hpp"
 
 #include <string>
 #include <vector>
@@ -20,6 +21,11 @@ namespace loom
 
         SiteConfig site_config() const;
         Theme theme() const;
+
+        // Reloadable: selectively reload based on what changed
+        void reload(const ChangeSet& changes);
+
+        const std::string& content_dir() const { return content_dir_; }
 
     private:
         std::string content_dir_;

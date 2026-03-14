@@ -8,7 +8,7 @@ OBJ = $(SRC:src/%.cpp=build/%.o)
 TARGET = loom
 
 $(TARGET): $(OBJ)
-	$(CXX) $(OBJ) -o $(TARGET) -lz
+	$(CXX) $(OBJ) -o $(TARGET) -lz -lpthread
 
 build/%.o: src/%.cpp
 	@mkdir -p $(dir $@)
