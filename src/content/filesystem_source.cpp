@@ -110,6 +110,10 @@ void FileSystemSource::load_config()
         }
     }
 
+    // Parse theme name
+    if (cfg.count("theme"))
+        theme_.name = cfg["theme"];
+
     // Parse theme variables (theme_* keys)
     for (const auto& [key, value] : cfg)
     {
@@ -171,8 +175,11 @@ void FileSystemSource::load_config()
 void FileSystemSource::load_theme()
 {
     auto css = read_file(content_dir_ + "/theme/style.css");
-    theme_.name = "custom";
-    theme_.css = css;
+    if (!css.empty())
+    {
+        theme_.name = "custom";
+        theme_.css = css;
+    }
 }
 
 void FileSystemSource::load_posts()

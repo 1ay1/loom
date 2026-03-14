@@ -1,4 +1,5 @@
 #include "../../include/loom/render/layout.hpp"
+#include "../../include/loom/render/themes.hpp"
 
 namespace loom
 {
@@ -483,6 +484,15 @@ std::string render_layout(
     else
         html += site.theme.css;
     html += "</style>";
+
+    // Apply built-in theme if selected
+    if (site.theme.name != "default" && site.theme.name != "custom")
+    {
+        auto& themes = builtin_themes();
+        auto it = themes.find(site.theme.name);
+        if (it != themes.end())
+            html += "<style>" + theme_to_css(it->second) + "</style>";
+    }
 
     // Emit theme variable overrides
     if (!site.theme.variables.empty())
