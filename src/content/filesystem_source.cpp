@@ -83,6 +83,11 @@ void FileSystemSource::load_config()
     config_.title       = cfg["title"];
     config_.description = cfg["description"];
     config_.author      = cfg["author"];
+    config_.base_url    = cfg["base_url"];
+
+    // Strip trailing slash from base_url
+    if (!config_.base_url.empty() && config_.base_url.back() == '/')
+        config_.base_url.pop_back();
 
     // Parse nav: Home:/,Blog:/blog,About:/about
     if (cfg.count("nav"))

@@ -42,11 +42,24 @@ struct LayoutConfig
     std::string custom_head_html;
 };
 
+struct PageMeta
+{
+    std::string title;
+    std::string description;
+    std::string canonical_path;     // e.g. "/post/my-slug"
+    std::string og_type = "website"; // "article" for posts
+    std::string published_date;     // ISO 8601 for articles
+    std::string author;
+    std::vector<std::string> tags;
+    bool noindex = false;
+};
+
 struct Site
 {
     std::string title;
     std::string description;
     std::string author;
+    std::string base_url;           // e.g. "https://example.com"
 
     std::vector<Post> posts;
     std::vector<Page> pages;

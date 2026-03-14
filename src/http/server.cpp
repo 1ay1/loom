@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <csignal>
 #include <cerrno>
+#include <chrono>
 #include <iostream>
 
 namespace loom
@@ -27,8 +28,8 @@ namespace loom
         fcntl(fd, F_SETFL, flags | O_NONBLOCK);
     }
 
-    HttpServer::HttpServer(int port, size_t num_threads)
-        : port_(port), pool_(num_threads) {}
+    HttpServer::HttpServer(int port)
+        : port_(port) {}
 
     Router& HttpServer::router()
     {
@@ -40,180 +41,294 @@ namespace loom
         running_.store(false);
     }
 
-    void HttpServer::handle_connection(int client_fd)
+    int64_t HttpServer::now_ms() const
     {
-        int flag = 1;
-        setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+        return std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
+    }
 
-        timeval tv{.tv_sec = 0, .tv_usec = 500000}; // 500ms recv timeout
-        setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    void HttpServer::close_connection(int fd)
+    {
+        epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, fd, nullptr);
+        connections_.erase(fd);
+        close(fd);
+    }
 
-        std::string buffer;
-        char read_buf[8192];
-        bool keep_alive = true;
-        int idle_rounds = 0;
-        constexpr int max_idle_rounds = 4; // 4 x 500ms = 2s keep-alive timeout
-
-        while (keep_alive && running_.load())
+    void HttpServer::accept_connections()
+    {
+        while (true)
         {
-            buffer.clear();
-            bool request_complete = false;
-            size_t header_end_pos = std::string::npos;
-
-            while (!request_complete)
+            int client_fd = accept(server_fd_, nullptr, nullptr);
+            if (client_fd < 0)
             {
-                ssize_t n = read(client_fd, read_buf, sizeof(read_buf));
-                if (n < 0)
-                {
-                    if (errno == EAGAIN || errno == EWOULDBLOCK)
-                    {
-                        if (!running_.load() || ++idle_rounds >= max_idle_rounds)
-                        {
-                            close(client_fd);
-                            return;
-                        }
-                        continue;
-                    }
-                    if (errno == EINTR) continue;
-                    close(client_fd);
-                    return;
-                }
-                if (n == 0)
-                {
-                    close(client_fd);
-                    return;
-                }
-                idle_rounds = 0;
-
-                buffer.append(read_buf, static_cast<size_t>(n));
-
-                if (header_end_pos == std::string::npos)
-                    header_end_pos = buffer.find("\r\n\r\n");
-
-                if (header_end_pos != std::string::npos)
-                {
-                    auto cl_pos = buffer.find("content-length:");
-                    if (cl_pos == std::string::npos)
-                        cl_pos = buffer.find("Content-Length:");
-
-                    if (cl_pos != std::string::npos && cl_pos < header_end_pos)
-                    {
-                        auto val_start = cl_pos + 15;
-                        auto val_end = buffer.find("\r\n", val_start);
-                        size_t content_length = std::stoul(
-                            buffer.substr(val_start, val_end - val_start));
-                        size_t body_start = header_end_pos + 4;
-
-                        if (buffer.size() - body_start >= content_length)
-                            request_complete = true;
-                    }
-                    else
-                    {
-                        request_complete = true;
-                    }
-                }
-
-                if (buffer.size() > 1024 * 1024)
-                {
-                    auto resp = HttpResponse::bad_request().serialize(false);
-                    write(client_fd, resp.c_str(), resp.size());
-                    close(client_fd);
-                    return;
-                }
+                if (errno == EAGAIN || errno == EWOULDBLOCK)
+                    break;
+                if (errno == EINTR)
+                    continue;
+                perror("accept");
+                break;
             }
 
-            HttpRequest request;
-            if (!parse_request(buffer, request))
+            set_nonblocking(client_fd);
+
+            int flag = 1;
+            setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+
+            epoll_event ev{};
+            ev.events = EPOLLIN | EPOLLET;
+            ev.data.fd = client_fd;
+            epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, client_fd, &ev);
+
+            connections_[client_fd] = Connection{{}, {}, 0, true, now_ms()};
+        }
+    }
+
+    void HttpServer::handle_readable(int fd)
+    {
+        auto it = connections_.find(fd);
+        if (it == connections_.end())
+            return;
+
+        auto& conn = it->second;
+        conn.last_activity_ms = now_ms();
+
+        char buf[8192];
+        while (true)
+        {
+            ssize_t n = read(fd, buf, sizeof(buf));
+            if (n > 0)
             {
-                auto resp = HttpResponse::bad_request().serialize(false);
-                write(client_fd, resp.c_str(), resp.size());
-                close(client_fd);
+                conn.read_buf.append(buf, static_cast<size_t>(n));
+
+                if (conn.read_buf.size() > MAX_REQUEST_SIZE)
+                {
+                    auto resp = HttpResponse::bad_request().serialize(false);
+                    start_write(fd, resp);
+                    conn.keep_alive = false;
+                    return;
+                }
+                continue;
+            }
+
+            if (n == 0)
+            {
+                close_connection(fd);
                 return;
             }
 
-            keep_alive = request.keep_alive();
-
-            auto response = router_.route(request);
-            auto raw = response.serialize(keep_alive);
-
-            size_t total = 0;
-            while (total < raw.size())
-            {
-                ssize_t written = write(client_fd,
-                    raw.c_str() + total, raw.size() - total);
-                if (written <= 0)
-                {
-                    close(client_fd);
-                    return;
-                }
-                total += static_cast<size_t>(written);
-            }
+            // n < 0
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+                break;
+            if (errno == EINTR)
+                continue;
+            close_connection(fd);
+            return;
         }
 
-        close(client_fd);
+        // Try to process complete requests from the buffer
+        process_request(fd);
+    }
+
+    void HttpServer::process_request(int fd)
+    {
+        auto it = connections_.find(fd);
+        if (it == connections_.end())
+            return;
+
+        auto& conn = it->second;
+
+        // Check if we have a complete request (headers end with \r\n\r\n)
+        auto header_end = conn.read_buf.find("\r\n\r\n");
+        if (header_end == std::string::npos)
+            return;
+
+        // Check Content-Length for body completion
+        auto cl_pos = conn.read_buf.find("Content-Length:");
+        if (cl_pos == std::string::npos)
+            cl_pos = conn.read_buf.find("content-length:");
+
+        if (cl_pos != std::string::npos && cl_pos < header_end)
+        {
+            auto val_start = cl_pos + 15;
+            auto val_end = conn.read_buf.find("\r\n", val_start);
+            size_t content_length = std::stoul(
+                conn.read_buf.substr(val_start, val_end - val_start));
+            size_t body_start = header_end + 4;
+
+            if (conn.read_buf.size() - body_start < content_length)
+                return; // Body not yet complete
+        }
+
+        HttpRequest request;
+        if (!parse_request(conn.read_buf, request))
+        {
+            auto resp = HttpResponse::bad_request().serialize(false);
+            start_write(fd, resp);
+            conn.keep_alive = false;
+            conn.read_buf.clear();
+            return;
+        }
+
+        conn.keep_alive = request.keep_alive();
+
+        auto response = router_.route(request);
+        auto raw = response.serialize(conn.keep_alive);
+
+        // Clear the consumed request from the buffer
+        conn.read_buf.clear();
+
+        start_write(fd, raw);
+    }
+
+    void HttpServer::start_write(int fd, const std::string& data)
+    {
+        auto it = connections_.find(fd);
+        if (it == connections_.end())
+            return;
+
+        auto& conn = it->second;
+        conn.write_buf = data;
+        conn.write_offset = 0;
+
+        // Try to write immediately
+        handle_writable(fd);
+    }
+
+    void HttpServer::handle_writable(int fd)
+    {
+        auto it = connections_.find(fd);
+        if (it == connections_.end())
+            return;
+
+        auto& conn = it->second;
+
+        while (conn.write_offset < conn.write_buf.size())
+        {
+            ssize_t n = write(fd,
+                conn.write_buf.c_str() + conn.write_offset,
+                conn.write_buf.size() - conn.write_offset);
+
+            if (n > 0)
+            {
+                conn.write_offset += static_cast<size_t>(n);
+                continue;
+            }
+
+            if (n < 0)
+            {
+                if (errno == EAGAIN || errno == EWOULDBLOCK)
+                {
+                    // Switch to waiting for writable
+                    epoll_event ev{};
+                    ev.events = EPOLLOUT | EPOLLET;
+                    ev.data.fd = fd;
+                    epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, fd, &ev);
+                    return;
+                }
+                if (errno == EINTR)
+                    continue;
+            }
+
+            // Write error or n == 0
+            close_connection(fd);
+            return;
+        }
+
+        // Write complete
+        conn.write_buf.clear();
+        conn.write_offset = 0;
+        conn.last_activity_ms = now_ms();
+
+        if (!conn.keep_alive)
+        {
+            close_connection(fd);
+            return;
+        }
+
+        // Switch back to reading for next request
+        epoll_event ev{};
+        ev.events = EPOLLIN | EPOLLET;
+        ev.data.fd = fd;
+        epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, fd, &ev);
+    }
+
+    void HttpServer::reap_idle_connections()
+    {
+        auto now = now_ms();
+        std::vector<int> to_close;
+
+        for (auto& [fd, conn] : connections_)
+        {
+            if (now - conn.last_activity_ms > KEEPALIVE_TIMEOUT_MS)
+                to_close.push_back(fd);
+        }
+
+        for (int fd : to_close)
+            close_connection(fd);
     }
 
     void HttpServer::run()
     {
-        int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-        if (server_fd < 0)
+        server_fd_ = socket(AF_INET, SOCK_STREAM, 0);
+        if (server_fd_ < 0)
         {
             perror("socket");
             return;
         }
 
         int opt = 1;
-        setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+        setsockopt(server_fd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
         sockaddr_in addr{};
         addr.sin_family = AF_INET;
         addr.sin_port = htons(static_cast<uint16_t>(port_));
         addr.sin_addr.s_addr = INADDR_ANY;
 
-        if (bind(server_fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0)
+        if (bind(server_fd_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0)
         {
             perror("bind");
-            close(server_fd);
+            close(server_fd_);
             return;
         }
 
-        if (listen(server_fd, SOMAXCONN) < 0)
+        if (listen(server_fd_, SOMAXCONN) < 0)
         {
             perror("listen");
-            close(server_fd);
+            close(server_fd_);
             return;
         }
 
-        set_nonblocking(server_fd);
+        set_nonblocking(server_fd_);
 
         signal(SIGINT, signal_handler);
         signal(SIGTERM, signal_handler);
         signal(SIGPIPE, SIG_IGN);
 
-        int epoll_fd = epoll_create1(0);
-        if (epoll_fd < 0)
+        epoll_fd_ = epoll_create1(0);
+        if (epoll_fd_ < 0)
         {
             perror("epoll_create1");
-            close(server_fd);
+            close(server_fd_);
             return;
         }
 
         epoll_event ev{};
         ev.events = EPOLLIN;
-        ev.data.fd = server_fd;
-        epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_fd, &ev);
+        ev.data.fd = server_fd_;
+        epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, server_fd_, &ev);
 
         running_.store(true);
         g_running.store(true);
 
         std::cout << "Listening on port " << port_
-                  << " (" << pool_.size() << " workers)\n";
+                  << " (single-threaded event loop)\n";
 
-        epoll_event events[64];
+        epoll_event events[MAX_EVENTS];
+        int64_t last_reap = now_ms();
 
         while (running_.load() && g_running.load())
         {
-            int nfds = epoll_wait(epoll_fd, events, 64, 500);
+            int nfds = epoll_wait(epoll_fd_, events, MAX_EVENTS, 1000);
 
             if (nfds < 0)
             {
@@ -224,32 +339,44 @@ namespace loom
 
             for (int i = 0; i < nfds; ++i)
             {
-                if (events[i].data.fd == server_fd)
-                {
-                    while (true)
-                    {
-                        int client_fd = accept(server_fd, nullptr, nullptr);
-                        if (client_fd < 0)
-                        {
-                            if (errno == EAGAIN || errno == EWOULDBLOCK)
-                                break;
-                            if (errno == EINTR)
-                                continue;
-                            perror("accept");
-                            break;
-                        }
+                int fd = events[i].data.fd;
 
-                        pool_.enqueue([this, client_fd] {
-                            handle_connection(client_fd);
-                        });
-                    }
+                if (fd == server_fd_)
+                {
+                    accept_connections();
+                    continue;
                 }
+
+                if (events[i].events & (EPOLLERR | EPOLLHUP))
+                {
+                    close_connection(fd);
+                    continue;
+                }
+
+                if (events[i].events & EPOLLIN)
+                    handle_readable(fd);
+
+                if (events[i].events & EPOLLOUT)
+                    handle_writable(fd);
+            }
+
+            // Reap idle keep-alive connections every second
+            auto now = now_ms();
+            if (now - last_reap > 1000)
+            {
+                reap_idle_connections();
+                last_reap = now;
             }
         }
 
         std::cout << "Shutting down...\n";
-        pool_.shutdown();
-        close(epoll_fd);
-        close(server_fd);
+
+        // Close all active connections
+        for (auto& [fd, _] : connections_)
+            close(fd);
+        connections_.clear();
+
+        close(epoll_fd_);
+        close(server_fd_);
     }
 }

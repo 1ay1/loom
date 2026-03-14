@@ -12,7 +12,7 @@ static const char* DEFAULT_CSS = R"CSS(
   --border: #e5e7eb;
   --accent: #2563eb;
   --font: system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
-  --max-width: 720px;
+  --max-width: 700px;
   --font-size: 17px;
   --heading-font: inherit;
   --code-font: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
@@ -20,8 +20,8 @@ static const char* DEFAULT_CSS = R"CSS(
   --heading-weight: 700;
   --border-radius: 6px;
   --container-padding: 40px 20px;
-  --sidebar-width: 240px;
-  --sidebar-gap: 48px;
+  --sidebar-width: 220px;
+  --sidebar-gap: 32px;
   --nav-gap: 18px;
   --header-size: 26px;
   --tag-radius: 12px;
@@ -58,6 +58,8 @@ body {
   font-family: var(--font);
   line-height: var(--line-height);
   font-size: var(--font-size);
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
 }
 
 .container {
@@ -67,7 +69,7 @@ body {
 }
 
 .has-sidebar .container {
-  max-width: calc(var(--content-width) + var(--sidebar-width) + var(--sidebar-gap));
+  max-width: 960px;
 }
 
 header {
@@ -148,8 +150,12 @@ h2 {
   font-weight: var(--heading-weight);
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 .post-listing {
-  padding: 12px 0;
+  padding: 14px 0;
   border-bottom: 1px solid var(--border);
   display: flex;
   flex-wrap: wrap;
@@ -538,7 +544,19 @@ footer {
   margin-top: 0;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 768px) {
+  :root {
+    --container-padding: 24px 16px;
+    --font-size: 15px;
+    --header-size: 24px;
+    --line-height: 1.65;
+  }
+
+  nav ul {
+    flex-wrap: wrap;
+    gap: 10px 14px;
+  }
+
   .with-sidebar {
     grid-template-columns: 1fr;
   }
@@ -562,6 +580,104 @@ footer {
   }
   .has-sidebar .container {
     max-width: var(--content-width);
+  }
+
+  .post-full h1 {
+    font-size: 1.5em;
+  }
+
+  .post-content h1, .page-content h1 {
+    font-size: 1.5em;
+    margin-top: 28px;
+  }
+
+  .post-content h2, .page-content h2 {
+    font-size: 1.3em;
+    margin-top: 22px;
+  }
+
+  .post-content h3, .page-content h3 {
+    font-size: 1.15em;
+    margin-top: 18px;
+  }
+
+  .post-content pre, .page-content pre {
+    padding: 12px;
+    font-size: 13px;
+    border-radius: 4px;
+    margin-left: -16px;
+    margin-right: -16px;
+    border-radius: 0;
+  }
+
+  .post-content table, .page-content table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .post-content, .page-content {
+    font-size: 14.5px;
+    line-height: 1.7;
+  }
+
+  .post-content blockquote, .page-content blockquote {
+    margin-left: 0;
+    margin-right: 0;
+    padding: 6px 12px;
+  }
+
+  .post-cards {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  footer {
+    margin-top: 40px;
+  }
+
+  .footer-links {
+    flex-wrap: wrap;
+    gap: 10px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --container-padding: 20px 12px;
+    --header-size: 20px;
+    --font-size: 14.5px;
+    --header-size: 22px;
+  }
+
+  .post-content, .page-content {
+    font-size: 13.5px;
+  }
+
+  .post-full h1 {
+    font-size: 1.35em;
+  }
+
+  .post-content pre, .page-content pre {
+    margin-left: -12px;
+    margin-right: -12px;
+    font-size: 12px;
+    padding: 10px;
+  }
+
+  .post-content th, .post-content td,
+  .page-content th, .page-content td {
+    padding: 6px 8px;
+    font-size: 14px;
+  }
+
+  .tag {
+    font-size: 12px;
+    padding: 2px 8px;
+  }
+
+  footer {
+    margin-top: 30px;
   }
 }
 
@@ -611,23 +727,125 @@ static const char* THEME_JS = R"JS(
       });
 )JS";
 
+static std::string escape_attr(const std::string& s)
+{
+    std::string out;
+    out.reserve(s.size());
+    for (char c : s)
+    {
+        switch (c)
+        {
+            case '"': out += "&quot;"; break;
+            case '&': out += "&amp;"; break;
+            case '<': out += "&lt;"; break;
+            case '>': out += "&gt;"; break;
+            default: out += c;
+        }
+    }
+    return out;
+}
+
 std::string render_layout(
     const Site& site,
     const std::string& navigation,
     const std::string& content,
-    const std::string& sidebar)
+    const std::string& sidebar,
+    const PageMeta& meta)
 {
     const auto& layout = site.layout;
     std::string html;
     html.reserve(8192 + content.size());
 
+    // Use page-specific title/description or fall back to site-level
+    std::string page_title = meta.title.empty() ? site.title
+        : meta.title + " — " + site.title;
+    std::string page_desc = meta.description.empty() ? site.description
+        : meta.description;
+    std::string canonical_url = site.base_url + meta.canonical_path;
+
     html += "<!DOCTYPE html>";
-    html += "<html>";
+    html += "<html lang=\"en\">";
     html += "<head>";
     html += "<meta charset=\"utf-8\">";
     html += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
-    html += "<title>" + site.title + "</title>";
-    html += "<meta name=\"description\" content=\"" + site.description + "\">";
+    html += "<title>" + escape_attr(page_title) + "</title>";
+    html += "<meta name=\"description\" content=\"" + escape_attr(page_desc) + "\">";
+
+    // Robots
+    if (meta.noindex)
+        html += "<meta name=\"robots\" content=\"noindex, nofollow\">";
+
+    // Author
+    if (!site.author.empty())
+        html += "<meta name=\"author\" content=\"" + escape_attr(site.author) + "\">";
+
+    // Canonical URL
+    if (!site.base_url.empty())
+        html += "<link rel=\"canonical\" href=\"" + escape_attr(canonical_url) + "\">";
+
+    // Open Graph
+    html += "<meta property=\"og:type\" content=\"" + (meta.og_type.empty() ? "website" : meta.og_type) + "\">";
+    html += "<meta property=\"og:title\" content=\"" + escape_attr(meta.title.empty() ? site.title : meta.title) + "\">";
+    html += "<meta property=\"og:description\" content=\"" + escape_attr(page_desc) + "\">";
+    if (!site.base_url.empty())
+    {
+        html += "<meta property=\"og:url\" content=\"" + escape_attr(canonical_url) + "\">";
+        html += "<meta property=\"og:site_name\" content=\"" + escape_attr(site.title) + "\">";
+    }
+    if (!site.author.empty() && meta.og_type == "article")
+        html += "<meta property=\"article:author\" content=\"" + escape_attr(site.author) + "\">";
+    if (!meta.published_date.empty())
+        html += "<meta property=\"article:published_time\" content=\"" + meta.published_date + "\">";
+    for (const auto& tag : meta.tags)
+        html += "<meta property=\"article:tag\" content=\"" + escape_attr(tag) + "\">";
+
+    // Twitter Card
+    html += "<meta name=\"twitter:card\" content=\"summary\">";
+    html += "<meta name=\"twitter:title\" content=\"" + escape_attr(meta.title.empty() ? site.title : meta.title) + "\">";
+    html += "<meta name=\"twitter:description\" content=\"" + escape_attr(page_desc) + "\">";
+
+    // RSS autodiscovery
+    if (!site.base_url.empty())
+        html += "<link rel=\"alternate\" type=\"application/rss+xml\" title=\"" + escape_attr(site.title) + " RSS\" href=\"" + site.base_url + "/feed.xml\">";
+
+    // JSON-LD structured data
+    if (meta.og_type == "article")
+    {
+        html += "<script type=\"application/ld+json\">{";
+        html += "\"@context\":\"https://schema.org\",";
+        html += "\"@type\":\"BlogPosting\",";
+        html += "\"headline\":\"" + escape_attr(meta.title) + "\",";
+        if (!meta.published_date.empty())
+            html += "\"datePublished\":\"" + meta.published_date + "\",";
+        if (!site.author.empty())
+        {
+            html += "\"author\":{\"@type\":\"Person\",\"name\":\"" + escape_attr(site.author) + "\"},";
+        }
+        if (!site.base_url.empty())
+            html += "\"url\":\"" + escape_attr(canonical_url) + "\",";
+        html += "\"publisher\":{\"@type\":\"Organization\",\"name\":\"" + escape_attr(site.title) + "\"}";
+        html += "}</script>";
+    }
+    else if (meta.canonical_path.empty() || meta.canonical_path == "/")
+    {
+        // Homepage — WebSite schema with potential SearchAction
+        html += "<script type=\"application/ld+json\">{";
+        html += "\"@context\":\"https://schema.org\",";
+        html += "\"@type\":\"WebSite\",";
+        html += "\"name\":\"" + escape_attr(site.title) + "\",";
+        if (!site.base_url.empty())
+            html += "\"url\":\"" + site.base_url + "\",";
+        html += "\"description\":\"" + escape_attr(site.description) + "\"";
+        html += "}</script>";
+    }
+
+    // Theme detection JS in <head> to prevent FOUC
+    if (layout.show_theme_toggle)
+    {
+        html += "<script>";
+        html += THEME_JS;
+        html += "</script>";
+    }
 
     // Custom head HTML (e.g. Google Fonts, analytics)
     if (!layout.custom_head_html.empty())
@@ -736,14 +954,6 @@ std::string render_layout(
     }
     html += "</div>";
     html += "</footer>";
-
-    // Theme toggle JS
-    if (layout.show_theme_toggle)
-    {
-        html += "<script>";
-        html += THEME_JS;
-        html += "</script>";
-    }
 
     html += "</body>";
     html += "</html>";

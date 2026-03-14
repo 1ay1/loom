@@ -10,6 +10,7 @@ namespace loom
         std::string title;
         std::string description;
         std::string author;
+        std::string base_url;
         Navigation navigation;
         Theme theme;
         Footer footer;
@@ -24,6 +25,7 @@ namespace loom
             .title = std::move(config.title),
             .description = std::move(config.description),
             .author = std::move(config.author),
+            .base_url = std::move(config.base_url),
             .posts = source.all_posts(),
             .pages = source.all_pages(),
             .navigation = std::move(config.navigation),
