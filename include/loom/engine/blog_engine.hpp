@@ -31,7 +31,8 @@ namespace loom
             }
 
             std::sort(result.begin(), result.end(), [](const auto& a, const auto& b) {
-                return a.published > b.published;
+                if (a.published != b.published) return a.published > b.published;
+                return a.modified_at > b.modified_at;
             });
 
             return result;
@@ -56,7 +57,8 @@ namespace loom
                 }
             }
             std::sort(result.begin(), result.end(), [](const auto& a, const auto& b) {
-                return a.published > b.published;
+                if (a.published != b.published) return a.published > b.published;
+                return a.modified_at > b.modified_at;
             });
             return result;
         }
@@ -151,7 +153,8 @@ namespace loom
 
             std::sort(scored.begin(), scored.end(), [](const auto& a, const auto& b) {
                 if (a.first != b.first) return a.first > b.first;
-                return a.second.published > b.second.published;
+                if (a.second.published != b.second.published) return a.second.published > b.second.published;
+                return a.second.modified_at > b.second.modified_at;
             });
 
             std::vector<PostSummary> result;
@@ -180,7 +183,8 @@ namespace loom
             for (auto& [year, posts] : result)
             {
                 std::sort(posts.begin(), posts.end(), [](const auto& a, const auto& b) {
-                    return a.published > b.published;
+                    if (a.published != b.published) return a.published > b.published;
+                    return a.modified_at > b.modified_at;
                 });
             }
 
@@ -233,7 +237,7 @@ namespace loom
 
         static PostSummary make_summary(const Post& p)
         {
-            return {p.id, p.title, p.slug, p.published, p.tags, p.excerpt, p.reading_time_minutes};
+            return {p.id, p.title, p.slug, p.published, p.tags, p.excerpt, p.reading_time_minutes, p.modified_at};
         }
     };
 }

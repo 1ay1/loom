@@ -17,5 +17,6 @@ namespace loom
         std::vector<Tag> tags;
         std::string excerpt;
         int reading_time_minutes = 0;
+        std::chrono::system_clock::time_point modified_at;
     };
 }

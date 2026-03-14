@@ -2,6 +2,7 @@
 #include "../../include/loom/util/config_parser.hpp"
 #include "../../include/loom/util/markdown.hpp"
 
+#include <sys/stat.h>
 #include <dirent.h>
 #include <fstream>
 #include <sstream>
@@ -71,6 +72,14 @@ static std::chrono::system_clock::time_point parse_date(const std::string& date_
 
     auto time = timegm(&tm);
     return std::chrono::system_clock::from_time_t(time);
+}
+
+static std::chrono::system_clock::time_point file_mtime(const std::string& path)
+{
+    struct stat st{};
+    if (stat(path.c_str(), &st) == 0)
+        return std::chrono::system_clock::from_time_t(st.st_mtime);
+    return std::chrono::system_clock::now();
 }
 
 void FileSystemSource::load_config()
@@ -235,6 +244,7 @@ void FileSystemSource::load_posts()
 
         auto date = doc.meta.count("date") ? parse_date(doc.meta["date"])
                                             : std::chrono::system_clock::now();
+        auto mtime = file_mtime(path);
 
         // Parse tags: comma-separated
         std::vector<Tag> tags;
@@ -324,6 +334,7 @@ void FileSystemSource::load_posts()
             reading_time,
             std::move(series),
             series_order,
+            mtime,
         });
     }
 }
