@@ -8,7 +8,7 @@ excerpt: No dependencies means writing your own markdown parser. Here's what Loo
 
 Loom includes a hand-written markdown-to-HTML parser. No regex engines, no external libraries — just a single-pass C++ parser.
 
-## Supported Syntax
+## Supported Syntax #####
 
 **Headings:** ATX (`# h1` through `###### h6`) and setext (underlined with `===` or `---`).
 
