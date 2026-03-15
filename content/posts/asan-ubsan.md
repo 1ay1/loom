@@ -8,7 +8,7 @@ excerpt: If you write C or C++ without sanitizers, you're debugging with a blind
 
 I spent three days debugging a segfault that only happened under load. Valgrind couldn't reproduce it (too slow — the timing changed). GDB caught it once but the stack was corrupted. Then I compiled with `-fsanitize=address` and got the answer in 2 seconds.
 
-## AddressSanitizer (ASan)
+## AddressSanitizer (ASan) TUOP
 
 ASan instruments every memory access to detect:
 
