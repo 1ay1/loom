@@ -455,7 +455,7 @@ static void run_with_filesystem(const std::string& content_dir)
 }
 
 static void run_with_git(const std::string& repo_path, const std::string& branch,
-                         const std::string& content_prefix)
+                         const std::string& content_prefix, bool fetch_remote)
 {
     std::cout << "Loading content from git: " << repo_path
               << " (" << branch << ")" << std::endl;
@@ -469,7 +469,7 @@ static void run_with_git(const std::string& repo_path, const std::string& branch
 
     loom::AtomicCache<SiteCache> cache(std::move(initial));
 
-    loom::GitWatcher watcher(repo_path, branch);
+    loom::GitWatcher watcher(repo_path, branch, fetch_remote);
 
     loom::HotReloader<loom::GitSource, loom::GitWatcher, SiteCache> reloader(
         source, watcher, cache,
@@ -478,7 +478,11 @@ static void run_with_git(const std::string& repo_path, const std::string& branch
         }
     );
     reloader.start();
-    std::cout << "[hot-reload] Polling " << branch << " for new commits" << std::endl;
+
+    if (fetch_remote)
+        std::cout << "[hot-reload] Fetching " << branch << " from remote" << std::endl;
+    else
+        std::cout << "[hot-reload] Polling " << branch << " for new commits" << std::endl;
 
     loom::HttpServer server(8080);
     setup_routes(server, cache);
@@ -490,21 +494,39 @@ static void run_with_git(const std::string& repo_path, const std::string& branch
 int main(int argc, char* argv[])
 {
     // Usage:
-    //   ./loom [content_dir]                              — filesystem source (default)
-    //   ./loom --git <repo_path> [branch] [content_prefix] — git source
+    //   ./loom [content_dir]                                 — filesystem source (default)
+    //   ./loom --git <repo_or_url> [branch] [content_prefix] — git source (local path or remote URL)
     if (argc > 1 && std::string(argv[1]) == "--git")
     {
         if (argc < 3)
         {
-            std::cerr << "Usage: loom --git <repo_path> [branch] [content_prefix]" << std::endl;
+            std::cerr << "Usage: loom --git <repo_path_or_url> [branch] [content_prefix]" << std::endl;
             return 1;
         }
 
-        std::string repo_path = argv[2];
+        std::string repo_arg = argv[2];
         std::string branch = (argc > 3) ? argv[3] : "main";
         std::string prefix = (argc > 4) ? argv[4] : "";
 
-        run_with_git(repo_path, branch, prefix);
+        bool remote = loom::is_remote_url(repo_arg);
+        std::string repo_path = repo_arg;
+
+        if (remote)
+        {
+            std::cout << "Cloning " << repo_arg << "..." << std::endl;
+            try
+            {
+                repo_path = loom::git_clone_bare(repo_arg, "/tmp/loom-repos");
+                std::cout << "Cloned to " << repo_path << std::endl;
+            }
+            catch (const loom::GitError& e)
+            {
+                std::cerr << "Failed to clone: " << e.what() << std::endl;
+                return 1;
+            }
+        }
+
+        run_with_git(repo_path, branch, prefix, remote);
     }
     else
     {

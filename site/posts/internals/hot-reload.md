@@ -2,7 +2,7 @@
 title: Hot Reload — Edit and See Changes Instantly
 date: 2024-02-01
 slug: hot-reload
-tags: feature, architecture
+tags: feature, architecture, git
 excerpt: Loom watches your content directory with inotify and rebuilds the cache atomically. No restart needed.
 ---
 

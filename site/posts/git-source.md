@@ -1,8 +1,8 @@
 ---
 title: Git Source — Serve a Blog Without a Checkout
-date: 2024-03-01
+date: 2025-03-01
 slug: git-source
-tags: feature, git
+tags: feature, git, architecture
 excerpt: Loom can read content directly from git objects. No working tree, no checkout, just git show and git ls-tree.
 ---
 

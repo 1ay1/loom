@@ -16,9 +16,10 @@ namespace loom
 class GitWatcher
 {
 public:
-    GitWatcher(const std::string& repo_path, const std::string& branch)
+    GitWatcher(const std::string& repo_path, const std::string& branch, bool fetch_remote = false)
         : repo_path_(repo_path)
         , branch_(branch)
+        , fetch_remote_(fetch_remote)
     {}
 
     ~GitWatcher()
@@ -56,6 +57,10 @@ public:
 
         try
         {
+            // For remote-cloned repos, fetch to update refs/heads/*
+            if (fetch_remote_)
+                git_fetch(repo_path_);
+
             auto current = git_rev_parse(repo_path_, branch_);
             if (current != last_hash_)
             {
@@ -72,6 +77,7 @@ private:
     std::string repo_path_;
     std::string branch_;
     std::string last_hash_;
+    bool fetch_remote_ = false;
     std::atomic<bool> running_{false};
 };
 

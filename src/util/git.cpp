@@ -1,9 +1,11 @@
 #include "../../include/loom/util/git.hpp"
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <array>
 #include <algorithm>
+#include <filesystem>
 
 namespace loom
 {
@@ -167,6 +169,69 @@ std::chrono::system_clock::time_point git_last_commit_date(const std::string& re
 std::string git_rev_parse(const std::string& repo_path, const std::string& ref)
 {
     return git_exec(repo_path, "rev-parse " + ref);
+}
+
+bool is_remote_url(const std::string& path)
+{
+    // https://, git://, ssh://, or git@host:path
+    if (path.find("://") != std::string::npos)
+        return true;
+    if (path.size() > 4 && path.substr(0, 4) == "git@" && path.find(':') != std::string::npos)
+        return true;
+    return false;
+}
+
+std::string git_clone_bare(const std::string& url, const std::string& dest)
+{
+    // Derive a directory name from the URL
+    auto name = url;
+    // Strip trailing .git
+    if (name.size() > 4 && name.substr(name.size() - 4) == ".git")
+        name = name.substr(0, name.size() - 4);
+    // Take the last path component
+    auto slash = name.rfind('/');
+    if (slash != std::string::npos)
+        name = name.substr(slash + 1);
+    auto colon = name.rfind(':');
+    if (colon != std::string::npos)
+        name = name.substr(colon + 1);
+
+    auto local_path = dest + "/" + name + ".git";
+
+    if (std::filesystem::exists(local_path))
+    {
+        // Already cloned — just fetch
+        git_fetch(local_path);
+        return local_path;
+    }
+
+    std::string cmd = "git clone --bare " + url + " " + local_path + " 2>&1";
+    FILE* pipe = popen(cmd.c_str(), "r");
+    if (!pipe)
+        throw GitError("Failed to run git clone");
+
+    std::string output;
+    std::array<char, 4096> buf;
+    while (auto n = fread(buf.data(), 1, buf.size(), pipe))
+        output.append(buf.data(), n);
+
+    int status = pclose(pipe);
+    if (status != 0)
+        throw GitError("git clone failed: " + output);
+
+    return local_path;
+}
+
+void git_fetch(const std::string& repo_path)
+{
+    try
+    {
+        git_exec(repo_path, "fetch --quiet origin");
+    }
+    catch (const GitError&)
+    {
+        // Fetch failure is non-fatal — we still have the old data
+    }
 }
 
 }

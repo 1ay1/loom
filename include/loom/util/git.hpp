@@ -43,4 +43,14 @@ std::string git_rev_parse(const std::string& repo_path, const std::string& ref);
 // Parse an ISO 8601 date string (git --format=%aI output) to time_point.
 std::chrono::system_clock::time_point parse_iso8601(const std::string& date_str);
 
+// Clone a bare repository. Returns the local path.
+std::string git_clone_bare(const std::string& url, const std::string& dest);
+
+// Fetch latest from remote in a local repo.
+void git_fetch(const std::string& repo_path);
+
+// Returns true if the string looks like a remote git URL
+// (contains "://" or matches git@host:path pattern).
+bool is_remote_url(const std::string& path);
+
 }
