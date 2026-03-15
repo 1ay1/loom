@@ -1,0 +1,232 @@
+# loom
+
+A zero-dependency C++20 blog engine. One binary, one content directory, one command.
+
+Loom reads markdown, renders HTML, and serves it over HTTP — no frameworks, no build tools, no JavaScript bundlers. The HTTP server, markdown parser, router, and template engine are all written from scratch.
+
+```
+make && ./loom content/
+```
+
+That's it. Your blog is at `localhost:8080`.
+
+---
+
+## Why
+
+Every static site generator needs a build step, a deploy pipeline, and a runtime. Loom doesn't. It's a single binary that reads markdown and serves HTML. Hot reload is built in. Push a commit, the site updates.
+
+## Features
+
+- **Epoll-based HTTP server** — non-blocking I/O, TCP_NODELAY, keep-alive, trie-based router
+- **Hand-written markdown parser** — headings, bold/italic, code blocks, tables, footnotes, task lists, strikethrough, images, reference links, raw HTML passthrough
+- **Pre-rendered cache** — the entire site lives in memory, atomically swapped on content changes
+- **Gzip + ETag** — compressed responses with HTTP 304 support out of the box
+- **HTML minification** — automatic, zero config
+- **Hot reload** — inotify-based filesystem watching with 500ms debounce, or git polling for commit-driven updates
+- **8 built-in themes** — default, serif, mono, nord, rose, cobalt, earth, hacker — all with light/dark mode
+- **RSS, sitemap, robots.txt** — generated automatically
+- **Tags, series, archives** — first-class content organization with dedicated pages
+- **Sidebar widgets** — recent posts, tag cloud, about text
+- **Open Graph / SEO metadata** — og:tags, canonical URLs, structured data
+- **Git source** — serve content directly from a git branch, no checkout needed
+- **Strong types** — `Slug`, `Tag`, `Title`, `PostId`, `Content` — no stringly-typed domain logic
+- **C++20 concepts** — `ContentSource`, `WatchPolicy`, `Reloadable` — the type system enforces contracts
+
+## Quick Start
+
+```bash
+# build
+make
+
+# serve from filesystem (default)
+./loom content/
+
+# serve from a git repo
+./loom --git /path/to/repo main content
+```
+
+## Content Structure
+
+```
+content/
+├── site.conf            # site config
+├── posts/
+│   ├── hello-world.md
+│   └── my-second-post.md
+├── pages/
+│   └── about.md
+└── theme/
+    └── style.css        # optional, overrides everything
+```
+
+### Post frontmatter
+
+```markdown
+---
+title: Why epoll beats select
+date: 2024-03-10
+slug: epoll-vs-select
+tags: linux, networking, performance
+series: Systems Programming
+series_order: 1
+draft: false
+excerpt: Custom excerpt for social cards and listings
+---
+
+Your markdown here.
+```
+
+### Page frontmatter
+
+```markdown
+---
+title: About
+slug: about
+---
+
+Page content.
+```
+
+## Configuration
+
+`site.conf` uses `key = value` format:
+
+```conf
+title = My Blog
+description = Thoughts on software engineering
+author = Jane Doe
+base_url = https://example.com
+
+# Navigation bar
+nav = Home:/, Archives:/archives, About:/about
+
+# Theme: default, serif, mono, nord, rose, cobalt, earth, hacker
+theme = nord
+
+# Override individual theme variables
+theme_font_size = 16px
+theme_max_width = 800px
+
+# Sidebar
+sidebar_widgets = recent_posts, tag_cloud, about
+sidebar_recent_count = 5
+sidebar_about = Thoughts on software engineering, systems, and type theory.
+sidebar_position = right
+
+# Layout
+header_style = default
+post_list_style = cards
+show_description = true
+show_theme_toggle = true
+show_post_dates = true
+show_post_tags = true
+show_excerpts = true
+show_reading_time = true
+date_format = %Y-%m-%d
+
+# Footer
+footer_copyright = &copy; 2024 Jane Doe
+footer_links = GitHub:https://github.com/jane, RSS:/feed.xml
+
+# Inject custom CSS or HTML
+custom_css = body { letter-spacing: 0.02em; }
+custom_head_html = <link rel="icon" href="/favicon.ico">
+```
+
+## Routes
+
+| Path | Description |
+|------|-------------|
+| `/` | Post index |
+| `/post/:slug` | Single post |
+| `/tag/:slug` | Posts by tag |
+| `/tags` | All tags |
+| `/archives` | Posts by year |
+| `/series` | All series |
+| `/series/:name` | Posts in series |
+| `/:slug` | Static page |
+| `/feed.xml` | RSS 2.0 |
+| `/sitemap.xml` | XML sitemap |
+| `/robots.txt` | Robots |
+
+## Themes
+
+All themes ship with light and dark variants. The toggle is automatic (respects `prefers-color-scheme`, with manual override persisted to localStorage).
+
+| Theme | Vibe |
+|-------|------|
+| `default` | Clean, neutral grays, blue accent |
+| `serif` | Georgia/Garamond, warm browns, editorial |
+| `mono` | Monospace, green accent, terminal feel |
+| `nord` | Arctic blues, Inter font |
+| `rose` | Soft pinks, elegant |
+| `cobalt` | Deep blue, developer-friendly |
+| `earth` | Warm organics, Charter/Georgia |
+| `hacker` | No border-radius, no frills, green on black |
+
+Override any theme with `content/theme/style.css` — it replaces the built-in CSS entirely.
+
+## Git Source
+
+Serve content from any git branch without touching the working tree:
+
+```bash
+# local repo, main branch, content in "content/" subdirectory
+./loom --git . main content
+
+# bare repo, custom branch
+./loom --git /srv/blog.git production
+
+# no content prefix (content at repo root)
+./loom --git /path/to/repo main
+```
+
+The git source uses `git show` and `git ls-tree` to read blobs directly — no checkout, no temp files. Hot reload polls for new commits and rebuilds automatically.
+
+Post dates fall back to the first commit that introduced the file (`git log --diff-filter=A`). Modified timestamps use the last commit date. Both survive clones and CI rebuilds — unlike filesystem `mtime`.
+
+## Architecture
+
+```
+Request → Epoll → Router → AtomicCache snapshot → Gzip → Response
+                               ↑
+              HotReloader → build_cache() → atomic swap
+                   ↑
+        InotifyWatcher | GitWatcher
+```
+
+The site is pre-rendered into an immutable `SiteCache` struct on startup. Every request grabs a `shared_ptr` snapshot — zero contention on the read path. When content changes, a new cache is built and swapped atomically. In-flight requests continue serving from the old snapshot.
+
+### Build
+
+```bash
+make            # g++, C++20, -O2
+make clean
+```
+
+**Requirements:** Linux, g++ with C++20 support, zlib (`-lz`).
+
+No cmake. No conan. No vcpkg. No submodules.
+
+## Project Layout
+
+```
+src/
+├── main.cpp                 # entry point, routing, cache orchestration
+├── http/                    # epoll server, trie router, request/response
+├── content/                 # filesystem + git content sources
+├── render/                  # HTML rendering, themes, sidebar, layout
+├── util/                    # markdown parser, config parser, gzip, minify, git
+└── reload/                  # inotify watcher, git watcher, hot reloader
+
+include/loom/
+├── core/                    # strong types (Slug, Tag, Title, Content, PostId)
+├── domain/                  # Site, Post, Page, Navigation, Theme, Footer
+├── engine/                  # BlogEngine, site_builder
+└── ...                      # mirrors src/ structure
+```
+
+## License
+
+MIT
