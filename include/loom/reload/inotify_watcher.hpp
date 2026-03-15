@@ -8,6 +8,7 @@
 #include <dirent.h>
 
 #include <atomic>
+#include <cstring>
 #include <functional>
 #include <mutex>
 #include <string>
@@ -95,6 +96,12 @@ public:
                         std::string name = (ev->len > 0) ? ev->name : "";
                         changes << it->second.classify(name);
                         any = true;
+
+                        // Auto-watch newly created subdirectories
+                        if ((ev->mask & (IN_CREATE | IN_MOVED_TO)) && (ev->mask & IN_ISDIR))
+                        {
+                            watch_dir(it->second.path + "/" + name, it->second.classify);
+                        }
                     }
                 }
 
@@ -117,12 +124,24 @@ private:
         // Ensure directory exists
         DIR* d = opendir(path.c_str());
         if (!d) return;
-        closedir(d);
 
         constexpr uint32_t mask = IN_CREATE | IN_MODIFY | IN_DELETE | IN_MOVED_TO | IN_MOVED_FROM;
         int wd = inotify_add_watch(fd_, path.c_str(), mask);
         if (wd >= 0)
-            watches_[wd] = {path, std::move(classify)};
+            watches_[wd] = {path, classify};
+
+        // Recurse into subdirectories so nested content is watched too
+        struct dirent* entry;
+        while ((entry = readdir(d)) != nullptr)
+        {
+            if (entry->d_type == DT_DIR &&
+                std::strcmp(entry->d_name, ".") != 0 &&
+                std::strcmp(entry->d_name, "..") != 0)
+            {
+                watch_dir(path + "/" + entry->d_name, classify);
+            }
+        }
+        closedir(d);
     }
 
     std::string content_dir_;

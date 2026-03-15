@@ -12,7 +12,8 @@ namespace loom
 
 std::string git_exec(const std::string& repo_path, const std::string& args)
 {
-    std::string cmd = "git -C " + repo_path + " " + args + " 2>/dev/null";
+    // Use timeout to prevent hung git processes from accumulating
+    std::string cmd = "timeout 30 git -C " + repo_path + " " + args + " 2>/dev/null";
 
     FILE* pipe = popen(cmd.c_str(), "r");
     if (!pipe)
@@ -205,7 +206,7 @@ std::string git_clone_bare(const std::string& url, const std::string& dest)
         return local_path;
     }
 
-    std::string cmd = "git clone --bare " + url + " " + local_path + " 2>&1";
+    std::string cmd = "timeout 120 git clone --bare " + url + " " + local_path + " 2>&1";
     FILE* pipe = popen(cmd.c_str(), "r");
     if (!pipe)
         throw GitError("Failed to run git clone");

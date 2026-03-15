@@ -5,6 +5,7 @@
 #include "../util/git.hpp"
 
 #include <atomic>
+#include <chrono>
 #include <optional>
 #include <string>
 
@@ -16,10 +17,14 @@ namespace loom
 class GitWatcher
 {
 public:
-    GitWatcher(const std::string& repo_path, const std::string& branch, bool fetch_remote = false)
+    // fetch_interval: minimum time between remote fetches (default 10s)
+    GitWatcher(const std::string& repo_path, const std::string& branch,
+               bool fetch_remote = false,
+               std::chrono::seconds fetch_interval = std::chrono::seconds(10))
         : repo_path_(repo_path)
         , branch_(branch)
         , fetch_remote_(fetch_remote)
+        , fetch_interval_(fetch_interval)
     {}
 
     ~GitWatcher()
@@ -57,9 +62,17 @@ public:
 
         try
         {
-            // For remote-cloned repos, fetch to update refs/heads/*
+            // For remote-cloned repos, fetch to update refs — but throttle to
+            // avoid hammering the remote (default: at most once every 10s).
             if (fetch_remote_)
-                git_fetch(repo_path_);
+            {
+                auto now = std::chrono::steady_clock::now();
+                if (now - last_fetch_time_ >= fetch_interval_)
+                {
+                    git_fetch(repo_path_);
+                    last_fetch_time_ = now;
+                }
+            }
 
             auto current = git_rev_parse(repo_path_, branch_);
             if (current != last_hash_)
@@ -78,6 +91,8 @@ private:
     std::string branch_;
     std::string last_hash_;
     bool fetch_remote_ = false;
+    std::chrono::seconds fetch_interval_;
+    std::chrono::steady_clock::time_point last_fetch_time_{};
     std::atomic<bool> running_{false};
 };
 
