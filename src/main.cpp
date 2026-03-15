@@ -5,6 +5,7 @@
 #include <ctime>
 #include <sstream>
 #include "loom/util/gzip.hpp"
+#include "loom/util/minify.hpp"
 
 #include "loom/content/content_source.hpp"
 #include "loom/content/filesystem_source.hpp"
@@ -39,8 +40,10 @@ struct SiteCache
     CachedPage rss;
 };
 
-static CachedPage make_cached(std::string html)
+static CachedPage make_cached(std::string html, bool minify = true)
 {
+    if (minify)
+        html = loom::minify_html(html);
     auto hash = std::hash<std::string>{}(html);
     std::string etag = "\"" + std::to_string(hash) + "\"";
     auto gz = loom::gzip_compress(html);
@@ -285,7 +288,7 @@ static std::shared_ptr<const SiteCache> build_cache(loom::FileSystemSource& sour
             sitemap += "  <url><loc>" + site.base_url + "/series</loc><priority>0.4</priority></url>\n";
         sitemap += "</urlset>\n";
 
-        cache->sitemap = make_cached(sitemap);
+        cache->sitemap = make_cached(sitemap, false);
     }
 
     // Robots
@@ -296,7 +299,7 @@ static std::shared_ptr<const SiteCache> build_cache(loom::FileSystemSource& sour
         robots += "Disallow:\n\n";
         if (!site.base_url.empty())
             robots += "Sitemap: " + site.base_url + "/sitemap.xml\n";
-        cache->robots = make_cached(robots);
+        cache->robots = make_cached(robots, false);
     }
 
     // RSS
@@ -329,7 +332,7 @@ static std::shared_ptr<const SiteCache> build_cache(loom::FileSystemSource& sour
 
         rss += "</channel>\n";
         rss += "</rss>\n";
-        cache->rss = make_cached(rss);
+        cache->rss = make_cached(rss, false);
     }
 
     return cache;
