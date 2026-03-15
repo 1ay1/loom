@@ -56,7 +56,7 @@ static const std::map<std::string, ThemeColors> THEMES = {
 
     // Hacker — monospace, dark, no gimmicks
     {"hacker", {
-        "#0c0c0c", "#b5b5b5", "#606060", "#1a1a1a", "#88c070",
+        "#f0f0e8", "#1a1a1a", "#5a5a5a", "#c8c8b8", "#2d8a2d",
         "ui-monospace,SFMono-Regular,Menlo,Consolas,monospace", "14px", "800px",
         "#0c0c0c", "#b5b5b5", "#606060", "#1a1a1a", "#88c070",
 

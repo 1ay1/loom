@@ -20,7 +20,7 @@ static const char* DEFAULT_CSS = R"CSS(
   --heading-weight: 700;
   --border-radius: 6px;
   --container-padding: 40px 20px;
-  --sidebar-width: 220px;
+  --sidebar-width: 260px;
   --sidebar-gap: 32px;
   --nav-gap: 18px;
   --header-size: 42px;
@@ -457,8 +457,8 @@ footer {
 }
 
 .tag:hover {
-  background: var(--accent);
-  color: var(--bg);
+  background: color-mix(in srgb, var(--accent) 20%, var(--tag-bg));
+  color: var(--accent);
 }
 
 .with-sidebar {
@@ -517,6 +517,15 @@ footer {
 .widget li {
   margin-bottom: 8px;
   line-height: 1.4;
+}
+
+.sidebar .post-tags {
+  gap: 5px;
+}
+
+.sidebar .tag {
+  font-size: 12px;
+  padding: 1px 7px;
 }
 
 .widget li a {
