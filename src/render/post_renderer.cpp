@@ -63,7 +63,7 @@ namespace loom
         if (!ctx.series_name.empty() && ctx.series_posts.size() > 1)
         {
             html += "<nav class='series-nav'>";
-            html += "<p class='series-label'>Part of series: <strong>" + ctx.series_name + "</strong></p>";
+            html += "<p class='series-label'>Part of series: <strong>" + ctx.series_name.get() + "</strong></p>";
             html += "<ol class='series-list'>";
             for (const auto& sp : ctx.series_posts)
             {
@@ -261,11 +261,11 @@ namespace loom
         return html;
     }
 
-    std::string render_series_page(const std::string& series, const std::vector<PostSummary>& posts, const LayoutConfig& layout)
+    std::string render_series_page(const Series& series, const std::vector<PostSummary>& posts, const LayoutConfig& layout)
     {
         std::string html;
         html += "<section>";
-        html += "<h2>Series: " + series + "</h2>";
+        html += "<h2>Series: " + series.get() + "</h2>";
 
         html += "<ol class='series-list'>";
         for (const auto& post : posts)
@@ -282,14 +282,14 @@ namespace loom
         return html;
     }
 
-    std::string render_series_index(const std::vector<std::string>& series)
+    std::string render_series_index(const std::vector<Series>& series)
     {
         std::string html;
         html += "<section>";
         html += "<h2>Series</h2>";
         html += "<ul>";
         for (const auto& s : series)
-            html += "<li><a href='/series/" + s + "'>" + s + "</a></li>";
+            html += "<li><a href='/series/" + s.get() + "'>" + s.get() + "</a></li>";
         html += "</ul>";
         html += "</section>";
         return html;

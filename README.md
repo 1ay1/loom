@@ -68,14 +68,29 @@ title: Why epoll beats select
 date: 2024-03-10
 slug: epoll-vs-select
 tags: linux, networking, performance
-series: Systems Programming
-series_order: 1
 draft: false
 excerpt: Custom excerpt for social cards and listings
 ---
 
 Your markdown here.
 ```
+
+### Series
+
+Series are defined by directory structure — create a subfolder inside `posts/`:
+
+```
+posts/
+├── hello-world.md              # standalone post
+├── systems-programming/        # ← series name
+│   ├── epoll-vs-select.md
+│   └── tcp-nodelay.md
+└── type-safety/                # ← another series
+    ├── strong-types.md
+    └── phantom-types.md
+```
+
+Posts within a series are ordered by publish date (oldest first). No frontmatter needed.
 
 ### Page frontmatter
 

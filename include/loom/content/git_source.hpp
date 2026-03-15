@@ -60,6 +60,12 @@ private:
 
     // List files in a subdirectory of the content prefix
     std::vector<std::string> list_files(const std::string& subdir, const std::string& ext) const;
+
+    // List subdirectories within a directory
+    std::vector<std::string> list_subdirs(const std::string& subdir) const;
+
+    // Load a single post from a git blob path
+    Post load_git_post(const std::string& rel_path, const std::string& series_name, int& counter) const;
 };
 
 }

@@ -138,7 +138,8 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
 
     auto nav = loom::render_navigation(site.navigation);
     auto all_tags = engine.all_tags();
-    loom::SidebarData sidebar_data{engine.list_posts(), all_tags};
+    auto all_series = engine.all_series();
+    loom::SidebarData sidebar_data{engine.list_posts(), all_tags, all_series};
     auto sidebar_html = loom::render_sidebar(site, sidebar_data);
 
     auto cache = std::make_shared<SiteCache>();
@@ -229,15 +230,14 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
     }
 
     // Series
-    auto all_series = engine.all_series();
     for (const auto& series : all_series)
     {
         auto series_posts = engine.posts_in_series(series);
         loom::PageMeta meta;
-        meta.title = "Series: " + series;
-        meta.canonical_path = "/series/" + series;
-        meta.description = "Posts in the " + series + " series on " + site.title;
-        cache->pages["/series/" + series] = make_cached(loom::render_layout(site, nav, loom::render_series_page(series, series_posts, site.layout), sidebar_html, meta));
+        meta.title = "Series: " + series.get();
+        meta.canonical_path = "/series/" + series.get();
+        meta.description = "Posts in the " + series.get() + " series on " + site.title;
+        cache->pages["/series/" + series.get()] = make_cached(loom::render_layout(site, nav, loom::render_series_page(series, series_posts, site.layout), sidebar_html, meta));
     }
     if (!all_series.empty())
     {
@@ -286,7 +286,7 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         sitemap += "  <url><loc>" + site.base_url + "/tags</loc><priority>0.3</priority></url>\n";
         sitemap += "  <url><loc>" + site.base_url + "/archives</loc><priority>0.5</priority></url>\n";
         for (const auto& s : all_series)
-            sitemap += "  <url><loc>" + site.base_url + "/series/" + xml_escape(s) + "</loc><priority>0.5</priority></url>\n";
+            sitemap += "  <url><loc>" + site.base_url + "/series/" + xml_escape(s.get()) + "</loc><priority>0.5</priority></url>\n";
         if (!all_series.empty())
             sitemap += "  <url><loc>" + site.base_url + "/series</loc><priority>0.4</priority></url>\n";
         sitemap += "</urlset>\n";

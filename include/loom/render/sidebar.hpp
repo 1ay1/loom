@@ -14,6 +14,7 @@ struct SidebarData
 {
     std::vector<PostSummary> recent_posts;
     std::vector<Tag> tags;
+    std::vector<Series> series;
 };
 
 std::string render_sidebar(const Site& site, const SidebarData& data);

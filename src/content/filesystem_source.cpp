@@ -222,120 +222,135 @@ void FileSystemSource::load_theme()
     }
 }
 
+static std::vector<std::string> list_subdirs(const std::string& dir)
+{
+    std::vector<std::string> result;
+    DIR* d = opendir(dir.c_str());
+    if (!d) return result;
+
+    struct dirent* entry;
+    while ((entry = readdir(d)) != nullptr)
+    {
+        if (entry->d_type != DT_DIR) continue;
+        std::string name = entry->d_name;
+        if (name == "." || name == "..") continue;
+        result.push_back(name);
+    }
+    closedir(d);
+    std::sort(result.begin(), result.end());
+    return result;
+}
+
+static Post load_post(const std::string& path, const std::string& series_name, int& counter)
+{
+    auto text = FileSystemSource::read_file(path);
+    auto doc = parse_frontmatter(text);
+
+    auto slug = doc.meta.count("slug") ? doc.meta["slug"] : "";
+    if (slug.empty())
+    {
+        auto fname = path.substr(path.rfind('/') + 1);
+        slug = fname.substr(0, fname.size() - 3);
+    }
+
+    auto date = doc.meta.count("date") ? parse_date(doc.meta["date"])
+                                        : std::chrono::system_clock::now();
+    auto mtime = file_mtime(path);
+
+    std::vector<Tag> tags;
+    if (doc.meta.count("tags"))
+    {
+        std::istringstream ss(doc.meta["tags"]);
+        std::string tag;
+        while (std::getline(ss, tag, ','))
+        {
+            auto start = tag.find_first_not_of(" \t");
+            auto end = tag.find_last_not_of(" \t");
+            if (start != std::string::npos)
+                tags.push_back(Tag(tag.substr(start, end - start + 1)));
+        }
+    }
+
+    bool draft = false;
+    if (doc.meta.count("draft"))
+        draft = (doc.meta["draft"] == "true");
+
+    auto html_content = markdown_to_html(doc.body);
+
+    int reading_time = 0;
+    {
+        int words = 0;
+        bool in_word = false;
+        bool in_html_tag = false;
+        for (char c : html_content)
+        {
+            if (c == '<') { in_html_tag = true; continue; }
+            if (c == '>') { in_html_tag = false; continue; }
+            if (in_html_tag) continue;
+
+            bool is_space = (c == ' ' || c == '\n' || c == '\t' || c == '\r');
+            if (!is_space && !in_word) { ++words; in_word = true; }
+            else if (is_space) { in_word = false; }
+        }
+        reading_time = std::max(1, (words + 100) / 200);
+    }
+
+    std::string excerpt;
+    if (doc.meta.count("excerpt"))
+    {
+        excerpt = doc.meta["excerpt"];
+    }
+    else
+    {
+        bool in_html_tag = false;
+        for (char c : html_content)
+        {
+            if (c == '<') { in_html_tag = true; continue; }
+            if (c == '>') { in_html_tag = false; continue; }
+            if (in_html_tag) continue;
+            if (c == '\n') c = ' ';
+            excerpt += c;
+            if (excerpt.size() >= 200) break;
+        }
+        if (excerpt.size() >= 200)
+        {
+            auto last_space = excerpt.rfind(' ');
+            if (last_space != std::string::npos && last_space > 100)
+                excerpt = excerpt.substr(0, last_space) + "...";
+        }
+    }
+
+    return Post{
+        PostId(std::to_string(counter++)),
+        Title(doc.meta.count("title") ? doc.meta["title"] : slug),
+        Slug(slug),
+        Content(std::move(html_content)),
+        std::move(tags),
+        date,
+        draft,
+        std::move(excerpt),
+        reading_time,
+        Series(series_name),
+        mtime,
+    };
+}
+
 void FileSystemSource::load_posts()
 {
-    auto files = list_files(content_dir_ + "/posts", ".md");
     int counter = 1;
 
+    // Top-level posts (no series)
+    auto files = list_files(content_dir_ + "/posts", ".md");
     for (const auto& path : files)
+        posts_.push_back(load_post(path, "", counter));
+
+    // Subdirectories = series (folder name is the series name)
+    auto dirs = list_subdirs(content_dir_ + "/posts");
+    for (const auto& dir : dirs)
     {
-        auto text = read_file(path);
-        if (text.empty()) continue;
-
-        auto doc = parse_frontmatter(text);
-
-        auto slug = doc.meta.count("slug") ? doc.meta["slug"] : "";
-        if (slug.empty())
-        {
-            // Derive slug from filename
-            auto fname = path.substr(path.rfind('/') + 1);
-            slug = fname.substr(0, fname.size() - 3); // remove .md
-        }
-
-        auto date = doc.meta.count("date") ? parse_date(doc.meta["date"])
-                                            : std::chrono::system_clock::now();
-        auto mtime = file_mtime(path);
-
-        // Parse tags: comma-separated
-        std::vector<Tag> tags;
-        if (doc.meta.count("tags"))
-        {
-            std::istringstream ss(doc.meta["tags"]);
-            std::string tag;
-            while (std::getline(ss, tag, ','))
-            {
-                auto start = tag.find_first_not_of(" \t");
-                auto end = tag.find_last_not_of(" \t");
-                if (start != std::string::npos)
-                    tags.push_back(Tag(tag.substr(start, end - start + 1)));
-            }
-        }
-
-        // Draft flag
-        bool draft = false;
-        if (doc.meta.count("draft"))
-            draft = (doc.meta["draft"] == "true");
-
-        // Series
-        std::string series;
-        int series_order = 0;
-        if (doc.meta.count("series"))
-            series = doc.meta["series"];
-        if (doc.meta.count("series_order"))
-            series_order = std::stoi(doc.meta["series_order"]);
-
-        auto html_content = markdown_to_html(doc.body);
-
-        // Reading time: count words in plain text
-        int reading_time = 0;
-        {
-            int words = 0;
-            bool in_word = false;
-            bool in_html_tag = false;
-            for (char c : html_content)
-            {
-                if (c == '<') { in_html_tag = true; continue; }
-                if (c == '>') { in_html_tag = false; continue; }
-                if (in_html_tag) continue;
-
-                bool is_space = (c == ' ' || c == '\n' || c == '\t' || c == '\r');
-                if (!is_space && !in_word) { ++words; in_word = true; }
-                else if (is_space) { in_word = false; }
-            }
-            reading_time = std::max(1, (words + 100) / 200);
-        }
-
-        // Excerpt: frontmatter > first paragraph of plain text
-        std::string excerpt;
-        if (doc.meta.count("excerpt"))
-        {
-            excerpt = doc.meta["excerpt"];
-        }
-        else
-        {
-            bool in_html_tag = false;
-            for (char c : html_content)
-            {
-                if (c == '<') { in_html_tag = true; continue; }
-                if (c == '>') { in_html_tag = false; continue; }
-                if (in_html_tag) continue;
-                if (c == '\n') c = ' ';
-                excerpt += c;
-                if (excerpt.size() >= 200) break;
-            }
-            // Trim to last word boundary
-            if (excerpt.size() >= 200)
-            {
-                auto last_space = excerpt.rfind(' ');
-                if (last_space != std::string::npos && last_space > 100)
-                    excerpt = excerpt.substr(0, last_space) + "...";
-            }
-        }
-
-        posts_.push_back(Post{
-            PostId(std::to_string(counter++)),
-            Title(doc.meta.count("title") ? doc.meta["title"] : slug),
-            Slug(slug),
-            Content(std::move(html_content)),
-            std::move(tags),
-            date,
-            draft,
-            std::move(excerpt),
-            reading_time,
-            std::move(series),
-            series_order,
-            mtime,
-        });
+        auto series_files = list_files(content_dir_ + "/posts/" + dir, ".md");
+        for (const auto& path : series_files)
+            posts_.push_back(load_post(path, dir, counter));
     }
 }
 

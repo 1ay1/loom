@@ -302,11 +302,12 @@ html {
 
 .post-content pre, .page-content pre {
   background: var(--border);
-  padding: 16px;
+  padding: 14px;
   border-radius: var(--border-radius);
   overflow-x: auto;
   margin-bottom: 14px;
-  font-size: 15px;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .post-content code, .page-content code {
@@ -547,6 +548,16 @@ footer {
   color: var(--muted);
   line-height: 1.6;
   font-size: 14px;
+}
+
+.widget p a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.widget p a:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
 }
 
 .widget .post-tags {

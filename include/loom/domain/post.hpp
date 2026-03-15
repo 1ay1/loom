@@ -21,8 +21,7 @@ namespace loom
         bool draft = false;
         std::string excerpt;
         int reading_time_minutes = 0;
-        std::string series;
-        int series_order = 0;
+        Series series{""};
         std::chrono::system_clock::time_point modified_at;
     };
 }

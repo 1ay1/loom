@@ -48,6 +48,32 @@ static std::string render_tag_cloud(const SidebarData& data)
     return html;
 }
 
+static std::string render_archives()
+{
+    std::string html;
+    html += "<div class='widget'>";
+    html += "<h3>Archives</h3>";
+    html += "<p><a href='/archives'>Browse all posts by year</a></p>";
+    html += "</div>";
+    return html;
+}
+
+static std::string render_series(const SidebarData& data)
+{
+    if (data.series.empty())
+        return "";
+
+    std::string html;
+    html += "<div class='widget'>";
+    html += "<h3>Series</h3>";
+    html += "<ul>";
+    for (const auto& s : data.series)
+        html += "<li><a href='/series/" + s.get() + "'>" + s.get() + "</a></li>";
+    html += "</ul>";
+    html += "</div>";
+    return html;
+}
+
 static std::string render_about(const Site& site)
 {
     std::string html;
@@ -72,6 +98,10 @@ std::string render_sidebar(const Site& site, const SidebarData& data)
             html += render_recent_posts(site, data);
         else if (widget == "tag_cloud")
             html += render_tag_cloud(data);
+        else if (widget == "archives")
+            html += render_archives();
+        else if (widget == "series")
+            html += render_series(data);
         else if (widget == "about" && !site.sidebar.about_text.empty())
             html += render_about(site);
     }

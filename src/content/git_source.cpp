@@ -41,6 +41,29 @@ std::vector<std::string> GitSource::list_files(const std::string& subdir, const 
     return git_list_tree(config_.repo_path, ref(), prefix(subdir), ext);
 }
 
+std::vector<std::string> GitSource::list_subdirs(const std::string& subdir) const
+{
+    std::vector<std::string> result;
+    try
+    {
+        auto lines = git_exec_lines(config_.repo_path,
+            "ls-tree --name-only -d " + ref() + " " + prefix(subdir) + "/");
+        for (const auto& line : lines)
+        {
+            auto name = line;
+            auto slash = name.rfind('/');
+            if (slash != std::string::npos)
+                name = name.substr(slash + 1);
+            if (!name.empty())
+                result.push_back(name);
+        }
+    }
+    catch (const GitError&) {}
+
+    std::sort(result.begin(), result.end());
+    return result;
+}
+
 void GitSource::load()
 {
     load_config();
@@ -198,122 +221,125 @@ void GitSource::load_theme()
     }
 }
 
+Post GitSource::load_git_post(const std::string& rel_path, const std::string& series_name, int& counter) const
+{
+    auto text = read_blob(rel_path);
+    auto doc = parse_frontmatter(text);
+
+    // Filename from path
+    auto fname = rel_path.substr(rel_path.rfind('/') + 1);
+    auto slug = doc.meta.count("slug") ? doc.meta["slug"] : "";
+    if (slug.empty())
+        slug = fname.substr(0, fname.size() - 3);
+
+    auto date = doc.meta.count("date")
+        ? parse_date(doc.meta["date"])
+        : git_first_commit_date(config_.repo_path, prefix(rel_path));
+
+    auto mtime = git_last_commit_date(config_.repo_path, prefix(rel_path));
+
+    std::vector<Tag> tags;
+    if (doc.meta.count("tags"))
+    {
+        std::istringstream ss(doc.meta["tags"]);
+        std::string tag;
+        while (std::getline(ss, tag, ','))
+        {
+            auto start = tag.find_first_not_of(" \t");
+            auto end = tag.find_last_not_of(" \t");
+            if (start != std::string::npos)
+                tags.push_back(Tag(tag.substr(start, end - start + 1)));
+        }
+    }
+
+    bool draft = false;
+    if (doc.meta.count("draft"))
+        draft = (doc.meta["draft"] == "true");
+
+    auto html_content = markdown_to_html(doc.body);
+
+    int reading_time = 0;
+    {
+        int words = 0;
+        bool in_word = false;
+        bool in_html_tag = false;
+        for (char c : html_content)
+        {
+            if (c == '<') { in_html_tag = true; continue; }
+            if (c == '>') { in_html_tag = false; continue; }
+            if (in_html_tag) continue;
+
+            bool is_space = (c == ' ' || c == '\n' || c == '\t' || c == '\r');
+            if (!is_space && !in_word) { ++words; in_word = true; }
+            else if (is_space) { in_word = false; }
+        }
+        reading_time = std::max(1, (words + 100) / 200);
+    }
+
+    std::string excerpt;
+    if (doc.meta.count("excerpt"))
+    {
+        excerpt = doc.meta["excerpt"];
+    }
+    else
+    {
+        bool in_html_tag = false;
+        for (char c : html_content)
+        {
+            if (c == '<') { in_html_tag = true; continue; }
+            if (c == '>') { in_html_tag = false; continue; }
+            if (in_html_tag) continue;
+            if (c == '\n') c = ' ';
+            excerpt += c;
+            if (excerpt.size() >= 200) break;
+        }
+        if (excerpt.size() >= 200)
+        {
+            auto last_space = excerpt.rfind(' ');
+            if (last_space != std::string::npos && last_space > 100)
+                excerpt = excerpt.substr(0, last_space) + "...";
+        }
+    }
+
+    return Post{
+        PostId(std::to_string(counter++)),
+        Title(doc.meta.count("title") ? doc.meta["title"] : slug),
+        Slug(slug),
+        Content(std::move(html_content)),
+        std::move(tags),
+        date,
+        draft,
+        std::move(excerpt),
+        reading_time,
+        Series(series_name),
+        mtime,
+    };
+}
+
 void GitSource::load_posts()
 {
-    auto files = list_files("posts", ".md");
     int counter = 1;
 
+    // Top-level posts (no series)
+    auto files = list_files("posts", ".md");
     for (const auto& filename : files)
     {
         auto text = read_blob("posts/" + filename);
         if (text.empty()) continue;
+        posts_.push_back(load_git_post("posts/" + filename, "", counter));
+    }
 
-        auto doc = parse_frontmatter(text);
-
-        auto slug = doc.meta.count("slug") ? doc.meta["slug"] : "";
-        if (slug.empty())
+    // Subdirectories = series
+    auto subdirs = list_subdirs("posts");
+    for (const auto& dir : subdirs)
+    {
+        auto series_files = list_files("posts/" + dir, ".md");
+        for (const auto& filename : series_files)
         {
-            // Derive slug from filename (remove .md)
-            slug = filename.substr(0, filename.size() - 3);
+            auto text = read_blob("posts/" + dir + "/" + filename);
+            if (text.empty()) continue;
+            posts_.push_back(load_git_post("posts/" + dir + "/" + filename, dir, counter));
         }
-
-        // Date: frontmatter first, then git first-commit date as fallback
-        auto date = doc.meta.count("date")
-            ? parse_date(doc.meta["date"])
-            : git_first_commit_date(config_.repo_path, prefix("posts/" + filename));
-
-        // Modified: git last-commit date (survives clones unlike file mtime)
-        auto mtime = git_last_commit_date(config_.repo_path, prefix("posts/" + filename));
-
-        // Tags
-        std::vector<Tag> tags;
-        if (doc.meta.count("tags"))
-        {
-            std::istringstream ss(doc.meta["tags"]);
-            std::string tag;
-            while (std::getline(ss, tag, ','))
-            {
-                auto start = tag.find_first_not_of(" \t");
-                auto end = tag.find_last_not_of(" \t");
-                if (start != std::string::npos)
-                    tags.push_back(Tag(tag.substr(start, end - start + 1)));
-            }
-        }
-
-        // Draft flag
-        bool draft = false;
-        if (doc.meta.count("draft"))
-            draft = (doc.meta["draft"] == "true");
-
-        // Series
-        std::string series;
-        int series_order = 0;
-        if (doc.meta.count("series"))
-            series = doc.meta["series"];
-        if (doc.meta.count("series_order"))
-            series_order = std::stoi(doc.meta["series_order"]);
-
-        auto html_content = markdown_to_html(doc.body);
-
-        // Reading time
-        int reading_time = 0;
-        {
-            int words = 0;
-            bool in_word = false;
-            bool in_html_tag = false;
-            for (char c : html_content)
-            {
-                if (c == '<') { in_html_tag = true; continue; }
-                if (c == '>') { in_html_tag = false; continue; }
-                if (in_html_tag) continue;
-
-                bool is_space = (c == ' ' || c == '\n' || c == '\t' || c == '\r');
-                if (!is_space && !in_word) { ++words; in_word = true; }
-                else if (is_space) { in_word = false; }
-            }
-            reading_time = std::max(1, (words + 100) / 200);
-        }
-
-        // Excerpt
-        std::string excerpt;
-        if (doc.meta.count("excerpt"))
-        {
-            excerpt = doc.meta["excerpt"];
-        }
-        else
-        {
-            bool in_html_tag = false;
-            for (char c : html_content)
-            {
-                if (c == '<') { in_html_tag = true; continue; }
-                if (c == '>') { in_html_tag = false; continue; }
-                if (in_html_tag) continue;
-                if (c == '\n') c = ' ';
-                excerpt += c;
-                if (excerpt.size() >= 200) break;
-            }
-            if (excerpt.size() >= 200)
-            {
-                auto last_space = excerpt.rfind(' ');
-                if (last_space != std::string::npos && last_space > 100)
-                    excerpt = excerpt.substr(0, last_space) + "...";
-            }
-        }
-
-        posts_.push_back(Post{
-            PostId(std::to_string(counter++)),
-            Title(doc.meta.count("title") ? doc.meta["title"] : slug),
-            Slug(slug),
-            Content(std::move(html_content)),
-            std::move(tags),
-            date,
-            draft,
-            std::move(excerpt),
-            reading_time,
-            std::move(series),
-            series_order,
-            mtime,
-        });
     }
 }
 

@@ -85,8 +85,8 @@ namespace loom
             return result;
         }
 
-        // Published posts in the same series, sorted by series_order
-        std::vector<PostSummary> posts_in_series(const std::string& series) const
+        // Published posts in the same series, sorted by publish date (oldest first)
+        std::vector<PostSummary> posts_in_series(const Series& series) const
         {
             std::vector<PostSummary> result;
             auto now = std::chrono::system_clock::now();
@@ -98,24 +98,17 @@ namespace loom
                 if (p.series == series)
                     result.push_back(make_summary(p));
             }
-            std::sort(result.begin(), result.end(), [&](const auto& a, const auto& b) {
-                // Find original posts to compare series_order
-                int oa = 0, ob = 0;
-                for (const auto& p : site_.posts)
-                {
-                    if (p.slug.get() == a.slug.get()) oa = p.series_order;
-                    if (p.slug.get() == b.slug.get()) ob = p.series_order;
-                }
-                return oa < ob;
+            std::sort(result.begin(), result.end(), [](const auto& a, const auto& b) {
+                return a.published < b.published;
             });
             return result;
         }
 
         // All unique series names
-        std::vector<std::string> all_series() const
+        std::vector<Series> all_series() const
         {
-            std::set<std::string> seen;
-            std::vector<std::string> result;
+            std::set<Series> seen;
+            std::vector<Series> result;
             auto now = std::chrono::system_clock::now();
 
             for (const auto& p : site_.posts)

@@ -41,6 +41,7 @@ namespace loom
         void load_posts();
         void load_pages();
 
+    public:
         static std::string read_file(const std::string& path);
         static std::vector<std::string> list_files(const std::string& dir, const std::string& ext);
     };

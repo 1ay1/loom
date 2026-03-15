@@ -13,8 +13,12 @@ namespace loom
 
         T get() const { return value_; }
 
+        bool empty() const requires requires(const T& v) { v.empty(); }
+        { return value_.empty(); }
+
         bool operator==(const StrongType& other) const { return value_ == other.value_; }
         bool operator!=(const StrongType& other) const { return value_ != other.value_; }
+        bool operator<(const StrongType& other) const { return value_ < other.value_; }
 
     private:
         T value_;
