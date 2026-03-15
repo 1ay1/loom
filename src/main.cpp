@@ -9,6 +9,7 @@
 
 #include "loom/content/content_source.hpp"
 #include "loom/content/filesystem_source.hpp"
+#include "loom/content/git_source.hpp"
 #include "loom/engine/site_builder.hpp"
 #include "loom/engine/blog_engine.hpp"
 #include "loom/render/layout.hpp"
@@ -21,6 +22,7 @@
 
 #include "loom/reload/hot_reloader.hpp"
 #include "loom/reload/inotify_watcher.hpp"
+#include "loom/reload/git_watcher.hpp"
 
 struct CachedPage
 {
@@ -127,7 +129,8 @@ static std::string xml_escape(const std::string& s)
 }
 
 // Build the entire SiteCache from a source. Pure function — no side effects.
-static std::shared_ptr<const SiteCache> build_cache(loom::FileSystemSource& source)
+template<loom::ContentSource Source>
+static std::shared_ptr<const SiteCache> build_cache(Source& source)
 {
     auto config = source.site_config();
     auto site = loom::build_site(source, std::move(config));
@@ -338,39 +341,8 @@ static std::shared_ptr<const SiteCache> build_cache(loom::FileSystemSource& sour
     return cache;
 }
 
-int main(int argc, char* argv[])
+static void setup_routes(loom::HttpServer& server, loom::AtomicCache<SiteCache>& cache)
 {
-    std::string content_dir = "content";
-    if (argc > 1)
-        content_dir = argv[1];
-
-    std::cout << "Loading content from: " << content_dir << std::endl;
-
-    loom::FileSystemSource source(content_dir);
-
-    // Build initial cache
-    auto initial = build_cache(source);
-    std::cout << "Pre-rendered " << initial->pages.size() << " pages" << std::endl;
-
-    loom::AtomicCache<SiteCache> cache(std::move(initial));
-
-    // Set up hot reload: inotify watcher + background reloader
-    loom::InotifyWatcher watcher(content_dir);
-
-    loom::HotReloader<loom::FileSystemSource, loom::InotifyWatcher, SiteCache> reloader(
-        source, watcher, cache,
-        [](loom::FileSystemSource& src, const loom::ChangeSet&) {
-            return build_cache(src);
-        }
-    );
-    reloader.start();
-    std::cout << "[hot-reload] Watching " << content_dir << " for changes" << std::endl;
-
-    loom::HttpServer server(8080);
-
-    // All route handlers grab a cache snapshot, then serve from it.
-    // The snapshot is a shared_ptr — stays valid even if the cache is swapped mid-request.
-
     server.router().get("/", [&](const loom::HttpRequest& req)
     {
         auto snap = cache.load();
@@ -451,8 +423,95 @@ int main(int argc, char* argv[])
             return serve_cached(snap->not_found, req);
         return serve_cached(it->second, req);
     });
+}
 
-    auto snap = cache.load();
+static void run_with_filesystem(const std::string& content_dir)
+{
+    std::cout << "Loading content from: " << content_dir << std::endl;
+
+    loom::FileSystemSource source(content_dir);
+
+    auto initial = build_cache(source);
+    std::cout << "Pre-rendered " << initial->pages.size() << " pages" << std::endl;
+
+    loom::AtomicCache<SiteCache> cache(std::move(initial));
+
+    loom::InotifyWatcher watcher(content_dir);
+
+    loom::HotReloader<loom::FileSystemSource, loom::InotifyWatcher, SiteCache> reloader(
+        source, watcher, cache,
+        [](loom::FileSystemSource& src, const loom::ChangeSet&) {
+            return build_cache(src);
+        }
+    );
+    reloader.start();
+    std::cout << "[hot-reload] Watching " << content_dir << " for changes" << std::endl;
+
+    loom::HttpServer server(8080);
+    setup_routes(server, cache);
+
     std::cout << "Serving at http://localhost:8080" << std::endl;
     server.run();
+}
+
+static void run_with_git(const std::string& repo_path, const std::string& branch,
+                         const std::string& content_prefix)
+{
+    std::cout << "Loading content from git: " << repo_path
+              << " (" << branch << ")" << std::endl;
+    if (!content_prefix.empty())
+        std::cout << "Content prefix: " << content_prefix << std::endl;
+
+    loom::GitSource source({repo_path, branch, content_prefix});
+
+    auto initial = build_cache(source);
+    std::cout << "Pre-rendered " << initial->pages.size() << " pages" << std::endl;
+
+    loom::AtomicCache<SiteCache> cache(std::move(initial));
+
+    loom::GitWatcher watcher(repo_path, branch);
+
+    loom::HotReloader<loom::GitSource, loom::GitWatcher, SiteCache> reloader(
+        source, watcher, cache,
+        [](loom::GitSource& src, const loom::ChangeSet&) {
+            return build_cache(src);
+        }
+    );
+    reloader.start();
+    std::cout << "[hot-reload] Polling " << branch << " for new commits" << std::endl;
+
+    loom::HttpServer server(8080);
+    setup_routes(server, cache);
+
+    std::cout << "Serving at http://localhost:8080" << std::endl;
+    server.run();
+}
+
+int main(int argc, char* argv[])
+{
+    // Usage:
+    //   ./loom [content_dir]                              — filesystem source (default)
+    //   ./loom --git <repo_path> [branch] [content_prefix] — git source
+    if (argc > 1 && std::string(argv[1]) == "--git")
+    {
+        if (argc < 3)
+        {
+            std::cerr << "Usage: loom --git <repo_path> [branch] [content_prefix]" << std::endl;
+            return 1;
+        }
+
+        std::string repo_path = argv[2];
+        std::string branch = (argc > 3) ? argv[3] : "main";
+        std::string prefix = (argc > 4) ? argv[4] : "";
+
+        run_with_git(repo_path, branch, prefix);
+    }
+    else
+    {
+        std::string content_dir = "content";
+        if (argc > 1)
+            content_dir = argv[1];
+
+        run_with_filesystem(content_dir);
+    }
 }
