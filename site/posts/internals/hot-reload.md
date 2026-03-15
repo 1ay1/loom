@@ -1,5 +1,5 @@
 ---
-title: Hot Reload — Edit and See Changes Instantly
+title: Hot Reload — Edit and See Changes Instantly HEHE
 date: 2024-02-01
 slug: hot-reload
 tags: feature, architecture, git
