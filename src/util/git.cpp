@@ -220,6 +220,10 @@ std::string git_clone_bare(const std::string& url, const std::string& dest)
     if (status != 0)
         throw GitError("git clone failed: " + output);
 
+    // Bare clones don't get a fetch refspec by default — add one so that
+    // `git fetch origin` actually updates refs/heads/*.
+    git_exec(local_path, "config remote.origin.fetch +refs/heads/*:refs/heads/*");
+
     return local_path;
 }
 
@@ -227,7 +231,9 @@ void git_fetch(const std::string& repo_path)
 {
     try
     {
-        git_exec(repo_path, "fetch --quiet origin");
+        // Explicit refspec ensures bare repos update refs/heads/* even if
+        // the clone config is missing a fetch line.
+        git_exec(repo_path, "fetch --quiet origin +refs/heads/*:refs/heads/*");
     }
     catch (const GitError&)
     {
