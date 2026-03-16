@@ -25,8 +25,8 @@ static const char* DEFAULT_CSS = R"CSS(
   --nav-gap: 18px;
   --header-size: 42px;
   --tag-radius: 12px;
-  --tag-bg: var(--border);
-  --tag-text: var(--muted);
+  --tag-bg: color-mix(in srgb, var(--text) 7%, var(--bg));
+  --tag-text: var(--text);
   --link-decoration: underline;
   --card-bg: var(--bg);
   --card-border: var(--border);
@@ -301,7 +301,7 @@ html {
 }
 
 .post-content pre, .page-content pre {
-  background: var(--border);
+  background: color-mix(in srgb, var(--text) 7%, var(--bg));
   padding: 14px;
   border-radius: var(--border-radius);
   overflow-x: auto;
@@ -315,7 +315,7 @@ html {
 }
 
 .post-content :not(pre) > code, .page-content :not(pre) > code {
-  background: var(--border);
+  background: color-mix(in srgb, var(--text) 7%, var(--bg));
   padding: 2px 6px;
   border-radius: calc(var(--border-radius) * 0.67);
   font-size: 0.9em;
@@ -353,7 +353,7 @@ html {
 }
 
 .post-content th, .page-content th {
-  background: var(--border);
+  background: color-mix(in srgb, var(--text) 7%, var(--bg));
   font-weight: 600;
 }
 
