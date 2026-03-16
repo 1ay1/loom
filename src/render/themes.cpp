@@ -61,10 +61,18 @@ static const std::map<std::string, ThemeColors> THEMES = {
         "#0c0c0c", "#b5b5b5", "#606060", "#1a1a1a", "#88c070",
 
         R"CSS(
+:root {
+  --tag-bg: transparent;
+  --tag-text: var(--muted);
+  --tag-radius: 0;
+}
+
 .tag {
-  border-radius: 0;
-  background: transparent;
-  border: 1px solid var(--border);
+  border: 1px solid var(--muted);
+}
+
+.tag:hover {
+  border-color: var(--accent);
 }
 
 .post-card {
@@ -76,7 +84,7 @@ static const std::map<std::string, ThemeColors> THEMES = {
 }
 
 .post-content pre, .page-content pre {
-  border: 1px solid var(--border);
+  border: 1px solid var(--muted);
   border-radius: 0;
 }
 
@@ -121,7 +129,7 @@ static const std::map<std::string, ThemeColors> THEMES = {
 
     // Dracula — the mass-beloved dark-first theme
     {"dracula", {
-        "#f8f8f2", "#282a36", "#6272a4", "#d6d6e6", "#bd93f9",
+        "#f8f8f2", "#282a36", "#6272a4", "#d6d6e6", "#7c3aed",
         "system-ui,-apple-system,Segoe UI,Roboto,sans-serif", "17px", "720px",
         "#282a36", "#f8f8f2", "#6272a4", "#44475a", "#bd93f9",
 
@@ -135,17 +143,18 @@ static const std::map<std::string, ThemeColors> THEMES = {
   border-left-color: #ff79c6;
 }
 
-.tag {
-  background: color-mix(in srgb, #bd93f9 15%, var(--bg));
-  color: #bd93f9;
+:root {
+  --tag-bg: color-mix(in srgb, #7c3aed 12%, var(--bg));
+  --tag-text: #7c3aed;
 }
 
-[data-theme="dark"] .tag {
-  background: color-mix(in srgb, #bd93f9 20%, #282a36);
+[data-theme="dark"] {
+  --tag-bg: color-mix(in srgb, #bd93f9 20%, #282a36);
+  --tag-text: #bd93f9;
 }
 
 .post-content a, .page-content a {
-  color: #8be9fd;
+  color: #6838b2;
 }
 
 [data-theme="dark"] .post-content a,
@@ -231,14 +240,14 @@ static const std::map<std::string, ThemeColors> THEMES = {
   color: #89b4fa;
 }
 
-.tag {
-  background: color-mix(in srgb, #8839ef 12%, var(--bg));
-  color: #8839ef;
+:root {
+  --tag-bg: color-mix(in srgb, #8839ef 12%, var(--bg));
+  --tag-text: #8839ef;
 }
 
-[data-theme="dark"] .tag {
-  background: color-mix(in srgb, #cba6f7 15%, #1e1e2e);
-  color: #cba6f7;
+[data-theme="dark"] {
+  --tag-bg: color-mix(in srgb, #cba6f7 15%, #1e1e2e);
+  --tag-text: #cba6f7;
 }
 )CSS"
     }},
@@ -277,14 +286,14 @@ static const std::map<std::string, ThemeColors> THEMES = {
   border-color: #bb9af7;
 }
 
-.tag {
-  background: color-mix(in srgb, #7aa2f7 12%, var(--bg));
-  color: #7aa2f7;
+:root {
+  --tag-bg: color-mix(in srgb, #7aa2f7 12%, var(--bg));
+  --tag-text: #7aa2f7;
 }
 
-[data-theme="dark"] .tag {
-  background: color-mix(in srgb, #7aa2f7 15%, #1a1b26);
-  color: #7dcfff;
+[data-theme="dark"] {
+  --tag-bg: color-mix(in srgb, #7aa2f7 15%, #1a1b26);
+  --tag-text: #7dcfff;
 }
 )CSS"
     }},
@@ -319,14 +328,14 @@ static const std::map<std::string, ThemeColors> THEMES = {
   color: #7FB4CA;
 }
 
-.tag {
-  background: color-mix(in srgb, #957fb8 15%, var(--bg));
-  color: #957fb8;
+:root {
+  --tag-bg: color-mix(in srgb, #957fb8 15%, var(--bg));
+  --tag-text: #957fb8;
 }
 
-[data-theme="dark"] .tag {
-  background: color-mix(in srgb, #957fb8 20%, #1F1F28);
-  color: #938AA9;
+[data-theme="dark"] {
+  --tag-bg: color-mix(in srgb, #957fb8 20%, #1F1F28);
+  --tag-text: #938AA9;
 }
 )CSS"
     }},
@@ -359,11 +368,14 @@ header h1 {
   letter-spacing: 2px;
 }
 
+:root {
+  --tag-bg: transparent;
+  --tag-text: var(--text);
+  --tag-radius: 0;
+}
+
 .tag {
-  border-radius: 0;
-  background: transparent;
   border: 1px solid var(--text);
-  color: var(--text);
   text-transform: uppercase;
   font-size: 11px;
   letter-spacing: 1px;
@@ -462,30 +474,45 @@ footer {
   opacity: 0.7;
 }
 
+:root {
+  --tag-bg: var(--text);
+  --tag-text: var(--bg);
+  --tag-radius: 0;
+  --tag-hover-bg: var(--accent);
+  --tag-hover-text: var(--bg);
+}
+
 .tag {
-  border-radius: 0;
-  background: var(--text);
-  color: var(--bg);
   text-transform: uppercase;
   font-weight: 700;
   font-size: 11px;
   letter-spacing: 1px;
 }
 
-.tag:hover {
-  background: var(--accent);
-  color: var(--bg);
-}
-
 .post-content pre, .page-content pre {
   border-radius: 0;
   border: 2px solid var(--text);
+  background: color-mix(in srgb, var(--text) 12%, var(--bg));
 }
 
 .post-content :not(pre) > code, .page-content :not(pre) > code {
   border-radius: 0;
   border: 1px solid var(--text);
-  background: transparent;
+  background: color-mix(in srgb, var(--text) 8%, var(--bg));
+}
+
+.post-content th, .page-content th {
+  background: var(--text);
+  color: var(--bg);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.post-content th, .post-content td,
+.page-content th, .page-content td {
+  border: 2px solid var(--text);
 }
 
 .post-content blockquote, .page-content blockquote {
@@ -523,6 +550,403 @@ footer {
 .sidebar-left .sidebar {
   border-right: 3px solid var(--text);
   border-left: none;
+}
+)CSS"
+    }},
+
+    // Lavender — soft purple tones, warm and inviting
+    {"lavender", {
+        "#faf8ff", "#2d2640", "#7c7291", "#e6e0f0", "#7c5cbf",
+        "system-ui,-apple-system,Segoe UI,Roboto,sans-serif", "17px", "720px",
+        "#1a1724", "#e0daea", "#9890a8", "#2a2538", "#a78bfa",
+
+        R"CSS(
+:root {
+  --tag-bg: color-mix(in srgb, #7c5cbf 8%, var(--bg));
+  --tag-text: #7c5cbf;
+  --tag-hover-bg: #7c5cbf;
+  --tag-hover-text: #ffffff;
+  --tag-radius: 14px;
+}
+
+[data-theme="dark"] {
+  --tag-bg: color-mix(in srgb, #a78bfa 10%, var(--bg));
+  --tag-text: #a78bfa;
+  --tag-hover-bg: #a78bfa;
+  --tag-hover-text: #1a1724;
+}
+
+::selection {
+  background: #7c5cbf;
+  color: #ffffff;
+}
+
+[data-theme="dark"] ::selection {
+  background: #a78bfa;
+  color: #1a1724;
+}
+
+.post-card {
+  border-radius: 10px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.post-card:hover {
+  box-shadow: 0 2px 12px color-mix(in srgb, #7c5cbf 10%, transparent);
+}
+
+.post-listing {
+  transition: background 0.15s;
+  padding: 14px 10px;
+  margin: 0 -10px;
+  border-radius: 6px;
+}
+
+.post-listing:hover {
+  background: color-mix(in srgb, #7c5cbf 4%, var(--bg));
+}
+
+.post-content blockquote, .page-content blockquote {
+  border-left-color: #7c5cbf;
+}
+
+[data-theme="dark"] .post-content blockquote,
+[data-theme="dark"] .page-content blockquote {
+  border-left-color: #a78bfa;
+}
+
+.post-content a, .page-content a {
+  color: #6d4dab;
+}
+
+[data-theme="dark"] .post-content a,
+[data-theme="dark"] .page-content a {
+  color: #b49afa;
+}
+)CSS"
+    }},
+
+    // Warm — golden amber palette, cozy reading feel
+    {"warm", {
+        "#fdf8f0", "#33261a", "#8a7560", "#e8dcc8", "#c47a20",
+        "Georgia,Charter,Cambria,Times New Roman,serif", "18px", "700px",
+        "#1a1510", "#ddd0b8", "#8a7e68", "#2e2618", "#dda040",
+
+        R"CSS(
+:root {
+  --tag-bg: color-mix(in srgb, #c47a20 10%, var(--bg));
+  --tag-text: #a06418;
+  --tag-hover-bg: #c47a20;
+  --tag-hover-text: #ffffff;
+  --tag-radius: 4px;
+  --heading-weight: 600;
+}
+
+[data-theme="dark"] {
+  --tag-bg: color-mix(in srgb, #dda040 10%, var(--bg));
+  --tag-text: #dda040;
+  --tag-hover-bg: #dda040;
+  --tag-hover-text: #1a1510;
+}
+
+::selection {
+  background: #c47a20;
+  color: #ffffff;
+}
+
+[data-theme="dark"] ::selection {
+  background: #dda040;
+  color: #1a1510;
+}
+
+header h1 {
+  font-weight: 600;
+}
+
+.post-card {
+  border-radius: 6px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.post-card:hover {
+  box-shadow: 0 2px 10px color-mix(in srgb, #c47a20 8%, transparent);
+}
+
+.post-listing a {
+  font-weight: 500;
+}
+
+.post-full h1 {
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.post-content blockquote, .page-content blockquote {
+  border-left: 3px solid #c47a20;
+  font-style: italic;
+}
+
+[data-theme="dark"] .post-content blockquote,
+[data-theme="dark"] .page-content blockquote {
+  border-left-color: #dda040;
+}
+
+.post-content a, .page-content a {
+  color: #a06418;
+}
+
+[data-theme="dark"] .post-content a,
+[data-theme="dark"] .page-content a {
+  color: #e8b060;
+}
+)CSS"
+    }},
+
+    // Ocean — deep blue, calm and professional
+    {"ocean", {
+        "#f4f7fb", "#1a2744", "#5a6e8a", "#d4dce8", "#1a6fb5",
+        "system-ui,-apple-system,Segoe UI,Roboto,sans-serif", "17px", "720px",
+        "#0c1420", "#c8d4e4", "#6880a0", "#182840", "#4da8e8",
+
+        R"CSS(
+:root {
+  --tag-bg: color-mix(in srgb, #1a6fb5 8%, var(--bg));
+  --tag-text: #1a6fb5;
+  --tag-hover-bg: #1a6fb5;
+  --tag-hover-text: #ffffff;
+  --tag-radius: 4px;
+}
+
+[data-theme="dark"] {
+  --tag-bg: color-mix(in srgb, #4da8e8 10%, var(--bg));
+  --tag-text: #4da8e8;
+  --tag-hover-bg: #4da8e8;
+  --tag-hover-text: #0c1420;
+}
+
+::selection {
+  background: #1a6fb5;
+  color: #ffffff;
+}
+
+[data-theme="dark"] ::selection {
+  background: #4da8e8;
+  color: #0c1420;
+}
+
+header {
+  border-bottom-color: color-mix(in srgb, #1a6fb5 15%, var(--border));
+}
+
+.post-card {
+  border-radius: 8px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.post-card:hover {
+  box-shadow: 0 3px 14px color-mix(in srgb, #1a6fb5 10%, transparent);
+}
+
+.post-listing {
+  transition: background 0.15s;
+  padding: 14px 10px;
+  margin: 0 -10px;
+  border-radius: 6px;
+}
+
+.post-listing:hover {
+  background: color-mix(in srgb, #1a6fb5 3%, var(--bg));
+}
+
+.post-content blockquote, .page-content blockquote {
+  border-left: 3px solid #1a6fb5;
+  background: color-mix(in srgb, #1a6fb5 3%, var(--bg));
+  border-radius: 0 4px 4px 0;
+  padding: 10px 14px;
+}
+
+[data-theme="dark"] .post-content blockquote,
+[data-theme="dark"] .page-content blockquote {
+  border-left-color: #4da8e8;
+  background: color-mix(in srgb, #4da8e8 4%, var(--bg));
+}
+
+.post-content a, .page-content a {
+  color: #1a6fb5;
+}
+
+[data-theme="dark"] .post-content a,
+[data-theme="dark"] .page-content a {
+  color: #68b8f0;
+}
+)CSS"
+    }},
+
+    // Sakura — cherry blossom pinks, delicate and refined
+    {"sakura", {
+        "#fef9fa", "#3a2030", "#907080", "#ecd8e0", "#d4447a",
+        "system-ui,-apple-system,Segoe UI,Roboto,sans-serif", "17px", "720px",
+        "#1c1218", "#e0c8d4", "#907080", "#2e1e28", "#f07098",
+
+        R"CSS(
+:root {
+  --tag-bg: color-mix(in srgb, #d4447a 7%, var(--bg));
+  --tag-text: #c03868;
+  --tag-hover-bg: #d4447a;
+  --tag-hover-text: #ffffff;
+  --tag-radius: 14px;
+}
+
+[data-theme="dark"] {
+  --tag-bg: color-mix(in srgb, #f07098 10%, var(--bg));
+  --tag-text: #f07098;
+  --tag-hover-bg: #f07098;
+  --tag-hover-text: #1c1218;
+}
+
+::selection {
+  background: #d4447a;
+  color: #ffffff;
+}
+
+[data-theme="dark"] ::selection {
+  background: #f07098;
+  color: #1c1218;
+}
+
+.post-card {
+  border-radius: 10px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.post-card:hover {
+  border-color: color-mix(in srgb, #d4447a 30%, var(--border));
+  box-shadow: 0 2px 12px color-mix(in srgb, #d4447a 8%, transparent);
+}
+
+.post-listing {
+  transition: background 0.15s;
+  padding: 14px 10px;
+  margin: 0 -10px;
+  border-radius: 6px;
+}
+
+.post-listing:hover {
+  background: color-mix(in srgb, #d4447a 3%, var(--bg));
+}
+
+.post-content blockquote, .page-content blockquote {
+  border-left-color: #d4447a;
+}
+
+[data-theme="dark"] .post-content blockquote,
+[data-theme="dark"] .page-content blockquote {
+  border-left-color: #f07098;
+}
+
+.post-content a, .page-content a {
+  color: #c03868;
+}
+
+[data-theme="dark"] .post-content a,
+[data-theme="dark"] .page-content a {
+  color: #f48aaa;
+}
+)CSS"
+    }},
+
+    // Midnight — rich dark-first with electric blue, polished
+    {"midnight", {
+        "#f0f2f8", "#1e2030", "#5a6080", "#d0d4e0", "#3b82f6",
+        "system-ui,-apple-system,Segoe UI,Roboto,sans-serif", "16px", "740px",
+        "#0e1018", "#c8cce0", "#606888", "#1a1e30", "#60a5fa",
+
+        R"CSS(
+:root {
+  --tag-bg: color-mix(in srgb, #3b82f6 8%, var(--bg));
+  --tag-text: #3b82f6;
+  --tag-hover-bg: #3b82f6;
+  --tag-hover-text: #ffffff;
+  --tag-radius: 4px;
+}
+
+[data-theme="dark"] {
+  --tag-bg: color-mix(in srgb, #60a5fa 10%, var(--bg));
+  --tag-text: #60a5fa;
+  --tag-hover-bg: #60a5fa;
+  --tag-hover-text: #0e1018;
+}
+
+::selection {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+[data-theme="dark"] ::selection {
+  background: #60a5fa;
+  color: #0e1018;
+}
+
+header h1 {
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.post-card {
+  border-radius: 8px;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+
+.post-card:hover {
+  border-color: color-mix(in srgb, #3b82f6 30%, var(--border));
+  box-shadow: 0 4px 16px color-mix(in srgb, #3b82f6 8%, transparent);
+  transform: translateY(-1px);
+}
+
+.post-listing {
+  transition: background 0.15s;
+  padding: 14px 10px;
+  margin: 0 -10px;
+  border-radius: 6px;
+}
+
+.post-listing:hover {
+  background: color-mix(in srgb, #3b82f6 3%, var(--bg));
+}
+
+.post-full h1 {
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.post-content blockquote, .page-content blockquote {
+  border-left: 3px solid #3b82f6;
+  background: color-mix(in srgb, #3b82f6 3%, var(--bg));
+  border-radius: 0 6px 6px 0;
+  padding: 10px 14px;
+}
+
+[data-theme="dark"] .post-content blockquote,
+[data-theme="dark"] .page-content blockquote {
+  border-left-color: #60a5fa;
+  background: color-mix(in srgb, #60a5fa 4%, var(--bg));
+}
+
+.post-content a, .page-content a {
+  color: #2563eb;
+}
+
+[data-theme="dark"] .post-content a,
+[data-theme="dark"] .page-content a {
+  color: #78b4fc;
+}
+
+.post-content pre, .page-content pre {
+  border-radius: 8px;
+}
+
+.post-content :not(pre) > code, .page-content :not(pre) > code {
+  border-radius: 4px;
 }
 )CSS"
     }},

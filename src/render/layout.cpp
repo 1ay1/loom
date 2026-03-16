@@ -27,6 +27,8 @@ static const char* DEFAULT_CSS = R"CSS(
   --tag-radius: 12px;
   --tag-bg: color-mix(in srgb, var(--text) 7%, var(--bg));
   --tag-text: var(--text);
+  --tag-hover-bg: color-mix(in srgb, var(--accent) 20%, var(--tag-bg));
+  --tag-hover-text: var(--accent);
   --link-decoration: underline;
   --card-bg: var(--bg);
   --card-border: var(--border);
@@ -177,6 +179,15 @@ html {
   margin-top: 0;
 }
 
+.post-listing .tag {
+  color: var(--tag-text);
+  text-decoration: none;
+}
+
+.post-listing .tag:hover {
+  color: var(--tag-hover-text);
+}
+
 .post-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -213,6 +224,15 @@ html {
 
 .post-card .post-tags {
   margin-top: 10px;
+}
+
+.post-card .tag {
+  color: var(--tag-text);
+  text-decoration: none;
+}
+
+.post-card .tag:hover {
+  color: var(--tag-hover-text);
 }
 
 .post-full {
@@ -458,8 +478,8 @@ footer {
 }
 
 .tag:hover {
-  background: color-mix(in srgb, var(--accent) 20%, var(--tag-bg));
-  color: var(--accent);
+  background: var(--tag-hover-bg);
+  color: var(--tag-hover-text);
 }
 
 .with-sidebar {
