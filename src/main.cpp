@@ -59,7 +59,7 @@ static bool accepts_gzip(const loom::HttpRequest& req)
 }
 
 static loom::HttpResponse serve_cached(const CachedPage& page, const loom::HttpRequest& req,
-    const std::string& content_type = "text/html; charset=utf-8")
+    const std::string& content_type = "text/html; charset=utf-8", int status = 200)
 {
     auto inm = req.header("If-None-Match");
     if (!inm.empty() && inm == page.etag)
@@ -72,7 +72,7 @@ static loom::HttpResponse serve_cached(const CachedPage& page, const loom::HttpR
     }
 
     loom::HttpResponse resp;
-    resp.status = 200;
+    resp.status = status;
     resp.headers["Content-Type"] = content_type;
     resp.headers["ETag"] = page.etag;
     resp.headers["Cache-Control"] = "public, max-age=60, must-revalidate";
@@ -372,7 +372,7 @@ static void setup_routes(loom::HttpServer& server, loom::AtomicCache<SiteCache>&
         auto snap = cache.load();
         auto it = snap->pages.find("/post/" + req.params[0]);
         if (it == snap->pages.end())
-            return serve_cached(snap->not_found, req);
+            return serve_cached(snap->not_found, req, "text/html; charset=utf-8", 404);
         return serve_cached(it->second, req);
     });
 
@@ -387,7 +387,7 @@ static void setup_routes(loom::HttpServer& server, loom::AtomicCache<SiteCache>&
         auto snap = cache.load();
         auto it = snap->pages.find("/tag/" + req.params[0]);
         if (it == snap->pages.end())
-            return serve_cached(snap->not_found, req);
+            return serve_cached(snap->not_found, req, "text/html; charset=utf-8", 404);
         return serve_cached(it->second, req);
     });
 
@@ -402,7 +402,7 @@ static void setup_routes(loom::HttpServer& server, loom::AtomicCache<SiteCache>&
         auto snap = cache.load();
         auto it = snap->pages.find("/series");
         if (it == snap->pages.end())
-            return serve_cached(snap->not_found, req);
+            return serve_cached(snap->not_found, req, "text/html; charset=utf-8", 404);
         return serve_cached(it->second, req);
     });
 
@@ -411,7 +411,7 @@ static void setup_routes(loom::HttpServer& server, loom::AtomicCache<SiteCache>&
         auto snap = cache.load();
         auto it = snap->pages.find("/series/" + req.params[0]);
         if (it == snap->pages.end())
-            return serve_cached(snap->not_found, req);
+            return serve_cached(snap->not_found, req, "text/html; charset=utf-8", 404);
         return serve_cached(it->second, req);
     });
 
@@ -420,7 +420,7 @@ static void setup_routes(loom::HttpServer& server, loom::AtomicCache<SiteCache>&
         auto snap = cache.load();
         auto it = snap->pages.find("/" + req.params[0]);
         if (it == snap->pages.end())
-            return serve_cached(snap->not_found, req);
+            return serve_cached(snap->not_found, req, "text/html; charset=utf-8", 404);
         return serve_cached(it->second, req);
     });
 }
