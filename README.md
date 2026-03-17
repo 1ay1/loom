@@ -10,6 +10,8 @@ make && ./loom content/
 
 That's it. Your blog is at `localhost:8080`.
 
+![Loom screenshot](loom.png)
+
 ---
 
 ## Why
