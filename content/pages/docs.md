@@ -22,7 +22,21 @@ content/
     style.css            # Custom CSS override (optional)
 ```
 
-Any non-markdown file in the content directory is served as a static asset. Put images, fonts, or downloads anywhere and reference them by path (e.g. `![photo](/images/cover.png)`).
+Any non-markdown file in the content directory is a static asset — images, fonts, PDFs, downloads. Put them anywhere and reference them by path:
+
+```markdown
+![screenshot](/images/screenshot.png)
+```
+
+How they're served depends on how you're running Loom:
+
+| Mode | How images are served |
+|------|-----------------------|
+| `./loom content/` | Read from disk on each request |
+| `./loom --git /local/repo main content` | Read from git objects via `git show` |
+| `./loom --git https://github.com/you/blog.git main content` | `302` redirect to GitHub's CDN — bytes never touch your server |
+
+In all three cases, you write the same path in your markdown. Nothing changes on the content side.
 
 ## Post Frontmatter
 
@@ -196,30 +210,39 @@ Something[^1] interesting.
 
 ## Git Source
 
-Serve content directly from a git repository without a working tree:
+Serve content directly from a git repository without a working tree. No checkout needed — Loom reads everything via `git show` and `git ls-tree`.
 
 ```bash
-# local repo
-./loom --git /path/to/repo main content/
+# local or bare repo
+./loom --git /path/to/repo main content
 
-# public GitHub remote (clones bare automatically)
+# public GitHub remote — clones bare into /tmp automatically
 ./loom --git https://github.com/you/blog.git main content
+./loom --git git@github.com:you/blog.git main content
 ```
 
 Arguments: `repo_path_or_url`, `branch` (default: `main`), `content_prefix` (default: root).
 
-Content is read via `git show` and `git ls-tree`. The git watcher polls for new commits and hot-reloads automatically.
+The git watcher polls for new commits every 100ms and hot-reloads automatically. Push a commit and the site updates within seconds.
 
-### Static Assets with a Remote Repo
+### Images and Static Assets
 
-When you pass a GitHub URL, Loom redirects static asset requests to `raw.githubusercontent.com` instead of serving the bytes itself:
+Write image paths exactly as you would in filesystem mode:
+
+```markdown
+![cover](/images/cover.png)
+```
+
+For a **local repo**, Loom reads the blob from git objects and serves it directly.
+
+For a **public GitHub remote**, Loom issues a `302` redirect to `raw.githubusercontent.com` instead:
 
 ```
 GET /images/cover.png
 → 302 Location: https://raw.githubusercontent.com/you/blog/refs/heads/main/content/images/cover.png
 ```
 
-The browser fetches images, fonts, and other files directly from GitHub's CDN. Your server only handles HTML. Write image paths the same way regardless of mode — `/images/cover.png` works in filesystem, local git, and remote git mode alike.
+The browser fetches the image straight from GitHub's CDN. Your server only ever serves HTML — it never reads or streams image bytes. This works automatically whenever you pass a GitHub URL; no config needed.
 
 ## Hot Reload
 
