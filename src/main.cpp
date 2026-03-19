@@ -377,6 +377,31 @@ static bool safe_path(const std::string& path)
     return true;
 }
 
+static std::string raw_content_base(const std::string& remote_url, const std::string& branch)
+{
+    // GitHub HTTPS: https://github.com/user/repo[.git]
+    // GitHub SSH:   git@github.com:user/repo[.git]
+    std::string owner_repo;
+    auto gh = remote_url.find("github.com/");
+    if (gh != std::string::npos)
+        owner_repo = remote_url.substr(gh + 11);
+    else
+    {
+        gh = remote_url.find("github.com:");
+        if (gh != std::string::npos)
+            owner_repo = remote_url.substr(gh + 11);
+    }
+
+    if (!owner_repo.empty())
+    {
+        if (owner_repo.ends_with(".git"))
+            owner_repo = owner_repo.substr(0, owner_repo.size() - 4);
+        return "https://raw.githubusercontent.com/" + owner_repo + "/refs/heads/" + branch;
+    }
+
+    return "";
+}
+
 static void setup_routes(loom::HttpServer& server, loom::AtomicCache<SiteCache>& cache)
 {
     server.router().get("/", [&](const loom::HttpRequest& req)
@@ -512,7 +537,8 @@ static void run_with_filesystem(const std::string& content_dir)
 }
 
 static void run_with_git(const std::string& repo_path, const std::string& branch,
-                         const std::string& content_prefix, bool fetch_remote)
+                         const std::string& content_prefix, bool fetch_remote,
+                         const std::string& remote_url = "")
 {
     std::cout << "Loading content from git: " << repo_path
               << " (" << branch << ")" << std::endl;
@@ -544,7 +570,11 @@ static void run_with_git(const std::string& repo_path, const std::string& branch
     loom::HttpServer server(8080);
     setup_routes(server, cache);
 
-    server.router().set_fallback([&cache, repo_path, branch, content_prefix](const loom::HttpRequest& req)
+    std::string raw_base = raw_content_base(remote_url, branch);
+    if (!raw_base.empty())
+        std::cout << "[static] Redirecting assets to " << raw_base << std::endl;
+
+    server.router().set_fallback([&cache, repo_path, branch, content_prefix, raw_base](const loom::HttpRequest& req)
     {
         if (!safe_path(req.path))
             return loom::HttpResponse::not_found();
@@ -555,14 +585,25 @@ static void run_with_git(const std::string& repo_path, const std::string& branch
         if (it != snap->pages.end())
             return serve_cached(it->second, req);
 
-        // Try serving a static file from the git tree
-        std::string blob_path = content_prefix.empty()
+        // Static asset path within the repo
+        std::string asset_path = content_prefix.empty()
             ? req.path.substr(1)
             : content_prefix + req.path;
 
+        // If we have a public remote, redirect instead of serving bytes
+        if (!raw_base.empty())
+        {
+            loom::HttpResponse resp;
+            resp.status = 302;
+            resp.headers["Location"] = raw_base + "/" + asset_path;
+            resp.headers["Cache-Control"] = "public, max-age=3600";
+            return resp;
+        }
+
+        // Local repo — serve from git objects
         try
         {
-            auto body = loom::git_read_blob(repo_path, branch, blob_path);
+            auto body = loom::git_read_blob(repo_path, branch, asset_path);
 
             loom::HttpResponse resp;
             resp.status = 200;
@@ -616,7 +657,7 @@ int main(int argc, char* argv[])
             }
         }
 
-        run_with_git(repo_path, branch, prefix, remote);
+        run_with_git(repo_path, branch, prefix, remote, remote ? repo_arg : "");
     }
     else
     {
