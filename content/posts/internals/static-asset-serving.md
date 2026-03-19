@@ -96,11 +96,13 @@ Static assets get out of Loom's way. HTML stays fast in memory. The boundary is 
 In any mode, you write image references the same way — from the local perspective of your content directory:
 
 ```markdown
-![screenshot](/images/screenshot.png)
+![screenshot](/images/loom.png)
 ```
 
-In filesystem mode, `content/images/screenshot.png` is read from disk.
-In local git mode, `git show main:content/images/screenshot.png` serves it.
-In remote git mode, the browser fetches it from `raw.githubusercontent.com/you/blog/refs/heads/main/content/images/screenshot.png`.
+In filesystem mode, `content/images/loom.png` is read from disk.
+In local git mode, `git show main:content/images/loom.png` serves it.
+In remote git mode, the browser fetches it from `raw.githubusercontent.com` — no bytes touch your server.
 
-The markdown is the same in all three cases.
+The markdown is the same in all three cases. Here's that image, served right now via GitHub's CDN:
+
+![Loom — the image you're seeing was never sent by this server](/images/loom.png)
