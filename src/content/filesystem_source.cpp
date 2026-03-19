@@ -178,6 +178,8 @@ void FileSystemSource::load_config()
         config_.layout.show_reading_time = (cfg["show_reading_time"] != "false");
     if (cfg.count("show_breadcrumbs"))
         config_.layout.show_breadcrumbs = (cfg["show_breadcrumbs"] != "false");
+    if (cfg.count("external_links_new_tab"))
+        config_.layout.external_links_new_tab = (cfg["external_links_new_tab"] == "true");
     if (cfg.count("sidebar_position"))
         config_.layout.sidebar_position = cfg["sidebar_position"];
     if (cfg.count("date_format"))

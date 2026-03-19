@@ -338,23 +338,27 @@ static std::string process_inline(const std::string& text, const RefMap& refs)
             {
                 auto link_text = text.substr(i + 1, close_bracket - i - 1);
 
-                // Inline link: [text](url "title")
+                // Inline link: [text](url "title") or [text](url)^
                 if (close_bracket + 1 < len && text[close_bracket + 1] == '(')
                 {
                     std::string url, title;
                     size_t end;
                     if (parse_link_dest(text, close_bracket + 1, end, url, title))
                     {
+                        bool new_tab = (end < len && text[end] == '^');
+                        if (new_tab) ++end;
                         out += "<a href=\"" + escape_html(url) + "\"";
                         if (!title.empty())
                             out += " title=\"" + escape_html(title) + "\"";
+                        if (new_tab)
+                            out += " target=\"_blank\" rel=\"noopener noreferrer\"";
                         out += ">" + process_inline(link_text, refs) + "</a>";
                         i = end;
                         continue;
                     }
                 }
 
-                // Reference link: [text][ref]
+                // Reference link: [text][ref] or [text][ref]^
                 if (close_bracket + 1 < len && text[close_bracket + 1] == '[')
                 {
                     auto close_ref = text.find(']', close_bracket + 2);
@@ -365,27 +369,33 @@ static std::string process_inline(const std::string& text, const RefMap& refs)
                         auto it = refs.find(ref_key);
                         if (it != refs.end())
                         {
+                            bool new_tab = (close_ref + 1 < len && text[close_ref + 1] == '^');
                             out += "<a href=\"" + escape_html(it->second.url) + "\"";
                             if (!it->second.title.empty())
                                 out += " title=\"" + escape_html(it->second.title) + "\"";
+                            if (new_tab)
+                                out += " target=\"_blank\" rel=\"noopener noreferrer\"";
                             out += ">" + process_inline(link_text, refs) + "</a>";
-                            i = close_ref + 1;
+                            i = close_ref + 1 + (new_tab ? 1 : 0);
                             continue;
                         }
                     }
                 }
 
-                // Shortcut reference: [text]
+                // Shortcut reference: [text] or [text]^
                 {
                     auto ref_key = to_lower(trim(link_text));
                     auto it = refs.find(ref_key);
                     if (it != refs.end())
                     {
+                        bool new_tab = (close_bracket + 1 < len && text[close_bracket + 1] == '^');
                         out += "<a href=\"" + escape_html(it->second.url) + "\"";
                         if (!it->second.title.empty())
                             out += " title=\"" + escape_html(it->second.title) + "\"";
+                        if (new_tab)
+                            out += " target=\"_blank\" rel=\"noopener noreferrer\"";
                         out += ">" + process_inline(link_text, refs) + "</a>";
-                        i = close_bracket + 1;
+                        i = close_bracket + 1 + (new_tab ? 1 : 0);
                         continue;
                     }
                 }

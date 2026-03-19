@@ -42,6 +42,9 @@ struct LayoutConfig
     // Breadcrumbs
     bool show_breadcrumbs = true;
 
+    // Links
+    bool external_links_new_tab = false;
+
     // Custom injections
     std::string custom_css;
     std::string custom_head_html;

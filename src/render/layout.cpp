@@ -926,6 +926,61 @@ static std::string escape_attr(const std::string& s)
     return out;
 }
 
+// Single O(n) pass — copies the HTML in segments, injecting new-tab attributes
+// into external <a> tags without repeated string insertions.
+static std::string apply_external_new_tab(const std::string& html)
+{
+    static const char ATTRS[] = " target=\"_blank\" rel=\"noopener noreferrer\"";
+
+    std::string result;
+    result.reserve(html.size() + html.size() / 16);
+
+    size_t pos = 0;
+    while (true)
+    {
+        size_t a_start = html.find("<a ", pos);
+        if (a_start == std::string::npos)
+        {
+            result.append(html, pos, std::string::npos);
+            break;
+        }
+
+        size_t tag_end = html.find('>', a_start);
+        if (tag_end == std::string::npos)
+        {
+            result.append(html, pos, std::string::npos);
+            break;
+        }
+
+        bool is_external = false;
+        bool has_target  = false;
+        for (size_t k = a_start + 3; k < tag_end; ++k)
+        {
+            if (!is_external && html[k] == 'h' && html.compare(k, 10, "href=\"http") == 0)
+                is_external = true;
+            if (html[k] == 't' && html.compare(k, 7, "target=") == 0)
+            {
+                has_target = true;
+                break;
+            }
+        }
+
+        if (is_external && !has_target)
+        {
+            result.append(html, pos, tag_end - pos); // everything up to (not including) '>'
+            result += ATTRS;
+            result += '>';
+            pos = tag_end + 1;
+        }
+        else
+        {
+            result.append(html, pos, tag_end + 1 - pos); // include '>'
+            pos = tag_end + 1;
+        }
+    }
+    return result;
+}
+
 std::string render_layout(
     const Site& site,
     const std::string& navigation,
@@ -1246,6 +1301,9 @@ std::string render_layout(
 
     html += "</body>";
     html += "</html>";
+
+    if (layout.external_links_new_tab)
+        return apply_external_new_tab(html);
 
     return html;
 }
