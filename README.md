@@ -12,7 +12,7 @@ That's it. Your blog is at `localhost:8080`.
 
 The `content/` directory in this repo is a working example site — it's what you see at [blog.radiopsych.live](https://blog.radiopsych.live). Use it to try out themes, explore the config, or copy it as a starting point.
 
-![Loom screenshot](loom.png)
+![Loom screenshot](content/images/loom.png)
 
 ---
 
