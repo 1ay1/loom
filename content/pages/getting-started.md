@@ -3,6 +3,23 @@ title: Getting Started
 slug: getting-started
 ---
 
+## Quickest Start
+
+The repo ships with a complete example site in `content/`. Clone, build, and run it in one shot:
+
+```bash
+git clone https://github.com/1ay1/loom.git
+cd loom
+make
+./loom content/
+```
+
+Open `http://localhost:8080` — you're already running a live blog. Edit anything in `content/` and the page updates instantly.
+
+Copy `content/` as a base for your own site (`cp -r content/ myblog/`), or follow the steps below to build one from scratch.
+
+---
+
 ## Requirements
 
 - Linux (epoll and inotify are Linux-only)
@@ -19,7 +36,7 @@ make
 
 The binary is `./loom`. Build takes under 3 seconds.
 
-## Create Your Content
+## Create Your Own Site
 
 ```bash
 mkdir -p myblog/posts myblog/pages

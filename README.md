@@ -10,6 +10,8 @@ make && ./loom content/
 
 That's it. Your blog is at `localhost:8080`.
 
+The `content/` directory in this repo is a working example site — it's what you see at [loom.ayushbhat.com](https://loom.ayushbhat.com). Use it to try out themes, explore the config, or copy it as a starting point.
+
 ![Loom screenshot](loom.png)
 
 ---
@@ -41,10 +43,27 @@ Every static site generator needs a build step, a deploy pipeline, and a runtime
 # build
 make
 
-# serve from filesystem (default)
+# try the included example site immediately
 ./loom content/
+```
 
-# serve from a git repo
+Open `http://localhost:8080`. You're looking at a live blog — edit any file in `content/` and the site rebuilds instantly.
+
+To start your own site, copy the example or create from scratch:
+
+```bash
+# option 1: copy the example as a base
+cp -r content/ myblog/
+
+# option 2: start from scratch
+mkdir -p myblog/posts myblog/pages
+
+# then run
+./loom myblog/
+```
+
+```bash
+# serve from a git repo instead of the filesystem
 ./loom --git /path/to/repo main content
 ```
 
