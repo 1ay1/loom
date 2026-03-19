@@ -16,7 +16,7 @@ Loom includes a hand-written markdown-to-HTML parser. No regex engines, no exter
 
 **Code:** inline `` `code` `` with backtick nesting, fenced code blocks with triple backticks or tildes, optional language identifier for syntax hinting.
 
-**Links and images:** `[text](url)`, `[text](url "title")`, `![alt](url)`, reference-style `[text][ref]` with `[ref]: url` definitions.
+**Links and images:** `[text](url)`, `[text](url "title")`, `![alt](url)`, reference-style `[text][ref]` with `[ref]: url` definitions. Append `^` after the closing `)` or `]` to open a link in a new tab: `[text](url)^`, `[text][ref]^`. The `external_links_new_tab = true` config option applies `target="_blank" rel="noopener noreferrer"` to all external links across the whole page automatically.
 
 **Lists:** unordered (`-`, `*`, `+`), ordered (`1.`, `2)`), task lists (`- [ ]`, `- [x]`), nested to arbitrary depth.
 

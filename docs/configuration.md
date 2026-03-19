@@ -99,6 +99,24 @@ Set to `false` to hide breadcrumbs site-wide:
 show_breadcrumbs = false
 ```
 
+### Links
+
+```ini
+external_links_new_tab = false
+```
+
+When `true`, every external link (`href="https://..."` or `href="http://..."`) across the entire page — content, nav, footer, sidebar — gets `target="_blank" rel="noopener noreferrer"` added automatically. Default: `false`.
+
+For per-link control regardless of this setting, append `^` directly after the closing `)` or `]` in markdown:
+
+```markdown
+[Visit site](https://example.com)^          <!-- opens in new tab -->
+[Internal link](/about)                     <!-- stays in same tab -->
+[ref link][myref]^                          <!-- reference-style, new tab -->
+```
+
+The `^` sigil works on all three link forms: inline `[text](url)^`, reference `[text][ref]^`, and shortcut `[text]^`.
+
 ### Date Format
 
 ```ini
@@ -354,6 +372,7 @@ post_list_style = cards
 show_post_dates = true
 show_post_tags = true
 show_breadcrumbs = true
+external_links_new_tab = true
 date_format = %b %d, %Y
 sidebar_position = right
 

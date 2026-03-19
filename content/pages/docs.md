@@ -139,6 +139,8 @@ Available widgets: `recent_posts`, `tag_cloud`, `archives`, `series`, `about`.
 | `show_post_tags` | `true`, `false` | `true` | Tags on listings |
 | `show_excerpts` | `true`, `false` | `true` | Excerpts on listings |
 | `show_reading_time` | `true`, `false` | `true` | Reading time estimates |
+| `show_breadcrumbs` | `true`, `false` | `true` | Breadcrumb trail on post, tag, and series pages |
+| `external_links_new_tab` | `true`, `false` | `false` | Open all external links in a new tab site-wide |
 | `sidebar_position` | `right`, `left`, `none` | `right` | Sidebar placement |
 | `date_format` | strftime format | `%Y-%m-%d` | Date display format |
 | `custom_css` | CSS string | none | Additional CSS injected after theme |
@@ -174,6 +176,8 @@ Loom's hand-written markdown parser supports:
 **Block elements:** headings (ATX `#` and setext), paragraphs, fenced code blocks (backticks and tildes with language hints), blockquotes, unordered lists (`-`, `*`, `+`), ordered lists, task lists (`- [ ]`, `- [x]`), nested lists, tables with alignment, horizontal rules, footnote definitions, raw HTML blocks.
 
 **Inline elements:** bold, italic, bold italic, strikethrough, inline code, links, reference links, images, reference images, autolinks, footnote references, backslash escapes, line breaks (trailing spaces).
+
+**New-tab links:** append `^` after the closing `)` or `]` to open a link in a new tab: `[text](url)^`. Works on all link forms. The `external_links_new_tab = true` config option applies this site-wide to all external URLs automatically.
 
 **Tables:**
 
