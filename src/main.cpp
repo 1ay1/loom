@@ -4,8 +4,10 @@
 #include <map>
 #include <ctime>
 #include <sstream>
+#include <fstream>
 #include "loom/util/gzip.hpp"
 #include "loom/util/minify.hpp"
+#include "loom/util/git.hpp"
 
 #include "loom/content/content_source.hpp"
 #include "loom/content/filesystem_source.hpp"
@@ -344,6 +346,37 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
     return cache;
 }
 
+static std::string mime_type(const std::string& path)
+{
+    auto dot = path.rfind('.');
+    if (dot == std::string::npos) return "application/octet-stream";
+    auto ext = path.substr(dot);
+    if (ext == ".png") return "image/png";
+    if (ext == ".jpg" || ext == ".jpeg") return "image/jpeg";
+    if (ext == ".gif") return "image/gif";
+    if (ext == ".svg") return "image/svg+xml";
+    if (ext == ".webp") return "image/webp";
+    if (ext == ".ico") return "image/x-icon";
+    if (ext == ".css") return "text/css";
+    if (ext == ".js") return "application/javascript";
+    if (ext == ".json") return "application/json";
+    if (ext == ".woff") return "font/woff";
+    if (ext == ".woff2") return "font/woff2";
+    if (ext == ".ttf") return "font/ttf";
+    if (ext == ".pdf") return "application/pdf";
+    if (ext == ".mp4") return "video/mp4";
+    if (ext == ".webm") return "video/webm";
+    return "application/octet-stream";
+}
+
+static bool safe_path(const std::string& path)
+{
+    if (path.find("..") != std::string::npos) return false;
+    if (path.find('\0') != std::string::npos) return false;
+    if (path.empty() || path[0] != '/') return false;
+    return true;
+}
+
 static void setup_routes(loom::HttpServer& server, loom::AtomicCache<SiteCache>& cache)
 {
     server.router().get("/", [&](const loom::HttpRequest& req)
@@ -418,14 +451,6 @@ static void setup_routes(loom::HttpServer& server, loom::AtomicCache<SiteCache>&
         return serve_cached(it->second, req);
     });
 
-    server.router().get("/:slug", [&](const loom::HttpRequest& req)
-    {
-        auto snap = cache.load();
-        auto it = snap->pages.find("/" + req.params[0]);
-        if (it == snap->pages.end())
-            return serve_cached(snap->not_found, req, "text/html; charset=utf-8", 404);
-        return serve_cached(it->second, req);
-    });
 }
 
 static void run_with_filesystem(const std::string& content_dir)
@@ -452,6 +477,35 @@ static void run_with_filesystem(const std::string& content_dir)
 
     loom::HttpServer server(8080);
     setup_routes(server, cache);
+
+    server.router().set_fallback([&cache, content_dir](const loom::HttpRequest& req)
+    {
+        if (!safe_path(req.path))
+            return loom::HttpResponse::not_found();
+
+        auto snap = cache.load();
+
+        // Check if it's a known page first (shouldn't happen, but be safe)
+        auto it = snap->pages.find(req.path);
+        if (it != snap->pages.end())
+            return serve_cached(it->second, req);
+
+        // Try serving a static file from the content directory
+        std::string file_path = content_dir + req.path;
+        std::ifstream file(file_path, std::ios::binary);
+        if (!file.is_open())
+            return serve_cached(snap->not_found, req, "text/html; charset=utf-8", 404);
+
+        std::string body((std::istreambuf_iterator<char>(file)),
+                          std::istreambuf_iterator<char>());
+
+        loom::HttpResponse resp;
+        resp.status = 200;
+        resp.headers["Content-Type"] = mime_type(req.path);
+        resp.headers["Cache-Control"] = "public, max-age=3600";
+        resp.body = std::move(body);
+        return resp;
+    });
 
     std::cout << "Serving at http://localhost:8080" << std::endl;
     server.run();
@@ -489,6 +543,39 @@ static void run_with_git(const std::string& repo_path, const std::string& branch
 
     loom::HttpServer server(8080);
     setup_routes(server, cache);
+
+    server.router().set_fallback([&cache, repo_path, branch, content_prefix](const loom::HttpRequest& req)
+    {
+        if (!safe_path(req.path))
+            return loom::HttpResponse::not_found();
+
+        auto snap = cache.load();
+
+        auto it = snap->pages.find(req.path);
+        if (it != snap->pages.end())
+            return serve_cached(it->second, req);
+
+        // Try serving a static file from the git tree
+        std::string blob_path = content_prefix.empty()
+            ? req.path.substr(1)
+            : content_prefix + req.path;
+
+        try
+        {
+            auto body = loom::git_read_blob(repo_path, branch, blob_path);
+
+            loom::HttpResponse resp;
+            resp.status = 200;
+            resp.headers["Content-Type"] = mime_type(req.path);
+            resp.headers["Cache-Control"] = "public, max-age=3600";
+            resp.body = std::move(body);
+            return resp;
+        }
+        catch (const loom::GitError&)
+        {
+            return serve_cached(snap->not_found, req, "text/html; charset=utf-8", 404);
+        }
+    });
 
     std::cout << "Serving at http://localhost:8080" << std::endl;
     server.run();

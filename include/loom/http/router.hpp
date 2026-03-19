@@ -21,6 +21,8 @@ namespace loom
         void put(const std::string& pattern, RouteHandler handler);
         void del(const std::string& pattern, RouteHandler handler);
 
+        void set_fallback(RouteHandler handler);
+
         HttpResponse route(HttpRequest& request) const;
 
     private:
@@ -33,6 +35,7 @@ namespace loom
         };
 
         TrieNode root_;
+        RouteHandler fallback_;
 
         void add_route(HttpMethod method, const std::string& pattern, RouteHandler handler);
         static std::vector<std::string> split_path(const std::string& path);

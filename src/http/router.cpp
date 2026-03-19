@@ -67,12 +67,18 @@ namespace loom
         add_route(HttpMethod::DELETE, pattern, std::move(handler));
     }
 
+    void Router::set_fallback(RouteHandler handler)
+    {
+        fallback_ = std::move(handler);
+    }
+
     HttpResponse Router::route(HttpRequest& request) const
     {
         auto segments = split_path(request.path);
         const TrieNode* node = &root_;
         std::vector<std::string> params;
 
+        bool matched = true;
         for (const auto& seg : segments)
         {
             auto it = node->children.find(seg);
@@ -89,26 +95,42 @@ namespace loom
                 continue;
             }
 
-            return HttpResponse::not_found();
+            matched = false;
+            break;
         }
 
-        auto handler_it = node->handlers.find(request.method);
-        if (handler_it == node->handlers.end())
+        if (matched)
         {
-            if (node->handlers.empty())
-                return HttpResponse::not_found();
-            return HttpResponse::method_not_allowed();
+            auto handler_it = node->handlers.find(request.method);
+            if (handler_it != node->handlers.end())
+            {
+                request.params = std::move(params);
+                try
+                {
+                    return handler_it->second(request);
+                }
+                catch (const std::exception&)
+                {
+                    return HttpResponse::internal_error();
+                }
+            }
+
+            if (!node->handlers.empty())
+                return HttpResponse::method_not_allowed();
         }
 
-        request.params = std::move(params);
+        if (fallback_)
+        {
+            try
+            {
+                return fallback_(request);
+            }
+            catch (const std::exception&)
+            {
+                return HttpResponse::internal_error();
+            }
+        }
 
-        try
-        {
-            return handler_it->second(request);
-        }
-        catch (const std::exception&)
-        {
-            return HttpResponse::internal_error();
-        }
+        return HttpResponse::not_found();
     }
 }

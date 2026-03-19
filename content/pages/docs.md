@@ -16,9 +16,13 @@ content/
   pages/                 # Static pages
     about.md
     projects.md
+  images/                # Static assets (served as-is)
+    cover.png
   theme/
     style.css            # Custom CSS override (optional)
 ```
+
+Any non-markdown file in the content directory is served as a static asset. Put images, fonts, or downloads anywhere and reference them by path (e.g. `![photo](/images/cover.png)`).
 
 ## Post Frontmatter
 
@@ -29,6 +33,7 @@ date: 2024-01-15
 slug: my-post
 tags: systems, cpp, linux
 excerpt: A one-line summary for listings and SEO.
+image: /images/cover.png
 draft: true
 ---
 ```
@@ -40,6 +45,7 @@ draft: true
 | `slug` | no | filename | URL path (`/post/slug`) |
 | `tags` | no | none | Comma-separated tag list |
 | `excerpt` | no | auto-generated | Summary for listings and meta tags |
+| `image` | no | first image in post | Social preview image (`og:image`, `twitter:image`) |
 | `draft` | no | false | Set `true` to hide from all listings |
 
 If `excerpt` is omitted, the first ~200 characters of content are used.
@@ -186,6 +192,7 @@ Something[^1] interesting.
 | `/feed.xml` | RSS 2.0 feed (latest 20 posts) |
 | `/sitemap.xml` | XML sitemap |
 | `/robots.txt` | Robots exclusion |
+| `/*` | Static assets (images, fonts, etc.) |
 
 ## Git Source
 

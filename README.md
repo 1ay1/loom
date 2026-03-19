@@ -10,7 +10,7 @@ make && ./loom content/
 
 That's it. Your blog is at `localhost:8080`.
 
-The `content/` directory in this repo is a working example site — it's what you see at [loom.ayushbhat.com](https://loom.ayushbhat.com). Use it to try out themes, explore the config, or copy it as a starting point.
+The `content/` directory in this repo is a working example site — it's what you see at [blog.radiopsych.live](https://blog.radiopsych.live). Use it to try out themes, explore the config, or copy it as a starting point.
 
 ![Loom screenshot](loom.png)
 
@@ -77,9 +77,13 @@ content/
 │   └── my-second-post.md
 ├── pages/
 │   └── about.md
+├── images/              # static assets, served as-is
+│   └── cover.png
 └── theme/
     └── style.css        # optional, overrides everything
 ```
+
+Any file that isn't markdown or `site.conf` is served as a static asset. Put images, fonts, or downloads anywhere in `content/` and reference them by path (e.g. `![photo](/images/cover.png)`).
 
 ### Post frontmatter
 
@@ -91,6 +95,7 @@ slug: epoll-vs-select
 tags: linux, networking, performance
 draft: false
 excerpt: Custom excerpt for social cards and listings
+image: /images/epoll-cover.png
 ---
 
 Your markdown here.

@@ -103,6 +103,28 @@ This is the about page.
 
 Open `http://localhost:8080`. Edit any file and the site rebuilds instantly.
 
+## Add Images
+
+Put images anywhere in your content directory:
+
+```bash
+mkdir myblog/images
+cp photo.png myblog/images/
+```
+
+Reference them in markdown with `![alt text](/images/photo.png)`. Any file that isn't markdown or `site.conf` is served as a static asset — images, fonts, PDFs, whatever you need.
+
+For social media previews (`og:image`), add an `image` field to post frontmatter:
+
+```
+---
+title: Hello World
+image: /images/hello-cover.png
+---
+```
+
+If omitted, Loom uses the first image found in the post body.
+
 ## Create a Series
 
 Make a subdirectory in `posts/`:
