@@ -77,6 +77,28 @@ show_post_tags = true
 
 Toggle visibility of dates and tags in post listings and on individual post pages. Both default to `true`.
 
+### Breadcrumbs
+
+```ini
+show_breadcrumbs = true
+```
+
+Renders a visible breadcrumb trail at the top of content on post, tag, and series pages. Default: `true`.
+
+| Page type | Trail |
+|---|---|
+| Post | Home › Post Title |
+| Tag page (`/tag/:name`) | Home › Tags › tag-name |
+| Tags index (`/tags`) | Home › Tags |
+| Series page (`/series/:name`) | Home › Series › series-name |
+| Series index (`/series`) | Home › Series |
+
+Set to `false` to hide breadcrumbs site-wide:
+
+```ini
+show_breadcrumbs = false
+```
+
 ### Date Format
 
 ```ini
@@ -331,6 +353,7 @@ show_theme_toggle = true
 post_list_style = cards
 show_post_dates = true
 show_post_tags = true
+show_breadcrumbs = true
 date_format = %b %d, %Y
 sidebar_position = right
 

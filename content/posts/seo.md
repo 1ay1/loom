@@ -16,7 +16,9 @@ Every page Loom serves includes proper SEO metadata with zero configuration beyo
 
 **Twitter Cards:** `twitter:card` (`summary_large_image` when an image is present, otherwise `summary`), `twitter:title`, `twitter:description`, `twitter:image`.
 
-**JSON-LD:** `BlogPosting` schema on posts (headline, datePublished, author, url, publisher). `WebSite` schema on the homepage.
+**JSON-LD:** `BlogPosting` schema on posts (headline, datePublished, author, url, publisher). `WebSite` schema on the homepage. `BreadcrumbList` schema on posts, tag, and series pages for search engine trail rendering.
+
+**Breadcrumbs:** Visible breadcrumb nav rendered at the top of post, tag, and series pages (e.g. Home › Tags › performance). Toggle with `show_breadcrumbs = false` in `site.conf`.
 
 **RSS:** `/feed.xml` — RSS 2.0 with Atom self-link, latest 20 posts, per-post categories from tags.
 

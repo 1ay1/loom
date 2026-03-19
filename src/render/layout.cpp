@@ -840,6 +840,42 @@ footer {
 .archive-year {
   margin-top: 24px;
 }
+
+nav.breadcrumb {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 20px;
+}
+
+nav.breadcrumb ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+nav.breadcrumb li + li::before {
+  content: "›";
+  margin-right: 4px;
+  color: var(--muted);
+}
+
+nav.breadcrumb a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+nav.breadcrumb a:hover {
+  color: var(--link);
+  text-decoration: underline;
+}
+
+nav.breadcrumb li:last-child {
+  color: var(--text);
+}
 )CSS";
 
 static const char* THEME_JS = R"JS(
@@ -940,6 +976,10 @@ std::string render_layout(
     if (!site.base_url.empty())
         html += "<link rel=\"canonical\" href=\"" + escape_attr(canonical_url) + "\">";
 
+    // Preload hero image for articles (reduces LCP)
+    if (meta.og_type == "article" && !og_image_url.empty())
+        html += "<link rel=\"preload\" as=\"image\" href=\"" + escape_attr(og_image_url) + "\">";
+
     // Open Graph
     html += "<meta property=\"og:type\" content=\"" + (meta.og_type.empty() ? "website" : meta.og_type) + "\">";
     html += "<meta property=\"og:title\" content=\"" + escape_attr(meta.title.empty() ? site.title : meta.title) + "\">";
@@ -1000,6 +1040,54 @@ std::string render_layout(
             html += "\"url\":\"" + site.base_url + "\",";
         html += "\"description\":\"" + escape_attr(site.description) + "\"";
         html += "}</script>";
+    }
+
+    // BreadcrumbList JSON-LD for navigable pages
+    {
+        // Determine breadcrumb trail based on canonical path
+        struct Crumb { std::string name; std::string path; };
+        std::vector<Crumb> crumbs;
+        const auto& cp = meta.canonical_path;
+
+        if (meta.og_type == "article")
+        {
+            crumbs = {{"Home", "/"}, {meta.title, cp}};
+        }
+        else if (cp == "/tags")
+        {
+            crumbs = {{"Home", "/"}, {"Tags", "/tags"}};
+        }
+        else if (cp.size() > 5 && cp.substr(0, 5) == "/tag/")
+        {
+            std::string tag_name = cp.substr(5);
+            crumbs = {{"Home", "/"}, {"Tags", "/tags"}, {tag_name, cp}};
+        }
+        else if (cp == "/series")
+        {
+            crumbs = {{"Home", "/"}, {"Series", "/series"}};
+        }
+        else if (cp.size() > 8 && cp.substr(0, 8) == "/series/")
+        {
+            std::string series_name = cp.substr(8);
+            crumbs = {{"Home", "/"}, {"Series", "/series"}, {series_name, cp}};
+        }
+
+        if (!crumbs.empty() && !site.base_url.empty())
+        {
+            html += "<script type=\"application/ld+json\">{";
+            html += "\"@context\":\"https://schema.org\",";
+            html += "\"@type\":\"BreadcrumbList\",";
+            html += "\"itemListElement\":[";
+            for (size_t i = 0; i < crumbs.size(); ++i)
+            {
+                if (i > 0) html += ",";
+                html += "{\"@type\":\"ListItem\",";
+                html += "\"position\":" + std::to_string(i + 1) + ",";
+                html += "\"name\":\"" + escape_attr(crumbs[i].name) + "\",";
+                html += "\"item\":\"" + escape_attr(site.base_url + crumbs[i].path) + "\"}";
+            }
+            html += "]}</script>";
+        }
     }
 
     // Theme detection JS in <head> to prevent FOUC
@@ -1083,11 +1171,48 @@ std::string render_layout(
     html += "</div>";
     html += "</header>";
 
+    // Breadcrumb nav
+    std::string breadcrumb_html;
+    if (layout.show_breadcrumbs)
+    {
+        struct Crumb { std::string label; std::string href; };
+        std::vector<Crumb> crumbs;
+        const auto& cp = meta.canonical_path;
+
+        if (meta.og_type == "article")
+            crumbs = {{"Home", "/"}, {meta.title, ""}};
+        else if (cp == "/tags")
+            crumbs = {{"Home", "/"}, {"Tags", ""}};
+        else if (cp.size() > 5 && cp.substr(0, 5) == "/tag/")
+            crumbs = {{"Home", "/"}, {"Tags", "/tags"}, {cp.substr(5), ""}};
+        else if (cp == "/series")
+            crumbs = {{"Home", "/"}, {"Series", ""}};
+        else if (cp.size() > 8 && cp.substr(0, 8) == "/series/")
+            crumbs = {{"Home", "/"}, {"Series", "/series"}, {cp.substr(8), ""}};
+
+        if (!crumbs.empty())
+        {
+            breadcrumb_html += "<nav class='breadcrumb' aria-label='Breadcrumb'>";
+            breadcrumb_html += "<ol>";
+            for (const auto& crumb : crumbs)
+            {
+                breadcrumb_html += "<li>";
+                if (!crumb.href.empty())
+                    breadcrumb_html += "<a href='" + crumb.href + "'>" + escape_attr(crumb.label) + "</a>";
+                else
+                    breadcrumb_html += escape_attr(crumb.label);
+                breadcrumb_html += "</li>";
+            }
+            breadcrumb_html += "</ol></nav>";
+        }
+    }
+
     // Main content
     if (!sidebar.empty())
     {
         html += "<div class='container with-sidebar'>";
         html += "<main>";
+        html += breadcrumb_html;
         html += content;
         html += "</main>";
         html += sidebar;
@@ -1096,6 +1221,7 @@ std::string render_layout(
     else
     {
         html += "<div class='container'>";
+        html += breadcrumb_html;
         html += content;
         html += "</div>";
     }

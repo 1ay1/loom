@@ -39,6 +39,9 @@ struct LayoutConfig
     // Date
     std::string date_format = "%Y-%m-%d";
 
+    // Breadcrumbs
+    bool show_breadcrumbs = true;
+
     // Custom injections
     std::string custom_css;
     std::string custom_head_html;

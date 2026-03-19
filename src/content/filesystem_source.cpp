@@ -8,6 +8,7 @@
 #include <sstream>
 #include <algorithm>
 #include <ctime>
+#include <cstring>
 
 namespace loom
 {
@@ -175,6 +176,8 @@ void FileSystemSource::load_config()
         config_.layout.show_excerpts = (cfg["show_excerpts"] != "false");
     if (cfg.count("show_reading_time"))
         config_.layout.show_reading_time = (cfg["show_reading_time"] != "false");
+    if (cfg.count("show_breadcrumbs"))
+        config_.layout.show_breadcrumbs = (cfg["show_breadcrumbs"] != "false");
     if (cfg.count("sidebar_position"))
         config_.layout.sidebar_position = cfg["sidebar_position"];
     if (cfg.count("date_format"))
@@ -253,7 +256,106 @@ static std::string first_img_src(const std::string& html)
     return html.substr(src, end - src);
 }
 
-static Post load_post(const std::string& path, const std::string& series_name, int& counter)
+struct ImageDims { int width = 0, height = 0; };
+
+static ImageDims read_image_dims(const std::string& path)
+{
+    std::ifstream f(path, std::ios::binary);
+    if (!f) return {};
+
+    unsigned char buf[28] = {};
+    f.read(reinterpret_cast<char*>(buf), 28);
+    auto n = static_cast<size_t>(f.gcount());
+
+    // PNG: 8-byte signature, then IHDR chunk (4 len + 4 type + 4 width + 4 height)
+    if (n >= 24 && buf[0] == 0x89 && buf[1] == 'P' && buf[2] == 'N' && buf[3] == 'G'
+        && buf[4] == '\r' && buf[5] == '\n' && buf[6] == 0x1a && buf[7] == '\n')
+    {
+        int w = (buf[16] << 24) | (buf[17] << 16) | (buf[18] << 8) | buf[19];
+        int h = (buf[20] << 24) | (buf[21] << 16) | (buf[22] << 8) | buf[23];
+        return {w, h};
+    }
+
+    // JPEG: FF D8 FF — scan for SOF markers
+    if (n >= 3 && buf[0] == 0xFF && buf[1] == 0xD8 && buf[2] == 0xFF)
+    {
+        f.seekg(0);
+        std::vector<unsigned char> data(65536);
+        f.read(reinterpret_cast<char*>(data.data()), static_cast<std::streamsize>(data.size()));
+        size_t sz = static_cast<size_t>(f.gcount());
+
+        size_t pos = 2;
+        while (pos + 3 < sz)
+        {
+            if (data[pos] != 0xFF) break;
+            uint8_t marker = data[pos + 1];
+
+            // SOF markers contain image dimensions
+            if ((marker >= 0xC0 && marker <= 0xC3) || (marker >= 0xC5 && marker <= 0xC7)
+                || (marker >= 0xC9 && marker <= 0xCB) || (marker >= 0xCD && marker <= 0xCF))
+            {
+                if (pos + 8 < sz)
+                {
+                    int h = (data[pos + 5] << 8) | data[pos + 6];
+                    int w = (data[pos + 7] << 8) | data[pos + 8];
+                    return {w, h};
+                }
+                break;
+            }
+
+            // Markers without length field
+            if (marker == 0xD8 || marker == 0xD9 || marker == 0xDA
+                || (marker >= 0xD0 && marker <= 0xD7) || marker == 0x01)
+            {
+                pos += 2;
+                continue;
+            }
+
+            if (pos + 3 >= sz) break;
+            uint16_t seg_len = static_cast<uint16_t>((data[pos + 2] << 8) | data[pos + 3]);
+            pos += 2 + seg_len;
+        }
+    }
+
+    return {};
+}
+
+static void inject_image_dims(std::string& html, const std::string& content_dir)
+{
+    size_t pos = 0;
+    while ((pos = html.find("<img ", pos)) != std::string::npos)
+    {
+        size_t tag_end = html.find('>', pos);
+        if (tag_end == std::string::npos) break;
+
+        // Skip if dimensions already present
+        auto tag_view = html.substr(pos, tag_end - pos);
+        if (tag_view.find("width=") != std::string::npos) { pos = tag_end + 1; continue; }
+
+        size_t src_pos = html.find("src=\"", pos);
+        if (src_pos == std::string::npos || src_pos >= tag_end) { pos = tag_end + 1; continue; }
+        src_pos += 5;
+        size_t src_end = html.find('"', src_pos);
+        if (src_end == std::string::npos || src_end > tag_end) { pos = tag_end + 1; continue; }
+
+        std::string url = html.substr(src_pos, src_end - src_pos);
+
+        // Only resolve root-relative local paths (not external URLs)
+        if (url.empty() || url[0] != '/' || (url.size() > 1 && url[1] == '/')) { pos = tag_end + 1; continue; }
+
+        auto dims = read_image_dims(content_dir + url);
+        if (dims.width > 0 && dims.height > 0)
+        {
+            std::string attrs = " width=\"" + std::to_string(dims.width)
+                              + "\" height=\"" + std::to_string(dims.height) + "\"";
+            html.insert(tag_end, attrs);
+            tag_end += attrs.size();
+        }
+        pos = tag_end + 1;
+    }
+}
+
+static Post load_post(const std::string& path, const std::string& series_name, int& counter, const std::string& content_dir)
 {
     auto text = FileSystemSource::read_file(path);
     auto doc = parse_frontmatter(text);
@@ -288,6 +390,7 @@ static Post load_post(const std::string& path, const std::string& series_name, i
         draft = (doc.meta["draft"] == "true");
 
     auto html_content = markdown_to_html(doc.body);
+    inject_image_dims(html_content, content_dir);
 
     int reading_time = 0;
     {
@@ -361,7 +464,7 @@ void FileSystemSource::load_posts()
     // Top-level posts (no series)
     auto files = list_files(content_dir_ + "/posts", ".md");
     for (const auto& path : files)
-        posts_.push_back(load_post(path, "", counter));
+        posts_.push_back(load_post(path, "", counter, content_dir_));
 
     // Subdirectories = series (folder name is the series name)
     auto dirs = list_subdirs(content_dir_ + "/posts");
@@ -369,7 +472,7 @@ void FileSystemSource::load_posts()
     {
         auto series_files = list_files(content_dir_ + "/posts/" + dir, ".md");
         for (const auto& path : series_files)
-            posts_.push_back(load_post(path, dir, counter));
+            posts_.push_back(load_post(path, dir, counter, content_dir_));
     }
 }
 
@@ -392,6 +495,7 @@ void FileSystemSource::load_pages()
         }
 
         auto page_html = markdown_to_html(doc.body);
+        inject_image_dims(page_html, content_dir_);
         std::string image;
         if (doc.meta.count("image"))
             image = doc.meta["image"];
