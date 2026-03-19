@@ -199,12 +199,27 @@ Something[^1] interesting.
 Serve content directly from a git repository without a working tree:
 
 ```bash
+# local repo
 ./loom --git /path/to/repo main content/
+
+# public GitHub remote (clones bare automatically)
+./loom --git https://github.com/you/blog.git main content
 ```
 
-Arguments: `repo_path`, `branch` (default: `main`), `content_prefix` (default: root).
+Arguments: `repo_path_or_url`, `branch` (default: `main`), `content_prefix` (default: root).
 
 Content is read via `git show` and `git ls-tree`. The git watcher polls for new commits and hot-reloads automatically.
+
+### Static Assets with a Remote Repo
+
+When you pass a GitHub URL, Loom redirects static asset requests to `raw.githubusercontent.com` instead of serving the bytes itself:
+
+```
+GET /images/cover.png
+→ 302 Location: https://raw.githubusercontent.com/you/blog/refs/heads/main/content/images/cover.png
+```
+
+The browser fetches images, fonts, and other files directly from GitHub's CDN. Your server only handles HTML. Write image paths the same way regardless of mode — `/images/cover.png` works in filesystem, local git, and remote git mode alike.
 
 ## Hot Reload
 

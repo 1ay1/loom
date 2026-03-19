@@ -219,13 +219,24 @@ Serve content from any git branch without touching the working tree:
 # bare repo, custom branch
 ./loom --git /srv/blog.git production
 
-# no content prefix (content at repo root)
-./loom --git /path/to/repo main
+# public GitHub remote — clones bare automatically
+./loom --git https://github.com/you/blog.git main content
 ```
 
 The git source uses `git show` and `git ls-tree` to read blobs directly — no checkout, no temp files. Hot reload polls for new commits and rebuilds automatically.
 
 Post dates fall back to the first commit that introduced the file (`git log --diff-filter=A`). Modified timestamps use the last commit date. Both survive clones and CI rebuilds — unlike filesystem `mtime`.
+
+### Images with a Remote Repo
+
+When using a public GitHub remote, Loom redirects static asset requests to `raw.githubusercontent.com` instead of piping the bytes through your server:
+
+```
+GET /images/cover.png
+→ 302 Location: https://raw.githubusercontent.com/you/blog/refs/heads/main/content/images/cover.png
+```
+
+Write image paths the same way in all modes — `/images/cover.png` works on filesystem, local git, and remote git. The redirect is automatic.
 
 ## Architecture
 
