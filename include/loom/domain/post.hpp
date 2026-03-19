@@ -20,6 +20,7 @@ namespace loom
 
         bool draft = false;
         std::string excerpt;
+        std::string image;
         int reading_time_minutes = 0;
         Series series{""};
         std::chrono::system_clock::time_point modified_at;

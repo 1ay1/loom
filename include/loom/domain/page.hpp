@@ -11,5 +11,6 @@ namespace loom
         Slug slug;
         Title title;
         Content content;
+        std::string image;
     };
 }

@@ -241,6 +241,18 @@ static std::vector<std::string> list_subdirs(const std::string& dir)
     return result;
 }
 
+static std::string first_img_src(const std::string& html)
+{
+    auto pos = html.find("<img ");
+    if (pos == std::string::npos) return "";
+    auto src = html.find("src=\"", pos);
+    if (src == std::string::npos) return "";
+    src += 5;
+    auto end = html.find('"', src);
+    if (end == std::string::npos) return "";
+    return html.substr(src, end - src);
+}
+
 static Post load_post(const std::string& path, const std::string& series_name, int& counter)
 {
     auto text = FileSystemSource::read_file(path);
@@ -320,6 +332,12 @@ static Post load_post(const std::string& path, const std::string& series_name, i
         }
     }
 
+    std::string image;
+    if (doc.meta.count("image"))
+        image = doc.meta["image"];
+    else
+        image = first_img_src(html_content);
+
     return Post{
         PostId(std::to_string(counter++)),
         Title(doc.meta.count("title") ? doc.meta["title"] : slug),
@@ -329,6 +347,7 @@ static Post load_post(const std::string& path, const std::string& series_name, i
         date,
         draft,
         std::move(excerpt),
+        std::move(image),
         reading_time,
         Series(series_name),
         mtime,
@@ -372,10 +391,16 @@ void FileSystemSource::load_pages()
             slug = fname.substr(0, fname.size() - 3);
         }
 
+        auto page_html = markdown_to_html(doc.body);
+        std::string image;
+        if (doc.meta.count("image"))
+            image = doc.meta["image"];
+
         pages_.push_back(Page{
             Slug(slug),
             Title(doc.meta.count("title") ? doc.meta["title"] : slug),
-            Content(markdown_to_html(doc.body)),
+            Content(std::move(page_html)),
+            std::move(image),
         });
     }
 }

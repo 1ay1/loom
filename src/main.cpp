@@ -166,6 +166,8 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         for (const auto& t : post.tags)
             meta.tags.push_back(t.get());
 
+        meta.og_image = post.image;
+
         if (!post.excerpt.empty())
         {
             meta.description = post.excerpt.substr(0, 160);
@@ -254,6 +256,7 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         loom::PageMeta meta;
         meta.title = page.title.get();
         meta.canonical_path = "/" + page.slug.get();
+        meta.og_image = page.image;
         cache->pages["/" + page.slug.get()] = make_cached(loom::render_layout(site, nav, loom::render_page(page), sidebar_html, meta));
     }
 

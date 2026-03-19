@@ -221,6 +221,18 @@ void GitSource::load_theme()
     }
 }
 
+static std::string first_img_src(const std::string& html)
+{
+    auto pos = html.find("<img ");
+    if (pos == std::string::npos) return "";
+    auto src = html.find("src=\"", pos);
+    if (src == std::string::npos) return "";
+    src += 5;
+    auto end = html.find('"', src);
+    if (end == std::string::npos) return "";
+    return html.substr(src, end - src);
+}
+
 Post GitSource::load_git_post(const std::string& rel_path, const std::string& series_name, int& counter) const
 {
     auto text = read_blob(rel_path);
@@ -301,6 +313,12 @@ Post GitSource::load_git_post(const std::string& rel_path, const std::string& se
         }
     }
 
+    std::string image;
+    if (doc.meta.count("image"))
+        image = doc.meta["image"];
+    else
+        image = first_img_src(html_content);
+
     return Post{
         PostId(std::to_string(counter++)),
         Title(doc.meta.count("title") ? doc.meta["title"] : slug),
@@ -310,6 +328,7 @@ Post GitSource::load_git_post(const std::string& rel_path, const std::string& se
         date,
         draft,
         std::move(excerpt),
+        std::move(image),
         reading_time,
         Series(series_name),
         mtime,
@@ -360,10 +379,16 @@ void GitSource::load_pages()
             slug = filename.substr(0, filename.size() - 3);
         }
 
+        auto page_html = markdown_to_html(doc.body);
+        std::string image;
+        if (doc.meta.count("image"))
+            image = doc.meta["image"];
+
         pages_.push_back(Page{
             Slug(slug),
             Title(doc.meta.count("title") ? doc.meta["title"] : slug),
-            Content(markdown_to_html(doc.body)),
+            Content(std::move(page_html)),
+            std::move(image),
         });
     }
 }

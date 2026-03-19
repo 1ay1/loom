@@ -53,6 +53,7 @@ struct PageMeta
     std::string published_date;     // ISO 8601 for articles
     std::string author;
     std::vector<std::string> tags;
+    std::string og_image;
     bool noindex = false;
 };
 

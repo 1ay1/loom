@@ -12,9 +12,9 @@ Every page Loom serves includes proper SEO metadata with zero configuration beyo
 
 **Meta tags:** `<title>`, `description`, `author`, `canonical`, `robots` (noindex on 404).
 
-**Open Graph:** `og:type` (website or article), `og:title`, `og:description`, `og:url`, `og:site_name`, `article:author`, `article:published_time`, `article:tag`.
+**Open Graph:** `og:type` (website or article), `og:title`, `og:description`, `og:url`, `og:site_name`, `og:image`, `article:author`, `article:published_time`, `article:tag`.
 
-**Twitter Cards:** `twitter:card`, `twitter:title`, `twitter:description`.
+**Twitter Cards:** `twitter:card` (`summary_large_image` when an image is present, otherwise `summary`), `twitter:title`, `twitter:description`, `twitter:image`.
 
 **JSON-LD:** `BlogPosting` schema on posts (headline, datePublished, author, url, publisher). `WebSite` schema on the homepage.
 
@@ -27,6 +27,17 @@ Every page Loom serves includes proper SEO metadata with zero configuration beyo
 ## Per-Post Metadata
 
 Post excerpts (from frontmatter or auto-generated) are used as `meta description` and OG/Twitter descriptions. Tags become `article:tag` properties. The publish date populates `article:published_time` and `datePublished` in JSON-LD.
+
+Set the social preview image via the `image` frontmatter field:
+
+```markdown
+---
+title: My Post
+image: /images/cover.png
+---
+```
+
+If `image` is omitted, Loom falls back to the first image embedded in the post body. Relative paths are resolved against `base_url` automatically.
 
 ## Caching Headers
 

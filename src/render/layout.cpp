@@ -901,6 +901,18 @@ std::string render_layout(
     std::string html;
     html.reserve(8192 + content.size());
 
+    // Resolve og:image to an absolute URL
+    std::string og_image_url;
+    if (!meta.og_image.empty())
+    {
+        if (meta.og_image.find("://") != std::string::npos)
+            og_image_url = meta.og_image;
+        else if (!site.base_url.empty())
+            og_image_url = site.base_url + (meta.og_image.front() == '/' ? meta.og_image : "/" + meta.og_image);
+        else
+            og_image_url = meta.og_image;
+    }
+
     // Use page-specific title/description or fall back to site-level
     std::string page_title = meta.title.empty() ? site.title
         : meta.title + " — " + site.title;
@@ -943,11 +955,15 @@ std::string render_layout(
         html += "<meta property=\"article:published_time\" content=\"" + meta.published_date + "\">";
     for (const auto& tag : meta.tags)
         html += "<meta property=\"article:tag\" content=\"" + escape_attr(tag) + "\">";
+    if (!og_image_url.empty())
+        html += "<meta property=\"og:image\" content=\"" + escape_attr(og_image_url) + "\">";
 
     // Twitter Card
-    html += "<meta name=\"twitter:card\" content=\"summary\">";
+    html += "<meta name=\"twitter:card\" content=\"" + std::string(og_image_url.empty() ? "summary" : "summary_large_image") + "\">";
     html += "<meta name=\"twitter:title\" content=\"" + escape_attr(meta.title.empty() ? site.title : meta.title) + "\">";
     html += "<meta name=\"twitter:description\" content=\"" + escape_attr(page_desc) + "\">";
+    if (!og_image_url.empty())
+        html += "<meta name=\"twitter:image\" content=\"" + escape_attr(og_image_url) + "\">";
 
     // RSS autodiscovery
     if (!site.base_url.empty())
@@ -968,6 +984,8 @@ std::string render_layout(
         }
         if (!site.base_url.empty())
             html += "\"url\":\"" + escape_attr(canonical_url) + "\",";
+        if (!og_image_url.empty())
+            html += "\"image\":\"" + escape_attr(og_image_url) + "\",";
         html += "\"publisher\":{\"@type\":\"Organization\",\"name\":\"" + escape_attr(site.title) + "\"}";
         html += "}</script>";
     }
