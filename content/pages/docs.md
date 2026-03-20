@@ -107,7 +107,7 @@ Series appear in the sidebar widget and at `/series` and `/series/:name`.
 | `description` | Site description |
 | `author` | Author name (used in meta tags, RSS, JSON-LD) |
 | `base_url` | Full base URL for canonical links, sitemap, RSS |
-| `theme` | Theme name: `default`, `mono`, `serif`, `nord`, `rose`, `cobalt`, `earth`, `hacker` |
+| `theme` | Theme name — 21 built-in: `default`, `serif`, `mono`, `nord`, `solarized`, `dracula`, `gruvbox`, `catppuccin`, `tokyonight`, `kanagawa`, `typewriter`, `brutalist`, `lavender`, `warm`, `ocean`, `sakura`, `midnight`, `rose`, `cobalt`, `earth`, `hacker` |
 
 ### Navigation
 

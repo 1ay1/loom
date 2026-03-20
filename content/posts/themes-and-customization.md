@@ -1,23 +1,53 @@
 ---
-title: 8 Themes, Full Customization, Zero JavaScript Frameworks
+title: 21 Themes, Full Customization, Zero JavaScript Frameworks
 date: 2024-02-15
 slug: themes-and-customization
 tags: feature, themes, architecture
-excerpt: Built-in themes with dark mode, CSS variable overrides, and full stylesheet replacement. All inlined — no external requests.
+excerpt: 21 built-in themes with dark mode, CSS variable overrides, and full stylesheet replacement. All inlined — no external requests.
 ---
 
-Loom ships with 8 themes. Each supports automatic dark/light mode based on system preference, with a toggle button for manual override.
+Loom ships with 21 themes. Each supports automatic dark/light mode based on system preference, with a toggle button for manual override.
 
 ## Built-in Themes
 
-- **default** — clean, neutral, system sans-serif
-- **mono** — monospace terminal aesthetic
-- **serif** — editorial, Georgia/Garamond, warm tones
-- **nord** — arctic color palette
-- **rose** — soft pinks
-- **cobalt** — deep blue
-- **earth** — warm organic tones, serif
-- **hacker** — green on black, monospace, no borders
+**Classic** — clean starting points for any blog:
+
+- **default** — clean, neutral grays, blue accent, system sans-serif
+- **serif** — editorial, Georgia/Garamond, warm tones, literary feel
+- **mono** — monospace terminal aesthetic, green accent
+- **typewriter** — Courier New, old-school ink-on-paper, raw and minimal
+- **brutalist** — anti-design, bold borders, red accent, uppercase headings
+
+**Editor Palettes** — themes ported from popular code editors:
+
+- **nord** — arctic color palette, Inter font
+- **solarized** — Ethan Schoonover's precision-engineered palette
+- **dracula** — the beloved dark-first theme, purple accent
+- **gruvbox** — retro groove, warm earthy contrast, orange accent
+- **catppuccin** — soothing pastels, purple accent
+- **tokyonight** — neon-tinged Tokyo evening palette
+- **kanagawa** — inspired by Hokusai's The Great Wave, Charter/Georgia serif
+
+**Warm & Earthy** — cozy, inviting tones:
+
+- **earth** — warm organic tones, Charter/Georgia serif
+- **warm** — golden amber palette, Georgia serif, cozy reading feel
+
+**Cool & Blue** — calm, professional blue palettes:
+
+- **cobalt** — deep blue developer theme
+- **ocean** — deep blue, calm and professional
+- **midnight** — rich dark-first, electric blue, polished
+
+**Soft & Colorful** — gentle pastels and florals:
+
+- **rose** — soft pinks, elegant, magenta accent
+- **sakura** — cherry blossom pinks, delicate and refined
+- **lavender** — soft purple tones, warm and inviting
+
+**Minimal & Raw** — stripped back, opinionated:
+
+- **hacker** — green on black, monospace, no border-radius, no frills
 
 Set with `theme = name` in `site.conf`. Hot reload picks up the change instantly.
 

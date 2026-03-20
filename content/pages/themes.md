@@ -5,18 +5,58 @@ slug: themes
 
 ## Built-in Themes
 
-Set `theme = name` in `site.conf`. All themes support dark and light mode.
+Set `theme = name` in `site.conf`. All 21 themes support dark and light mode.
+
+### Classic
 
 | Theme | Font | Style |
 |-------|------|-------|
 | `default` | System sans-serif | Clean, neutral grays, blue accent |
+| `serif` | Georgia / Garamond | Editorial, warm tones, literary feel |
 | `mono` | Monospace | Terminal aesthetic, green accent |
-| `serif` | Georgia / Garamond | Editorial, warm tones, brown accent |
+| `typewriter` | Courier New | Old-school ink-on-paper, raw and minimal |
+| `brutalist` | System sans-serif | Anti-design, bold borders, red accent, uppercase |
+
+### Editor Palettes
+
+| Theme | Font | Style |
+|-------|------|-------|
 | `nord` | Inter / sans-serif | Arctic palette, muted blues |
-| `rose` | System sans-serif | Soft pinks, elegant |
+| `solarized` | System sans-serif | Ethan Schoonover's precision-engineered palette |
+| `dracula` | System sans-serif | The beloved dark-first theme, purple accent |
+| `gruvbox` | System sans-serif | Retro groove, warm earthy contrast, orange accent |
+| `catppuccin` | System sans-serif | Soothing pastels, purple accent |
+| `tokyonight` | System sans-serif | Neon-tinged Tokyo evening palette |
+| `kanagawa` | Charter / Georgia | Inspired by Hokusai's The Great Wave |
+
+### Warm & Earthy
+
+| Theme | Font | Style |
+|-------|------|-------|
+| `earth` | Charter / Georgia | Warm organic tones, olive accent |
+| `warm` | Georgia / Charter | Golden amber palette, cozy reading feel |
+
+### Cool & Blue
+
+| Theme | Font | Style |
+|-------|------|-------|
 | `cobalt` | System sans-serif | Deep blue developer theme |
-| `earth` | Serif | Warm organic tones, olive accent |
-| `hacker` | Monospace | Dark-first, green-on-black, no borders |
+| `ocean` | System sans-serif | Deep blue, calm and professional |
+| `midnight` | System sans-serif | Rich dark-first, electric blue, polished |
+
+### Soft & Colorful
+
+| Theme | Font | Style |
+|-------|------|-------|
+| `rose` | System sans-serif | Soft pinks, elegant, magenta accent |
+| `sakura` | System sans-serif | Cherry blossom pinks, delicate and refined |
+| `lavender` | System sans-serif | Soft purple tones, warm and inviting |
+
+### Minimal & Raw
+
+| Theme | Font | Style |
+|-------|------|-------|
+| `hacker` | Monospace | Green on black, no border-radius, no frills |
 
 ## Overriding Variables
 

@@ -23,7 +23,7 @@ static const std::map<std::string, ThemeColors> THEMES = {
     {"mono", {
         "#f5f5f0", "#1e1e1e", "#666666", "#d4d4d4", "#16a34a",
         "ui-monospace,SFMono-Regular,Menlo,Consolas,monospace", "15px", "760px",
-        "#0a0a0a", "#d4d4d4", "#737373", "#262626", "#4ade80", {}
+        "#0a0a0a", "#d4d4d4", "#7a7a7a", "#262626", "#4ade80", {}
     }},
 
     // Nord — arctic color palette
@@ -58,7 +58,7 @@ static const std::map<std::string, ThemeColors> THEMES = {
     {"hacker", {
         "#f0f0e8", "#1a1a1a", "#5a5a5a", "#c8c8b8", "#2d8a2d",
         "ui-monospace,SFMono-Regular,Menlo,Consolas,monospace", "14px", "800px",
-        "#0c0c0c", "#b5b5b5", "#606060", "#1a1a1a", "#88c070",
+        "#0c0c0c", "#b5b5b5", "#7b7b7b", "#1a1a1a", "#88c070",
 
         R"CSS(
 :root {
@@ -101,9 +101,9 @@ static const std::map<std::string, ThemeColors> THEMES = {
 
     // Solarized — Ethan Schoonover's precision-engineered palette
     {"solarized", {
-        "#fdf6e3", "#657b83", "#93a1a1", "#eee8d5", "#268bd2",
+        "#fdf6e3", "#657b83", "#677171", "#eee8d5", "#268bd2",
         "system-ui,-apple-system,Segoe UI,Roboto,sans-serif", "17px", "720px",
-        "#002b36", "#839496", "#586e75", "#073642", "#2aa198",
+        "#002b36", "#839496", "#819297", "#073642", "#2aa198",
 
         R"CSS(
 ::selection {
@@ -129,9 +129,9 @@ static const std::map<std::string, ThemeColors> THEMES = {
 
     // Dracula — the mass-beloved dark-first theme
     {"dracula", {
-        "#f8f8f2", "#282a36", "#6272a4", "#d6d6e6", "#7c3aed",
+        "#f8f8f2", "#282a36", "#606fa0", "#d6d6e6", "#7c3aed",
         "system-ui,-apple-system,Segoe UI,Roboto,sans-serif", "17px", "720px",
-        "#282a36", "#f8f8f2", "#6272a4", "#44475a", "#bd93f9",
+        "#282a36", "#f8f8f2", "#8592b8", "#44475a", "#bd93f9",
 
         R"CSS(
 ::selection {
@@ -170,7 +170,7 @@ static const std::map<std::string, ThemeColors> THEMES = {
 
     // Gruvbox — retro groove with warm, earthy contrast
     {"gruvbox", {
-        "#fbf1c7", "#3c3836", "#7c6f64", "#d5c4a1", "#d65d0e",
+        "#fbf1c7", "#3c3836", "#766a60", "#d5c4a1", "#d65d0e",
         "system-ui,-apple-system,Segoe UI,Roboto,sans-serif", "17px", "720px",
         "#282828", "#ebdbb2", "#a89984", "#3c3836", "#fe8019",
 
@@ -207,7 +207,7 @@ static const std::map<std::string, ThemeColors> THEMES = {
 
     // Catppuccin — soothing pastel theme for the high-spirited
     {"catppuccin", {
-        "#eff1f5", "#4c4f69", "#7c7f93", "#ccd0da", "#8839ef",
+        "#eff1f5", "#4c4f69", "#696b7c", "#ccd0da", "#8839ef",
         "system-ui,-apple-system,Segoe UI,Roboto,sans-serif", "17px", "720px",
         "#1e1e2e", "#cdd6f4", "#a6adc8", "#313244", "#cba6f7",
 
@@ -254,9 +254,9 @@ static const std::map<std::string, ThemeColors> THEMES = {
 
     // Tokyo Night — neon-tinged Tokyo evening palette
     {"tokyonight", {
-        "#d5d6db", "#343b58", "#6b7089", "#c0c1c8", "#7aa2f7",
+        "#d5d6db", "#343b58", "#575b70", "#c0c1c8", "#7aa2f7",
         "system-ui,-apple-system,Segoe UI,Roboto,sans-serif", "16px", "720px",
-        "#1a1b26", "#a9b1d6", "#565f89", "#292e42", "#7aa2f7",
+        "#1a1b26", "#a9b1d6", "#7d84a4", "#292e42", "#7aa2f7",
 
         R"CSS(
 ::selection {
@@ -300,9 +300,9 @@ static const std::map<std::string, ThemeColors> THEMES = {
 
     // Kanagawa — inspired by Katsushika Hokusai's famous painting
     {"kanagawa", {
-        "#f2ecbc", "#1F1F28", "#727169", "#d8d3ab", "#957fb8",
+        "#f2ecbc", "#1F1F28", "#696961", "#d8d3ab", "#957fb8",
         "Charter,Georgia,Cambria,serif", "17px", "700px",
-        "#1F1F28", "#DCD7BA", "#727169", "#2A2A37", "#957FB8",
+        "#1F1F28", "#DCD7BA", "#8a8983", "#2A2A37", "#957FB8",
 
         R"CSS(
 ::selection {
@@ -342,9 +342,9 @@ static const std::map<std::string, ThemeColors> THEMES = {
 
     // Typewriter — old-school ink-on-paper, Courier, raw
     {"typewriter", {
-        "#f4f1ea", "#222222", "#888888", "#d1cdc4", "#222222",
+        "#f4f1ea", "#222222", "#6c6c6c", "#d1cdc4", "#222222",
         "Courier New,Courier,monospace", "16px", "640px",
-        "#1a1814", "#c8c0b0", "#6e685e", "#2a2620", "#c8c0b0",
+        "#1a1814", "#c8c0b0", "#878279", "#2a2620", "#c8c0b0",
 
         R"CSS(
 ::selection {
@@ -556,7 +556,7 @@ footer {
 
     // Lavender — soft purple tones, warm and inviting
     {"lavender", {
-        "#faf8ff", "#2d2640", "#7c7291", "#e6e0f0", "#7c5cbf",
+        "#faf8ff", "#2d2640", "#766d8a", "#e6e0f0", "#7c5cbf",
         "system-ui,-apple-system,Segoe UI,Roboto,sans-serif", "17px", "720px",
         "#1a1724", "#e0daea", "#9890a8", "#2a2538", "#a78bfa",
 
@@ -628,7 +628,7 @@ footer {
 
     // Warm — golden amber palette, cozy reading feel
     {"warm", {
-        "#fdf8f0", "#33261a", "#8a7560", "#e8dcc8", "#c47a20",
+        "#fdf8f0", "#33261a", "#816d5a", "#e8dcc8", "#c47a20",
         "Georgia,Charter,Cambria,Times New Roman,serif", "18px", "700px",
         "#1a1510", "#ddd0b8", "#8a7e68", "#2e2618", "#dda040",
 
@@ -784,9 +784,9 @@ header {
 
     // Sakura — cherry blossom pinks, delicate and refined
     {"sakura", {
-        "#fef9fa", "#3a2030", "#907080", "#ecd8e0", "#d4447a",
+        "#fef9fa", "#3a2030", "#876978", "#ecd8e0", "#d4447a",
         "system-ui,-apple-system,Segoe UI,Roboto,sans-serif", "17px", "720px",
-        "#1c1218", "#e0c8d4", "#907080", "#2e1e28", "#f07098",
+        "#1c1218", "#e0c8d4", "#967887", "#2e1e28", "#f07098",
 
         R"CSS(
 :root {
@@ -859,7 +859,7 @@ header {
     {"midnight", {
         "#f0f2f8", "#1e2030", "#5a6080", "#d0d4e0", "#3b82f6",
         "system-ui,-apple-system,Segoe UI,Roboto,sans-serif", "16px", "740px",
-        "#0e1018", "#c8cce0", "#606888", "#1a1e30", "#60a5fa",
+        "#0e1018", "#c8cce0", "#757c98", "#1a1e30", "#60a5fa",
 
         R"CSS(
 :root {

@@ -59,7 +59,7 @@ At startup, Loom reads your content directory, parses every markdown file and th
 - Image `width` and `height` attributes auto-detected from local PNG/JPEG files
 
 **Theming:**
-- 8 built-in themes: `default`, `mono`, `serif`, `nord`, `rose`, `cobalt`, `earth`, `hacker`
+- 21 built-in themes: `default`, `serif`, `mono`, `nord`, `solarized`, `dracula`, `gruvbox`, `catppuccin`, `tokyonight`, `kanagawa`, `typewriter`, `brutalist`, `lavender`, `warm`, `ocean`, `sakura`, `midnight`, `rose`, `cobalt`, `earth`, `hacker`
 - Dark/light mode toggle with `localStorage` persistence and `prefers-color-scheme` detection
 - CSS custom properties for fine-grained overrides (`theme_accent`, `theme_font`, etc.)
 - Full CSS override via `content/theme/style.css`
