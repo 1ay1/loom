@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <unordered_map>
 #include <algorithm>
 #include <functional>
 
@@ -20,7 +21,7 @@ struct RefDef
     std::string title;
 };
 
-using RefMap = std::map<std::string, RefDef>;
+using RefMap = std::unordered_map<std::string, RefDef>;
 
 struct FootnoteDef
 {
@@ -99,13 +100,65 @@ static std::string escape_html(const std::string& s)
 
 static bool is_punctuation(char c)
 {
-    return c == '!' || c == '"' || c == '#' || c == '$' || c == '%' ||
-           c == '&' || c == '\'' || c == '(' || c == ')' || c == '*' ||
-           c == '+' || c == ',' || c == '-' || c == '.' || c == '/' ||
-           c == ':' || c == ';' || c == '<' || c == '=' || c == '>' ||
-           c == '?' || c == '@' || c == '[' || c == '\\' || c == ']' ||
-           c == '^' || c == '_' || c == '`' || c == '{' || c == '|' ||
-           c == '}' || c == '~';
+    // Lookup table for ASCII punctuation (CommonMark spec)
+    static constexpr bool table[128] = {
+        // 0-31: control chars
+        0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,
+        // 32-47: space ! " # $ % & ' ( ) * + , - . /
+        0,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+        // 48-63: 0-9 : ; < = > ?
+        0,0,0,0,0,0,0,0, 0,0,1,1,1,1,1,1,
+        // 64-79: @ A-O
+        1,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,
+        // 80-95: P-Z [ \ ] ^ _
+        0,0,0,0,0,0,0,0, 0,0,0,1,1,1,1,1,
+        // 96-111: ` a-o
+        1,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,
+        // 112-127: p-z { | } ~
+        0,0,0,0,0,0,0,0, 0,0,0,1,1,1,1,0,
+    };
+    auto uc = static_cast<unsigned char>(c);
+    return uc < 128 && table[uc];
+}
+
+static std::string slugify(const std::string& text)
+{
+    std::string slug;
+    slug.reserve(text.size());
+    bool prev_dash = true; // true suppresses leading dash
+    for (char c : text)
+    {
+        auto uc = static_cast<unsigned char>(c);
+        if (std::isalnum(uc))
+        {
+            slug += static_cast<char>(std::tolower(uc));
+            prev_dash = false;
+        }
+        else if (!prev_dash)
+        {
+            slug += '-';
+            prev_dash = true;
+        }
+    }
+    if (!slug.empty() && slug.back() == '-') slug.pop_back();
+    return slug;
+}
+
+static std::string make_heading_id(const std::string& text,
+                                   std::unordered_map<std::string, int>& seen)
+{
+    auto slug = slugify(text);
+    if (slug.empty()) slug = "heading";
+    auto it = seen.find(slug);
+    if (it == seen.end())
+    {
+        seen[slug] = 1;
+        return slug;
+    }
+    auto id = slug + "-" + std::to_string(it->second);
+    it->second++;
+    return id;
 }
 
 static std::vector<std::string> split_lines(const std::string& text)
@@ -186,6 +239,7 @@ static bool parse_link_dest(const std::string& text, size_t start, size_t& end,
 static std::string process_inline(const std::string& text, const RefMap& refs)
 {
     std::string out;
+    out.reserve(text.size() + text.size() / 2);
     size_t i = 0;
     size_t len = text.size();
 
@@ -270,7 +324,7 @@ static std::string process_inline(const std::string& text, const RefMap& refs)
                         out += "<img src=\"" + escape_html(url) + "\" alt=\"" + escape_html(alt) + "\"";
                         if (!title.empty())
                             out += " title=\"" + escape_html(title) + "\"";
-                        out += ">";
+                        out += " loading=\"lazy\">";
                         i = end;
                         continue;
                     }
@@ -290,7 +344,7 @@ static std::string process_inline(const std::string& text, const RefMap& refs)
                             out += "<img src=\"" + escape_html(it->second.url) + "\" alt=\"" + escape_html(alt) + "\"";
                             if (!it->second.title.empty())
                                 out += " title=\"" + escape_html(it->second.title) + "\"";
-                            out += ">";
+                            out += " loading=\"lazy\">";
                             i = close_ref + 1;
                             continue;
                         }
@@ -518,7 +572,8 @@ static std::string process_inline(const std::string& text, const RefMap& refs)
 // Forward declaration
 static std::string process_blocks(const std::vector<std::string>& lines,
                                   const RefMap& refs,
-                                  const std::map<std::string, FootnoteDef>& footnotes);
+                                  const std::map<std::string, FootnoteDef>& footnotes,
+                                  std::unordered_map<std::string, int>& heading_slugs);
 
 // --- Line classification helpers ---
 
@@ -586,26 +641,40 @@ static bool is_setext_underline(const std::string& s, int& level)
     return false;
 }
 
-static bool is_fenced_code(const std::string& s, std::string& lang)
+static bool is_fenced_code(const std::string& s, std::string& lang, char& fence_char, size_t& fence_len)
 {
     auto t = ltrim(s);
-    if (t.size() >= 3 && t.substr(0, 3) == "```")
+    if (t.size() >= 3 && (t[0] == '`' || t[0] == '~'))
     {
-        lang = trim(t.substr(3));
-        return true;
-    }
-    if (t.size() >= 3 && t.substr(0, 3) == "~~~")
-    {
-        lang = trim(t.substr(3));
-        return true;
+        char ch = t[0];
+        size_t count = 0;
+        while (count < t.size() && t[count] == ch) count++;
+        if (count >= 3)
+        {
+            fence_char = ch;
+            fence_len = count;
+            lang = trim(t.substr(count));
+            return true;
+        }
     }
     return false;
 }
 
-static bool is_fenced_code_end(const std::string& s)
+static bool is_fenced_code_end(const std::string& s, char fence_char, size_t fence_len)
 {
     auto t = ltrim(s);
-    return (t.size() >= 3 && (t.substr(0, 3) == "```" || t.substr(0, 3) == "~~~"));
+    if (t.size() >= fence_len)
+    {
+        size_t count = 0;
+        while (count < t.size() && t[count] == fence_char) count++;
+        if (count >= fence_len)
+        {
+            // Closing fence must be only fence chars + optional trailing whitespace
+            auto rest = t.substr(count);
+            return rest.find_first_not_of(" \t") == std::string::npos;
+        }
+    }
+    return false;
 }
 
 static bool is_blockquote(const std::string& s)
@@ -690,7 +759,7 @@ static bool is_table_separator(const std::string& s)
         char c = (i < t.size()) ? t[i] : '|';
         if (c == '|' || i == t.size())
         {
-            if (dashes < 1) return false;
+            if (dashes < 3) return false;
             dashes = 0;
         }
         else if (c == '-') { dashes++; }
@@ -974,9 +1043,11 @@ static std::string render_list_entries(const std::vector<ListEntry>& entries,
 
 static std::string process_blocks(const std::vector<std::string>& lines,
                                   const RefMap& refs,
-                                  const std::map<std::string, FootnoteDef>& footnotes)
+                                  const std::map<std::string, FootnoteDef>& footnotes,
+                                  std::unordered_map<std::string, int>& heading_slugs)
 {
     std::string html;
+    html.reserve(lines.size() * 80);
     size_t i = 0;
     size_t n = lines.size();
 
@@ -1009,14 +1080,17 @@ static std::string process_blocks(const std::vector<std::string>& lines,
         // --- Fenced code block ---
         {
             std::string lang;
-            if (is_fenced_code(line, lang))
+            char fence_char;
+            size_t fence_len;
+            if (is_fenced_code(line, lang, fence_char, fence_len))
             {
                 flush_paragraph();
                 i++;
-                std::string code;
-                while (i < n && !is_fenced_code_end(lines[i]))
+                std::string raw;
+                while (i < n && !is_fenced_code_end(lines[i], fence_char, fence_len))
                 {
-                    code += escape_html(lines[i]) + "\n";
+                    raw += lines[i];
+                    raw += '\n';
                     i++;
                 }
                 if (i < n) i++; // skip closing fence
@@ -1025,7 +1099,7 @@ static std::string process_blocks(const std::vector<std::string>& lines,
                     html += "<pre><code class=\"language-" + escape_html(lang) + "\">";
                 else
                     html += "<pre><code>";
-                html += code + "</code></pre>\n";
+                html += escape_html(raw) + "</code></pre>\n";
                 continue;
             }
         }
@@ -1063,9 +1137,12 @@ static std::string process_blocks(const std::vector<std::string>& lines,
             {
                 flush_paragraph();
                 auto text = atx_heading_text(line, level);
-                html += "<h" + std::to_string(level) + ">" +
-                        process_inline(text, refs) +
-                        "</h" + std::to_string(level) + ">\n";
+                auto id = make_heading_id(text, heading_slugs);
+                auto lvl = std::to_string(level);
+                html += "<h" + lvl + " id=\"" + id + "\">"
+                      + "<a class=\"heading-anchor\" href=\"#" + id + "\" aria-hidden=\"true\">#</a>"
+                      + process_inline(text, refs)
+                      + "</h" + lvl + ">\n";
                 i++;
                 continue;
             }
@@ -1083,9 +1160,12 @@ static std::string process_blocks(const std::vector<std::string>& lines,
                 {
                     flush_paragraph();
                     auto text = trim(line);
-                    html += "<h" + std::to_string(slevel) + ">" +
-                            process_inline(text, refs) +
-                            "</h" + std::to_string(slevel) + ">\n";
+                    auto id = make_heading_id(text, heading_slugs);
+                    auto lvl = std::to_string(slevel);
+                    html += "<h" + lvl + " id=\"" + id + "\">"
+                          + "<a class=\"heading-anchor\" href=\"#" + id + "\" aria-hidden=\"true\">#</a>"
+                          + process_inline(text, refs)
+                          + "</h" + lvl + ">\n";
                     i += 2;
                     continue;
                 }
@@ -1137,7 +1217,7 @@ static std::string process_blocks(const std::vector<std::string>& lines,
                     break;
                 }
             }
-            html += "<blockquote>\n" + process_blocks(bq_lines, refs, footnotes) + "</blockquote>\n";
+            html += "<blockquote>\n" + process_blocks(bq_lines, refs, footnotes, heading_slugs) + "</blockquote>\n";
             continue;
         }
 
@@ -1303,6 +1383,18 @@ std::string markdown_to_html(const std::string& markdown)
 
     for (size_t i = 0; i < lines.size(); i++)
     {
+        // Skip fenced code blocks in pass 1
+        std::string skip_lang;
+        char skip_fc;
+        size_t skip_fl;
+        if (is_fenced_code(lines[i], skip_lang, skip_fc, skip_fl))
+        {
+            i++;
+            while (i < lines.size() && !is_fenced_code_end(lines[i], skip_fc, skip_fl))
+                i++;
+            continue; // skip closing fence
+        }
+
         std::string key;
         RefDef def;
         if (parse_ref_def(lines[i], key, def))
@@ -1330,7 +1422,8 @@ std::string markdown_to_html(const std::string& markdown)
     }
 
     // Second pass: process blocks
-    std::string html = process_blocks(lines, refs, footnotes);
+    std::unordered_map<std::string, int> heading_slugs;
+    std::string html = process_blocks(lines, refs, footnotes, heading_slugs);
 
     // Append footnotes section if any
     if (!footnotes.empty())

@@ -300,6 +300,37 @@ html {
   color: var(--muted);
 }
 
+.post-content h1, .post-content h2, .post-content h3,
+.post-content h4, .post-content h5, .post-content h6,
+.page-content h1, .page-content h2, .page-content h3,
+.page-content h4, .page-content h5, .page-content h6 {
+  position: relative;
+}
+
+.heading-anchor {
+  opacity: 0;
+  text-decoration: none;
+  padding-right: 0.4em;
+  margin-left: -1.2em;
+  font-weight: 400;
+  color: var(--meta);
+  transition: opacity 0.15s;
+}
+
+h1:hover > .heading-anchor,
+h2:hover > .heading-anchor,
+h3:hover > .heading-anchor,
+h4:hover > .heading-anchor,
+h5:hover > .heading-anchor,
+h6:hover > .heading-anchor {
+  opacity: 0.5;
+}
+
+.heading-anchor:hover {
+  opacity: 1 !important;
+  color: var(--link);
+}
+
 .post-content p, .page-content p {
   margin-bottom: 14px;
 }
