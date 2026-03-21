@@ -250,6 +250,11 @@ namespace loom
         ev.events = EPOLLIN | EPOLLET;
         ev.data.fd = fd;
         epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, fd, &ev);
+
+        // With edge-triggered epoll, data may have arrived while we were
+        // writing. Re-arming EPOLLIN won't fire an event for data already
+        // in the kernel buffer, so we must drain it now.
+        handle_readable(fd);
     }
 
     void HttpServer::reap_idle_connections()
