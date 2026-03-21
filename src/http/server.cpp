@@ -269,7 +269,7 @@ namespace loom
 
     void HttpServer::run()
     {
-        server_fd_ = socket(AF_INET, SOCK_STREAM, 0);
+        server_fd_ = socket(AF_INET6, SOCK_STREAM, 0);
         if (server_fd_ < 0)
         {
             perror("socket");
@@ -279,10 +279,13 @@ namespace loom
         int opt = 1;
         setsockopt(server_fd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
-        sockaddr_in addr{};
-        addr.sin_family = AF_INET;
-        addr.sin_port = htons(static_cast<uint16_t>(port_));
-        addr.sin_addr.s_addr = INADDR_ANY;
+        int v6only = 0;
+        setsockopt(server_fd_, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only));
+
+        sockaddr_in6 addr{};
+        addr.sin6_family = AF_INET6;
+        addr.sin6_port = htons(static_cast<uint16_t>(port_));
+        addr.sin6_addr = in6addr_any;
 
         if (bind(server_fd_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0)
         {
