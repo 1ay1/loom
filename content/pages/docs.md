@@ -3,6 +3,8 @@ title: Documentation
 slug: docs
 ---
 
+Everything you need to configure and use Loom. If you haven't installed it yet, start with the [Getting Started](/getting-started) guide — you'll be up and running in 30 seconds.
+
 ## Content Structure
 
 ```

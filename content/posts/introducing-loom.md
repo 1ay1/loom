@@ -3,77 +3,95 @@ title: Introducing Loom
 date: 2024-01-01
 slug: introducing-loom
 tags: release, architecture
-excerpt: A zero-dependency C++20 blog engine. Single binary, sub-millisecond responses, hot reload, and no build step.
+excerpt: A blog engine that just works. Clone, make, run — your blog is live in 30 seconds with themes, RSS, SEO, and hot reload built in.
 ---
 
-Loom is a blog engine written in C++20 with zero external dependencies beyond zlib. You give it a directory of markdown files and a `site.conf`, and it serves a complete, fast blog — with RSS, sitemap, Open Graph, dark mode, tag pages, series navigation, and gzip compression — from a single binary under 1MB.
+## Install and Run
 
-## The Architecture in One Paragraph
+```bash
+git clone https://github.com/1ay1/loom.git
+cd loom
+make
+./loom content/
+```
 
-At startup, Loom reads your content directory, parses every markdown file and the configuration, renders each page to HTML, minifies it, compresses it with gzip, and stores everything in an in-memory hash map. Requests are hash table lookups — no template rendering, no disk I/O, no allocations on the hot path. When a file changes, inotify detects it and a background thread builds a new cache, which is swapped atomically via `shared_ptr`. Active requests finish on the old cache; new requests get the new one. Zero downtime, no restart.
+Open `http://localhost:8080`. You're running a blog. The whole setup is four commands.
 
-## Why Build This
+No Node.js. No Ruby. No Python. No Docker. No config files to debug. Just a C++ compiler and `make`.
 
-**No build step.** Static site generators (Hugo, Jekyll, Eleventy) require a separate build phase. Edit a file, run a command, wait, see the result. Loom's hot reload makes editing feel like a live document editor — save, refresh, done.
+## What You Get
 
-**No database.** CMSes (WordPress, Ghost) need a database, cache layer, and plugin ecosystem to stay fast. Loom's "database" is an in-memory hash map of pre-rendered strings.
+Out of the box, with zero configuration:
 
-**No dependencies.** One `make` command, no package manager, no virtualenv, no `node_modules`. The binary links only against libc, libstdc++, libpthread, and zlib.
+- **Hot reload** — edit a file, refresh the browser, see the change. No build step, no restart.
+- **21 themes** — switch with one line in `site.conf`. Dark mode included.
+- **Full SEO** — Open Graph, Twitter Cards, JSON-LD, sitemap, RSS feed. All automatic.
+- **Sub-millisecond responses** — every page is pre-rendered, compressed, and cached in memory.
+- **Series, tags, archives** — organize content however you want.
+- **Single binary, ~846KB** — no runtime dependencies, no frameworks, no `node_modules`.
 
-**Real performance.** An epoll-based single-threaded server handling pre-compressed cached responses has essentially zero overhead per request. Response times are in the sub-millisecond range even under load.
+## How It Works
 
-## What Loom Provides
+You give Loom a directory of markdown files and a `site.conf`. It reads everything at startup, renders every page to HTML, compresses it, and holds it all in memory. Serving a page is a hash table lookup — no disk I/O, no template rendering.
 
-**Content:**
-- Markdown to HTML with a hand-written parser (no regex engine, no library)
-- Post frontmatter: title, date, slug, tags, excerpt, image, draft
-- Series via directory structure (`posts/series-name/post.md`)
-- Tag pages, tag index, archive by year
-- Static pages (`pages/about.md` → `/about`)
+When you edit a file, inotify detects the change and Loom rebuilds the cache in the background. The new cache is swapped in atomically — active requests finish on the old cache, new requests get the new one. Zero downtime.
 
-**Navigation and discovery:**
-- Configurable header navigation (`nav = Home:/, Tags:/tags, ...`)
-- Prev/next post navigation on every post
-- Related posts by tag overlap (top 3 by tag count)
-- Series navigation panel on posts that are part of a series
-- Sidebar with widgets: recent posts, tag cloud, series list, about, archives
+## Your Content Directory
 
-**SEO:**
-- `<title>`, `<meta name="description">`, `<link rel="canonical">`
-- Open Graph: `og:type`, `og:title`, `og:description`, `og:url`, `og:image`, `og:site_name`
-- Article meta: `article:author`, `article:published_time`, `article:tag`
-- Twitter Cards: `twitter:card` (`summary_large_image` when image present)
-- JSON-LD: `BlogPosting` schema on posts, `WebSite` on homepage, `BreadcrumbList` on tag/series/post pages
-- `<link rel="preload" as="image">` for hero images on article pages
-- RSS 2.0 feed at `/feed.xml` (latest 20 posts)
-- XML sitemap at `/sitemap.xml` (all pages, priority-weighted)
-- `/robots.txt` with sitemap reference
+```
+myblog/
+  site.conf           # Title, theme, nav, sidebar
+  posts/
+    hello.md          # Blog posts
+    my-series/        # Subdirectory = series
+      part-one.md
+      part-two.md
+  pages/
+    about.md          # Static pages (served at /about)
+  images/
+    photo.png         # Static assets (served as-is)
+```
 
-**Performance:**
-- All pages pre-rendered and stored in memory
-- Gzip compression at level 9, computed once at cache build time
-- ETag-based `304 Not Modified` responses
-- `Cache-Control: public, max-age=60, must-revalidate`
-- HTML minification before compression
-- `TCP_NODELAY` for low-latency response delivery
-- Image `width` and `height` attributes auto-detected from local PNG/JPEG files
+That's the whole structure. No layouts, no partials, no frontmatter templates.
 
-**Theming:**
-- 21 built-in themes: `default`, `serif`, `mono`, `nord`, `solarized`, `dracula`, `gruvbox`, `catppuccin`, `tokyonight`, `kanagawa`, `typewriter`, `brutalist`, `lavender`, `warm`, `ocean`, `sakura`, `midnight`, `rose`, `cobalt`, `earth`, `hacker`
-- Dark/light mode toggle with `localStorage` persistence and `prefers-color-scheme` detection
-- CSS custom properties for fine-grained overrides (`theme_accent`, `theme_font`, etc.)
-- Full CSS override via `content/theme/style.css`
+## Minimal Configuration
 
-**Deployment:**
-- Filesystem mode: `./loom content/` — serves from disk, inotify hot reload
-- Git mode: `./loom --git /path/to/repo branch prefix` — reads from git objects, no checkout needed
-- Remote git: `./loom --git https://github.com/you/blog.git` — auto-clones to `/tmp`, image requests redirect to GitHub CDN
+```
+title = My Blog
+description = What I'm working on
+author = Your Name
+base_url = https://yourdomain.com
+theme = nord
 
-## Loom as a Docs Platform
+nav = Home:/, About:/about
+sidebar_widgets = recent_posts, tag_cloud
+```
 
-Loom isn't just for blogs. This site — Loom's own documentation — is served by Loom itself. The `internals/` series covers the HTTP server, router, pre-rendering pipeline, and strong types system. The `cpp/` series covers the C++20 features and Linux APIs used in the engine. Reference documentation lives in `pages/`.
+That's a complete `site.conf`. Everything else has sensible defaults.
 
-See [Using Loom as a Project Documentation Platform](/post/loom-as-docs-platform) for the full breakdown.
+## Why Not Hugo / Jekyll / Ghost?
+
+**No build step.** Static site generators require a separate build phase. Edit, build, wait, check. Loom's hot reload makes it: edit, refresh, done.
+
+**No database.** CMSes need a database, cache layer, and plugins to stay fast. Loom's "database" is an in-memory hash map.
+
+**No dependencies.** One `make` command. No package manager, no virtualenv, no `node_modules`. The binary links against libc, libstdc++, libpthread, and zlib — that's it.
+
+**Real performance.** Pre-compressed cached responses served through an epoll event loop. Sub-millisecond response times even under load.
+
+## Deploy
+
+Loom is the server. Put it behind nginx/caddy for TLS, or run it directly:
+
+```bash
+./loom /var/www/myblog
+```
+
+Or serve straight from git — push to publish, no CI needed:
+
+```bash
+./loom --git /path/to/repo.git main content/
+```
 
 ## Get Started
 
@@ -84,9 +102,7 @@ make
 ./loom content/
 ```
 
-Visit `http://localhost:8080`. The example site in `content/` is this documentation site.
-
-Copy `content/` as a starting point for your own site, or read the [Getting Started](/getting-started) guide to build one from scratch.
+Read the [Getting Started](/getting-started) guide to build your own site, or explore the [full documentation](/docs) for everything Loom can do.
 
 ## The Stack
 
@@ -97,10 +113,7 @@ Copy `content/` as a starting point for your own site, or read the [Getting Star
 | Cache | `std::unordered_map` + `shared_ptr` atomic swap |
 | Markdown | Hand-written two-pass parser, ~1200 lines |
 | Compression | zlib deflate, level 9, pre-computed |
-| Content | Filesystem or git objects (local or remote) |
 | Hot reload | Linux inotify or git poll |
 | Language | C++20 — concepts, structured bindings, ranges |
-| Dependencies | zlib only (libc/libstdc++ are standard) |
+| Dependencies | zlib only |
 | Binary size | ~846KB stripped |
-
-No Boost. No ASIO. No external HTTP parser. No templating engine. No JSON library. Just C++20 and one compression library.
