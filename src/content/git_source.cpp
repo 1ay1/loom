@@ -75,13 +75,14 @@ void GitSource::load()
 static std::chrono::system_clock::time_point parse_date(const std::string& date_str)
 {
     std::tm tm{};
+    tm.tm_isdst = -1;
     if (date_str.size() >= 10)
     {
         tm.tm_year = std::stoi(date_str.substr(0, 4)) - 1900;
         tm.tm_mon  = std::stoi(date_str.substr(5, 2)) - 1;
         tm.tm_mday = std::stoi(date_str.substr(8, 2));
     }
-    auto time = timegm(&tm);
+    auto time = mktime(&tm);
     return std::chrono::system_clock::from_time_t(time);
 }
 

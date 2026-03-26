@@ -1,6 +1,6 @@
 ---
 title: Loom vs Hugo vs Jekyll
-date: 2025-03-25
+date: 2026-03-25
 slug: loom-vs-hugo-vs-jekyll
 tags: comparison, architecture
 excerpt: An honest side-by-side of three blog engines — what each does well, where each falls short, and why they exist.
