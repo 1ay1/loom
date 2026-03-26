@@ -1,11 +1,9 @@
 ---
-title: "Part 1: Your Web Framework Is Lying to You"
-description: "A blunt look at why modern web frameworks hide complexity instead of removing it."
-author: "Ayush"
-date: "2026-03-27"
-tags: ["systems", "c++", "web", "architecture", "performance", "loom-series"]
-series: "Rebuilding the Web Without Frameworks"
-part: 1
+title: Your Web Framework Is Lying to You
+excerpt: A blunt look at why modern web frameworks hide complexity instead of removing it.
+slug: your-framework-is-lying-to-you
+date: 2026-03-27
+tags: systems, c++, web, architecture, performance, loom-series
 ---
 
 # Your Web Framework Is Lying to You
