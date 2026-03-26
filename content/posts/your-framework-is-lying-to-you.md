@@ -16,75 +16,49 @@ Drop in middleware.
 Deploy.
 
 It feels fast. Clean. Productive.
-
 It feels like progress.
-
 It is not.
-
----
 
 ## The Lie
 
 Web frameworks do not remove complexity.
-
 They hide it.
-
 Hidden complexity is the most dangerous kind.
-
 Because you do not fight it early.
-
 You meet it later. In production. At 3AM.
-
----
 
 ## A Simple Question
 
 Take this request:
-
 GET /users
-
 Now answer this, precisely:
-
 - What exact path does this request take through your system?
 - In what order does middleware execute?
 - Where does memory allocation happen?
 - Where can it fail?
 - What is the worst-case latency?
-
 Not approximately.
-
 Exactly.
-
 If you cannot answer that:
-
 You are not running a system.
 You are running a guess.
-
----
 
 ## The Illusion of Simplicity
 
 This looks simple:
-
+```
 app.use(auth)
 app.get("/users", handler)
-
+```
 But this is not a system.
-
 It is an interface to a system you cannot see.
-
 The real system lives in:
-
 - middleware ordering rules
 - framework internals
 - implicit control flow
 - undocumented behavior
-
 You are not reading execution.
-
 You are interpreting it.
-
----
 
 ## The Cost You Do Not See
 
@@ -105,8 +79,6 @@ You feel faster.
 
 But you understand less.
 
----
-
 ## Where It Breaks
 
 ### Control Flow
@@ -123,7 +95,7 @@ You do not follow the flow.
 
 You reconstruct it.
 
----
+
 
 ### Debugging
 
@@ -142,7 +114,6 @@ Not because the system is complex.
 
 But because it is hidden.
 
----
 
 ### Performance
 
@@ -156,7 +127,6 @@ Because performance was not designed.
 
 It was discovered.
 
----
 
 ### State
 
@@ -174,7 +144,6 @@ So the system behaves correctly.
 
 Until it does not.
 
----
 
 ## The Trade
 
@@ -191,7 +160,6 @@ But here is the trade you are making:
 - You lose control
 - You lose the ability to reason about the system
 
----
 
 ## The Uncomfortable Truth
 
@@ -205,8 +173,6 @@ But cannot be fully understood by the people who built them.
 
 That should bother you more than it does.
 
----
-
 ## A Different Direction
 
 What if we stopped hiding the system?
@@ -219,12 +185,6 @@ What if:
 - correctness was enforced at compile time, not runtime
 
 What if the code was the system?
-
----
-
-## This Is Part 1
-
-This is the first post in the series:
 
 Rebuilding the Web Without Frameworks
 
