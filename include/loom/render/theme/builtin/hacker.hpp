@@ -4,6 +4,7 @@
 
 namespace loom::theme::builtin
 {
+using namespace css;
 
 // Hacker — monospace, dark, no gimmicks
 inline const ThemeDef hacker = {
@@ -22,12 +23,9 @@ inline const ThemeDef hacker = {
     .sidebar_style = SidebarStyle::Clean,
     .post_nav = PostNavStyle::Arrows,
     .scrollbar = Scrollbar::Thin,
-    .extra_css = R"CSS(
-::selection {
-  background: #88c070;
-  color: #0c0c0c;
-}
-)CSS",
+    .styles = sheet(
+        sel("::selection") | bg(hex("#88c070")) | color(hex("#0c0c0c"))
+    ),
 };
 
 } // namespace loom::theme::builtin

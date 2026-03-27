@@ -4,6 +4,7 @@
 
 namespace loom::theme::builtin
 {
+using namespace css;
 
 // Dracula — the mass-beloved dark-first theme
 inline const ThemeDef dracula = {
@@ -12,39 +13,15 @@ inline const ThemeDef dracula = {
     .font  = {"system-ui,-apple-system,Segoe UI,Roboto,sans-serif"},
     .font_size = "17px",
     .max_width = "720px",
-    .extra_css = R"CSS(
-::selection {
-  background: #44475a;
-  color: #f8f8f2;
-}
-
-.post-content blockquote, .page-content blockquote {
-  border-left-color: #ff79c6;
-}
-
-:root {
-  --tag-bg: color-mix(in srgb, #7c3aed 12%, var(--bg));
-  --tag-text: #7c3aed;
-}
-
-[data-theme="dark"] {
-  --tag-bg: color-mix(in srgb, #bd93f9 20%, #282a36);
-  --tag-text: #bd93f9;
-}
-
-.post-content a, .page-content a {
-  color: #6838b2;
-}
-
-[data-theme="dark"] .post-content a,
-[data-theme="dark"] .page-content a {
-  color: #8be9fd;
-}
-
-.post-card:hover {
-  border-color: #ff79c6;
-}
-)CSS",
+    .styles = sheet(
+        sel("::selection") | bg(hex("#44475a")) | color(hex("#f8f8f2")),
+        sel(".post-content blockquote", ".page-content blockquote") | border_left_color(hex("#ff79c6")),
+        root() | set("tag-bg", mix(hex("#7c3aed"), 12, v::bg)) | set("tag-text", hex("#7c3aed")),
+        dark_root() | set("tag-bg", mix(hex("#bd93f9"), 20, hex("#282a36"))) | set("tag-text", hex("#bd93f9")),
+        sel(".post-content a", ".page-content a") | color(hex("#6838b2")),
+        dark(sel(".post-content a", ".page-content a")) | color(hex("#8be9fd")),
+        sel(".post-card:hover") | border_color(hex("#ff79c6"))
+    ),
 };
 
 } // namespace loom::theme::builtin

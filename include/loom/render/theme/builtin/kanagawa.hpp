@@ -4,6 +4,7 @@
 
 namespace loom::theme::builtin
 {
+using namespace css;
 
 // Kanagawa — inspired by Katsushika Hokusai's famous painting
 inline const ThemeDef kanagawa = {
@@ -12,40 +13,15 @@ inline const ThemeDef kanagawa = {
     .font  = {"Charter,Georgia,Cambria,serif"},
     .font_size = "17px",
     .max_width = "700px",
-    .extra_css = R"CSS(
-::selection {
-  background: #957fb8;
-  color: #DCD7BA;
-}
-
-.post-content blockquote, .page-content blockquote {
-  border-left-color: #FF5D62;
-}
-
-[data-theme="dark"] .post-content blockquote,
-[data-theme="dark"] .page-content blockquote {
-  border-left-color: #E82424;
-}
-
-.post-content a, .page-content a {
-  color: #6a9589;
-}
-
-[data-theme="dark"] .post-content a,
-[data-theme="dark"] .page-content a {
-  color: #7FB4CA;
-}
-
-:root {
-  --tag-bg: color-mix(in srgb, #957fb8 15%, var(--bg));
-  --tag-text: #957fb8;
-}
-
-[data-theme="dark"] {
-  --tag-bg: color-mix(in srgb, #957fb8 20%, #1F1F28);
-  --tag-text: #938AA9;
-}
-)CSS",
+    .styles = sheet(
+        sel("::selection") | bg(hex("#957fb8")) | color(hex("#DCD7BA")),
+        sel(".post-content blockquote", ".page-content blockquote") | border_left_color(hex("#FF5D62")),
+        dark(sel(".post-content blockquote", ".page-content blockquote")) | border_left_color(hex("#E82424")),
+        sel(".post-content a", ".page-content a") | color(hex("#6a9589")),
+        dark(sel(".post-content a", ".page-content a")) | color(hex("#7FB4CA")),
+        root() | set("tag-bg", mix(hex("#957fb8"), 15, v::bg)) | set("tag-text", hex("#957fb8")),
+        dark_root() | set("tag-bg", mix(hex("#957fb8"), 20, hex("#1F1F28"))) | set("tag-text", hex("#938AA9"))
+    ),
 };
 
 } // namespace loom::theme::builtin

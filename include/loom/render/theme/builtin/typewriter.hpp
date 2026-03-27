@@ -4,6 +4,7 @@
 
 namespace loom::theme::builtin
 {
+using namespace css;
 
 // Typewriter — old-school ink-on-paper, Courier, raw
 inline const ThemeDef typewriter = {
@@ -25,36 +26,14 @@ inline const ThemeDef typewriter = {
     .hr_style = HrStyle::Dashed,
     .table_style = TableStyle::Minimal,
     .post_nav = PostNavStyle::Minimal,
-    .extra_css = R"CSS(
-::selection {
-  background: #222222;
-  color: #f4f1ea;
-}
-
-[data-theme="dark"] ::selection {
-  background: #c8c0b0;
-  color: #1a1814;
-}
-
-.tag {
-  text-transform: uppercase;
-  font-size: 11px;
-  letter-spacing: 1px;
-}
-
-header h1 {
-  letter-spacing: 4px;
-  font-weight: 400;
-}
-
-.post-card {
-  border-style: dashed;
-}
-
-.post-content blockquote, .page-content blockquote {
-  font-style: italic;
-}
-)CSS",
+    .styles = sheet(
+        sel("::selection") | bg(hex("#222222")) | color(hex("#f4f1ea")),
+        dark(sel("::selection")) | bg(hex("#c8c0b0")) | color(hex("#1a1814")),
+        sel(".tag") | text_transform(uppercase) | font_size(px(11)) | letter_spacing(px(1)),
+        sel("header h1") | letter_spacing(px(4)) | font_weight(400),
+        sel(".post-card") | border_style(dashed),
+        sel(".post-content blockquote", ".page-content blockquote") | font_style(italic)
+    ),
 };
 
 } // namespace loom::theme::builtin

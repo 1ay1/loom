@@ -4,6 +4,7 @@
 
 namespace loom::theme::builtin
 {
+using namespace css;
 
 // Ocean — deep blue, calm and professional
 inline const ThemeDef ocean = {
@@ -12,78 +13,21 @@ inline const ThemeDef ocean = {
     .font  = {"system-ui,-apple-system,Segoe UI,Roboto,sans-serif"},
     .font_size = "17px",
     .max_width = "720px",
-    .extra_css = R"CSS(
-:root {
-  --tag-bg: color-mix(in srgb, #1a6fb5 8%, var(--bg));
-  --tag-text: #1a6fb5;
-  --tag-hover-bg: #1a6fb5;
-  --tag-hover-text: #ffffff;
-  --tag-radius: 4px;
-}
-
-[data-theme="dark"] {
-  --tag-bg: color-mix(in srgb, #4da8e8 10%, var(--bg));
-  --tag-text: #4da8e8;
-  --tag-hover-bg: #4da8e8;
-  --tag-hover-text: #0c1420;
-}
-
-::selection {
-  background: #1a6fb5;
-  color: #ffffff;
-}
-
-[data-theme="dark"] ::selection {
-  background: #4da8e8;
-  color: #0c1420;
-}
-
-header {
-  border-bottom-color: color-mix(in srgb, #1a6fb5 15%, var(--border));
-}
-
-.post-card {
-  border-radius: 8px;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.post-card:hover {
-  box-shadow: 0 3px 14px color-mix(in srgb, #1a6fb5 10%, transparent);
-}
-
-.post-listing {
-  transition: background 0.15s;
-  padding: 14px 10px;
-  margin: 0 -10px;
-  border-radius: 6px;
-}
-
-.post-listing:hover {
-  background: color-mix(in srgb, #1a6fb5 3%, var(--bg));
-}
-
-.post-content blockquote, .page-content blockquote {
-  border-left: 3px solid #1a6fb5;
-  background: color-mix(in srgb, #1a6fb5 3%, var(--bg));
-  border-radius: 0 4px 4px 0;
-  padding: 10px 14px;
-}
-
-[data-theme="dark"] .post-content blockquote,
-[data-theme="dark"] .page-content blockquote {
-  border-left-color: #4da8e8;
-  background: color-mix(in srgb, #4da8e8 4%, var(--bg));
-}
-
-.post-content a, .page-content a {
-  color: #1a6fb5;
-}
-
-[data-theme="dark"] .post-content a,
-[data-theme="dark"] .page-content a {
-  color: #68b8f0;
-}
-)CSS",
+    .styles = sheet(
+        root() | set("tag-bg", mix(hex("#1a6fb5"), 8, v::bg)) | set("tag-text", hex("#1a6fb5")) | set("tag-hover-bg", hex("#1a6fb5")) | set("tag-hover-text", hex("#ffffff")) | set("tag-radius", px(4)),
+        dark_root() | set("tag-bg", mix(hex("#4da8e8"), 10, v::bg)) | set("tag-text", hex("#4da8e8")) | set("tag-hover-bg", hex("#4da8e8")) | set("tag-hover-text", hex("#0c1420")),
+        sel("::selection") | bg(hex("#1a6fb5")) | color(hex("#ffffff")),
+        dark(sel("::selection")) | bg(hex("#4da8e8")) | color(hex("#0c1420")),
+        sel("header") | prop("border-bottom-color", mix(hex("#1a6fb5"), 15, v::border)),
+        sel(".post-card") | border_radius(px(8)) | transition(raw("border-color 0.2s, box-shadow 0.2s")),
+        sel(".post-card:hover") | box_shadow(raw("0 3px 14px color-mix(in srgb, #1a6fb5 10%, transparent)")),
+        sel(".post-listing") | transition(raw("background 0.15s")) | padding(px(14), px(10)) | margin(raw("0 -10px")) | border_radius(px(6)),
+        sel(".post-listing:hover") | bg(mix(hex("#1a6fb5"), 3, v::bg)),
+        sel(".post-content blockquote", ".page-content blockquote") | border_left(px(3), solid, hex("#1a6fb5")) | bg(mix(hex("#1a6fb5"), 3, v::bg)) | border_radius(raw("0 4px 4px 0")) | padding(px(10), px(14)),
+        dark(sel(".post-content blockquote", ".page-content blockquote")) | border_left_color(hex("#4da8e8")) | bg(mix(hex("#4da8e8"), 4, v::bg)),
+        sel(".post-content a", ".page-content a") | color(hex("#1a6fb5")),
+        dark(sel(".post-content a", ".page-content a")) | color(hex("#68b8f0"))
+    ),
 };
 
 } // namespace loom::theme::builtin

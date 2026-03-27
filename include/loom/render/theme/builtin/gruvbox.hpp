@@ -4,6 +4,7 @@
 
 namespace loom::theme::builtin
 {
+using namespace css;
 
 // Gruvbox — retro groove with warm, earthy contrast
 inline const ThemeDef gruvbox = {
@@ -12,35 +13,14 @@ inline const ThemeDef gruvbox = {
     .font  = {"system-ui,-apple-system,Segoe UI,Roboto,sans-serif"},
     .font_size = "17px",
     .max_width = "720px",
-    .extra_css = R"CSS(
-::selection {
-  background: #d65d0e;
-  color: #fbf1c7;
-}
-
-[data-theme="dark"] ::selection {
-  background: #fe8019;
-  color: #282828;
-}
-
-.post-content blockquote, .page-content blockquote {
-  border-left-color: #b8bb26;
-}
-
-[data-theme="dark"] .post-content blockquote,
-[data-theme="dark"] .page-content blockquote {
-  border-left-color: #b8bb26;
-}
-
-.post-content a, .page-content a {
-  color: #458588;
-}
-
-[data-theme="dark"] .post-content a,
-[data-theme="dark"] .page-content a {
-  color: #83a598;
-}
-)CSS",
+    .styles = sheet(
+        sel("::selection") | bg(hex("#d65d0e")) | color(hex("#fbf1c7")),
+        dark(sel("::selection")) | bg(hex("#fe8019")) | color(hex("#282828")),
+        sel(".post-content blockquote", ".page-content blockquote") | border_left_color(hex("#b8bb26")),
+        dark(sel(".post-content blockquote", ".page-content blockquote")) | border_left_color(hex("#b8bb26")),
+        sel(".post-content a", ".page-content a") | color(hex("#458588")),
+        dark(sel(".post-content a", ".page-content a")) | color(hex("#83a598"))
+    ),
 };
 
 } // namespace loom::theme::builtin

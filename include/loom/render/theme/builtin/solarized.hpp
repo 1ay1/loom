@@ -4,6 +4,7 @@
 
 namespace loom::theme::builtin
 {
+using namespace css;
 
 // Solarized — Ethan Schoonover's precision-engineered palette
 inline const ThemeDef solarized = {
@@ -12,26 +13,12 @@ inline const ThemeDef solarized = {
     .font  = {"system-ui,-apple-system,Segoe UI,Roboto,sans-serif"},
     .font_size = "17px",
     .max_width = "720px",
-    .extra_css = R"CSS(
-::selection {
-  background: #268bd2;
-  color: #fdf6e3;
-}
-
-[data-theme="dark"] ::selection {
-  background: #2aa198;
-  color: #002b36;
-}
-
-.post-content blockquote, .page-content blockquote {
-  border-left-color: #cb4b16;
-}
-
-[data-theme="dark"] .post-content blockquote,
-[data-theme="dark"] .page-content blockquote {
-  border-left-color: #cb4b16;
-}
-)CSS",
+    .styles = sheet(
+        sel("::selection") | bg(hex("#268bd2")) | color(hex("#fdf6e3")),
+        dark(sel("::selection")) | bg(hex("#2aa198")) | color(hex("#002b36")),
+        sel(".post-content blockquote", ".page-content blockquote") | border_left_color(hex("#cb4b16")),
+        dark(sel(".post-content blockquote", ".page-content blockquote")) | border_left_color(hex("#cb4b16"))
+    ),
 };
 
 } // namespace loom::theme::builtin

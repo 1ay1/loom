@@ -4,6 +4,7 @@
 #include "palette.hpp"
 #include "types.hpp"
 #include "components.hpp"
+#include "css.hpp"
 
 namespace loom::theme
 {
@@ -50,7 +51,10 @@ struct ThemeDef
     Scrollbar       scrollbar    = Scrollbar::Default;
     FocusStyle      focus_style  = FocusStyle::Outline;
 
-    // ── Escape hatch ──
+    // ── Custom styles (typed CSS DSL) ──
+    css::Sheet styles = {};
+
+    // ── Raw escape hatch (prefer styles above) ──
     std::string extra_css = {};
 };
 

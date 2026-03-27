@@ -435,7 +435,11 @@ inline std::string compile(const ThemeDef& t)
     detail::emit_scrollbar(css, t.scrollbar);
     detail::emit_focus_style(css, t.focus_style);
 
-    // Escape hatch
+    // Typed styles
+    if (!t.styles.empty())
+        css += t.styles.compile();
+
+    // Raw escape hatch
     if (!t.extra_css.empty())
         css += t.extra_css;
 

@@ -4,6 +4,7 @@
 
 namespace loom::theme::builtin
 {
+using namespace css;
 
 // Brutalist — raw, functional, anti-design design
 inline const ThemeDef brutalist = {
@@ -20,87 +21,23 @@ inline const ThemeDef brutalist = {
     .image_style = ImageStyle::Bordered,
     .table_style = TableStyle::Bordered,
     .focus_style = FocusStyle::Ring,
-    .extra_css = R"CSS(
-::selection {
-  background: #ff0000;
-  color: #ffffff;
-}
-
-[data-theme="dark"] ::selection {
-  background: #ff4444;
-  color: #000000;
-}
-
-header h1 {
-  letter-spacing: 6px;
-}
-
-.post-card {
-  border-color: var(--text);
-}
-
-.post-card:hover {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--bg);
-}
-
-.post-card:hover a {
-  color: var(--bg);
-}
-
-.post-card:hover .date {
-  color: var(--bg);
-  opacity: 0.7;
-}
-
-:root {
-  --tag-bg: var(--text);
-  --tag-text: var(--bg);
-  --tag-radius: 0;
-  --tag-hover-bg: var(--accent);
-  --tag-hover-text: var(--bg);
-}
-
-.tag {
-  text-transform: uppercase;
-  font-weight: 700;
-  font-size: 11px;
-  letter-spacing: 1px;
-}
-
-.post-content pre, .page-content pre {
-  background: color-mix(in srgb, var(--text) 12%, var(--bg));
-}
-
-.post-content :not(pre) > code, .page-content :not(pre) > code {
-  border: 1px solid var(--text);
-  background: color-mix(in srgb, var(--text) 8%, var(--bg));
-}
-
-.post-content blockquote, .page-content blockquote {
-  border-left: 6px solid var(--accent);
-  font-weight: 700;
-  color: var(--text);
-}
-
-.post-content img, .page-content img {
-  border-width: 2px;
-  border-color: var(--text);
-}
-
-.post-content a, .page-content a {
-  text-decoration: none;
-  background: linear-gradient(var(--accent), var(--accent)) no-repeat 0 100%;
-  background-size: 100% 2px;
-  padding-bottom: 1px;
-}
-
-.post-content a:hover, .page-content a:hover {
-  background-size: 100% 100%;
-  color: var(--bg);
-}
-)CSS",
+    .styles = sheet(
+        sel("::selection") | bg(hex("#ff0000")) | color(hex("#ffffff")),
+        dark(sel("::selection")) | bg(hex("#ff4444")) | color(hex("#000000")),
+        sel("header h1") | letter_spacing(px(6)),
+        sel(".post-card") | border_color(v::text),
+        sel(".post-card:hover") | border_color(v::accent) | bg(v::accent) | color(v::bg),
+        sel(".post-card:hover a") | color(v::bg),
+        sel(".post-card:hover .date") | color(v::bg) | opacity(0.7),
+        root() | set("tag-bg", v::text) | set("tag-text", v::bg) | set("tag-radius", raw("0")) | set("tag-hover-bg", v::accent) | set("tag-hover-text", v::bg),
+        sel(".tag") | text_transform(uppercase) | font_weight(700) | font_size(px(11)) | letter_spacing(px(1)),
+        sel(".post-content pre", ".page-content pre") | bg(mix(v::text, 12, v::bg)),
+        sel(".post-content :not(pre) > code", ".page-content :not(pre) > code") | border(px(1), solid, v::text) | bg(mix(v::text, 8, v::bg)),
+        sel(".post-content blockquote", ".page-content blockquote") | border_left(px(6), solid, v::accent) | font_weight(700) | color(v::text),
+        sel(".post-content img", ".page-content img") | border_width(px(2)) | border_color(v::text),
+        sel(".post-content a", ".page-content a") | text_decoration(none) | bg(raw("linear-gradient(var(--accent), var(--accent)) no-repeat 0 100%")) | background_size(raw("100% 2px")) | padding_bottom(px(1)),
+        sel(".post-content a:hover", ".page-content a:hover") | background_size(raw("100% 100%")) | color(v::bg)
+    ),
 };
 
 } // namespace loom::theme::builtin

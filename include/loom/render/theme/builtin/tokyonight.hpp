@@ -4,6 +4,7 @@
 
 namespace loom::theme::builtin
 {
+using namespace css;
 
 // Tokyo Night — neon-tinged Tokyo evening palette
 inline const ThemeDef tokyonight = {
@@ -12,44 +13,16 @@ inline const ThemeDef tokyonight = {
     .font  = {"system-ui,-apple-system,Segoe UI,Roboto,sans-serif"},
     .font_size = "16px",
     .max_width = "720px",
-    .extra_css = R"CSS(
-::selection {
-  background: #7aa2f7;
-  color: #1a1b26;
-}
-
-.post-content blockquote, .page-content blockquote {
-  border-left-color: #ff9e64;
-}
-
-[data-theme="dark"] .post-content blockquote,
-[data-theme="dark"] .page-content blockquote {
-  border-left-color: #ff9e64;
-}
-
-.post-content a, .page-content a {
-  color: #7aa2f7;
-}
-
-[data-theme="dark"] .post-content a,
-[data-theme="dark"] .page-content a {
-  color: #7dcfff;
-}
-
-.post-card:hover {
-  border-color: #bb9af7;
-}
-
-:root {
-  --tag-bg: color-mix(in srgb, #7aa2f7 12%, var(--bg));
-  --tag-text: #7aa2f7;
-}
-
-[data-theme="dark"] {
-  --tag-bg: color-mix(in srgb, #7aa2f7 15%, #1a1b26);
-  --tag-text: #7dcfff;
-}
-)CSS",
+    .styles = sheet(
+        sel("::selection") | bg(hex("#7aa2f7")) | color(hex("#1a1b26")),
+        sel(".post-content blockquote", ".page-content blockquote") | border_left_color(hex("#ff9e64")),
+        dark(sel(".post-content blockquote", ".page-content blockquote")) | border_left_color(hex("#ff9e64")),
+        sel(".post-content a", ".page-content a") | color(hex("#7aa2f7")),
+        dark(sel(".post-content a", ".page-content a")) | color(hex("#7dcfff")),
+        sel(".post-card:hover") | border_color(hex("#bb9af7")),
+        root() | set("tag-bg", mix(hex("#7aa2f7"), 12, v::bg)) | set("tag-text", hex("#7aa2f7")),
+        dark_root() | set("tag-bg", mix(hex("#7aa2f7"), 15, hex("#1a1b26"))) | set("tag-text", hex("#7dcfff"))
+    ),
 };
 
 } // namespace loom::theme::builtin

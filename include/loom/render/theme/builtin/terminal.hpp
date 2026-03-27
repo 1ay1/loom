@@ -4,6 +4,7 @@
 
 namespace loom::theme::builtin
 {
+using namespace css;
 
 // Terminal — monospace, sharp, restrained. Let typography do the work.
 inline const ThemeDef terminal = {

@@ -4,6 +4,7 @@
 
 namespace loom::theme::builtin
 {
+using namespace css;
 
 // Warm — golden amber palette, cozy reading feel
 inline const ThemeDef warm = {
@@ -16,74 +17,21 @@ inline const ThemeDef warm = {
     .density = Density::Airy,
     .image_style = ImageStyle::Shadow,
     .hr_style = HrStyle::Fade,
-    .extra_css = R"CSS(
-:root {
-  --tag-bg: color-mix(in srgb, #c47a20 10%, var(--bg));
-  --tag-text: #a06418;
-  --tag-hover-bg: #c47a20;
-  --tag-hover-text: #ffffff;
-  --tag-radius: 4px;
-  --heading-weight: 600;
-}
-
-[data-theme="dark"] {
-  --tag-bg: color-mix(in srgb, #dda040 10%, var(--bg));
-  --tag-text: #dda040;
-  --tag-hover-bg: #dda040;
-  --tag-hover-text: #1a1510;
-}
-
-::selection {
-  background: #c47a20;
-  color: #ffffff;
-}
-
-[data-theme="dark"] ::selection {
-  background: #dda040;
-  color: #1a1510;
-}
-
-header h1 {
-  font-weight: 600;
-}
-
-.post-card {
-  border-radius: 6px;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.post-card:hover {
-  box-shadow: 0 2px 10px color-mix(in srgb, #c47a20 8%, transparent);
-}
-
-.post-listing a {
-  font-weight: 500;
-}
-
-.post-full h1 {
-  font-weight: 600;
-  line-height: 1.25;
-}
-
-.post-content blockquote, .page-content blockquote {
-  border-left: 3px solid #c47a20;
-  font-style: italic;
-}
-
-[data-theme="dark"] .post-content blockquote,
-[data-theme="dark"] .page-content blockquote {
-  border-left-color: #dda040;
-}
-
-.post-content a, .page-content a {
-  color: #a06418;
-}
-
-[data-theme="dark"] .post-content a,
-[data-theme="dark"] .page-content a {
-  color: #e8b060;
-}
-)CSS",
+    .styles = sheet(
+        root() | set("tag-bg", mix(hex("#c47a20"), 10, v::bg)) | set("tag-text", hex("#a06418")) | set("tag-hover-bg", hex("#c47a20")) | set("tag-hover-text", hex("#ffffff")) | set("tag-radius", px(4)) | set("heading-weight", raw("600")),
+        dark_root() | set("tag-bg", mix(hex("#dda040"), 10, v::bg)) | set("tag-text", hex("#dda040")) | set("tag-hover-bg", hex("#dda040")) | set("tag-hover-text", hex("#1a1510")),
+        sel("::selection") | bg(hex("#c47a20")) | color(hex("#ffffff")),
+        dark(sel("::selection")) | bg(hex("#dda040")) | color(hex("#1a1510")),
+        sel("header h1") | font_weight(600),
+        sel(".post-card") | border_radius(px(6)) | transition(raw("border-color 0.2s, box-shadow 0.2s")),
+        sel(".post-card:hover") | box_shadow(raw("0 2px 10px color-mix(in srgb, #c47a20 8%, transparent)")),
+        sel(".post-listing a") | font_weight(500),
+        sel(".post-full h1") | font_weight(600) | line_height(num(1.25)),
+        sel(".post-content blockquote", ".page-content blockquote") | border_left(px(3), solid, hex("#c47a20")) | font_style(italic),
+        dark(sel(".post-content blockquote", ".page-content blockquote")) | border_left_color(hex("#dda040")),
+        sel(".post-content a", ".page-content a") | color(hex("#a06418")),
+        dark(sel(".post-content a", ".page-content a")) | color(hex("#e8b060"))
+    ),
 };
 
 } // namespace loom::theme::builtin
