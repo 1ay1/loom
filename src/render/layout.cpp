@@ -38,6 +38,8 @@ static const char* DEFAULT_CSS = R"CSS(
   --header-border-width: 1px;
   --footer-border-width: 1px;
   --content-width: var(--max-width);
+  --card-hover-shadow: 0 2px 12px color-mix(in srgb, var(--text) 6%, transparent);
+  --card-hover-lift: translateY(-1px);
 }
 
 [data-theme="dark"] {
@@ -235,8 +237,8 @@ html {
 
 .post-card:hover {
   border-color: var(--accent);
-  box-shadow: 0 2px 12px color-mix(in srgb, var(--text) 6%, transparent);
-  transform: translateY(-1px);
+  box-shadow: var(--card-hover-shadow);
+  transform: var(--card-hover-lift);
 }
 
 .post-card a {

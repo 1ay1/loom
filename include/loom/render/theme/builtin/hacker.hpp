@@ -13,9 +13,12 @@ inline const ThemeDef hacker = {
     .font_size = "14px",
     .max_width = "800px",
     .corners = Corners::Sharp,
+    .density = Density::Compact,
     .tag_style = TagStyle::Outline,
     .code_style = CodeBlockStyle::Bordered,
     .quote_style = BlockquoteStyle::MutedBorder,
+    .card_hover = CardHover::None,
+    .table_style = TableStyle::Bordered,
     .extra_css = R"CSS(
 ::selection {
   background: #88c070;

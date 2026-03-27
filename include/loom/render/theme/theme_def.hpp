@@ -8,31 +8,41 @@
 namespace loom::theme
 {
 
-// Complete theme definition: palettes + typography + structure + escape hatch
+// Complete theme definition.
 //
-// Fields with defaults can be omitted in designated initializers.
-// A minimal theme only needs: light, dark, font, font_size, max_width.
-// Structural fields default to the base CSS behavior.
+// Only the first 5 fields (light, dark, font, font_size, max_width) are
+// required. Everything else has a default that matches the base CSS behavior.
+// A maximally opinionated theme can set every field; a minimal theme sets five.
 struct ThemeDef
 {
-    // Colors
+    // --- Colors ---
     Palette   light;
     Palette   dark;
 
-    // Typography
-    FontStack font;
+    // --- Typography ---
+    FontStack   font;
     std::string font_size;
     std::string max_width;
+    FontStack   heading_font = {};   // empty = inherit from font
+    FontStack   code_font    = {};   // empty = base CSS monospace stack
+    std::string line_height  = {};   // empty = base CSS default ("1.7")
 
-    // Structure (all have defaults matching base CSS)
-    Corners        corners    = Corners::Soft;
-    TagStyle       tag_style  = TagStyle::Pill;
-    LinkStyle      link_style = LinkStyle::Underline;
-    CodeBlockStyle code_style = CodeBlockStyle::Plain;
+    // --- Shape & density ---
+    Corners  corners = Corners::Soft;
+    Density  density = Density::Normal;
+
+    // --- Component styles ---
+    TagStyle        tag_style  = TagStyle::Pill;
+    LinkStyle       link_style = LinkStyle::Underline;
+    CodeBlockStyle  code_style = CodeBlockStyle::Plain;
     BlockquoteStyle quote_style = BlockquoteStyle::AccentBorder;
-    HeadingCase    heading_case = HeadingCase::None;
+    HeadingCase     heading_case = HeadingCase::None;
+    ImageStyle      image_style = ImageStyle::Default;
+    CardHover       card_hover  = CardHover::Lift;
+    HrStyle         hr_style    = HrStyle::Line;
+    TableStyle      table_style = TableStyle::Default;
 
-    // Escape hatch for truly custom CSS
+    // --- Escape hatch ---
     std::string extra_css = {};
 };
 

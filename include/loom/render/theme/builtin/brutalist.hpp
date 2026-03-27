@@ -15,6 +15,8 @@ inline const ThemeDef brutalist = {
     .corners = Corners::Sharp,
     .code_style = CodeBlockStyle::Bordered,
     .heading_case = HeadingCase::Upper,
+    .image_style = ImageStyle::Bordered,
+    .table_style = TableStyle::Bordered,
     .extra_css = R"CSS(
 ::selection {
   background: #ff0000;
@@ -88,20 +90,6 @@ footer {
   background: color-mix(in srgb, var(--text) 8%, var(--bg));
 }
 
-.post-content th, .page-content th {
-  background: var(--text);
-  color: var(--bg);
-  font-weight: 700;
-  text-transform: uppercase;
-  font-size: 12px;
-  letter-spacing: 1px;
-}
-
-.post-content th, .post-content td,
-.page-content th, .page-content td {
-  border: 2px solid var(--text);
-}
-
 .post-content blockquote, .page-content blockquote {
   border-left: 6px solid var(--accent);
   font-weight: 700;
@@ -113,7 +101,8 @@ footer {
 }
 
 .post-content img, .page-content img {
-  border: 2px solid var(--text);
+  border-width: 2px;
+  border-color: var(--text);
 }
 
 .post-content a, .page-content a {

@@ -12,11 +12,15 @@ inline const ThemeDef typewriter = {
     .font  = {"Courier New,Courier,monospace"},
     .font_size = "16px",
     .max_width = "640px",
+    .line_height = "1.8",
     .corners = Corners::Sharp,
+    .density = Density::Airy,
     .tag_style = TagStyle::Outline,
     .link_style = LinkStyle::Dashed,
     .quote_style = BlockquoteStyle::MutedBorder,
     .heading_case = HeadingCase::Upper,
+    .card_hover = CardHover::Border,
+    .hr_style = HrStyle::Dashed,
     .extra_css = R"CSS(
 ::selection {
   background: #222222;
@@ -41,10 +45,6 @@ header h1 {
 
 .post-card {
   border-style: dashed;
-}
-
-.post-content pre, .page-content pre {
-  border: 1px dashed var(--border);
 }
 
 .post-content blockquote, .page-content blockquote {

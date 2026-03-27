@@ -12,6 +12,10 @@ inline const ThemeDef warm = {
     .font  = {"Georgia,Charter,Cambria,Times New Roman,serif"},
     .font_size = "18px",
     .max_width = "700px",
+    .line_height = "1.8",
+    .density = Density::Airy,
+    .image_style = ImageStyle::Shadow,
+    .hr_style = HrStyle::Fade,
     .extra_css = R"CSS(
 :root {
   --tag-bg: color-mix(in srgb, #c47a20 10%, var(--bg));

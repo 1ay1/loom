@@ -17,6 +17,9 @@ inline const ThemeDef terminal = {
     .link_style = LinkStyle::Dotted,
     .code_style = CodeBlockStyle::LeftAccent,
     .quote_style = BlockquoteStyle::MutedBorder,
+    .card_hover = CardHover::Border,
+    .hr_style = HrStyle::Fade,
+    .table_style = TableStyle::Minimal,
 };
 
 } // namespace loom::theme::builtin

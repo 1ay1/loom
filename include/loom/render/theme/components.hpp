@@ -3,8 +3,17 @@
 namespace loom::theme
 {
 
-// Shape language — controls border-radius across all elements
+// --- Shape ---
+
+// Controls border-radius across all elements
 enum class Corners { Soft, Sharp, Round };
+
+// --- Spacing ---
+
+// Controls line-height, margins, padding site-wide
+enum class Density { Compact, Normal, Airy };
+
+// --- Component styles ---
 
 // Tag badge appearance
 enum class TagStyle {
@@ -41,6 +50,36 @@ enum class HeadingCase {
     None,  // as written (default)
     Upper, // UPPERCASE + letter-spacing
     Lower  // lowercase
+};
+
+// Image treatment in content
+enum class ImageStyle {
+    Default,  // just border-radius from Corners
+    Bordered, // thin border in border color
+    Shadow    // subtle drop shadow
+};
+
+// Post card hover interaction
+enum class CardHover {
+    Lift,   // translate up + shadow (default)
+    Border, // border-color only, no motion
+    Glow,   // accent-tinted glow shadow
+    None    // no hover effect
+};
+
+// Horizontal rule style
+enum class HrStyle {
+    Line,   // solid 1px border (default)
+    Dashed, // dashed border
+    Fade    // gradient fade from transparent to border to transparent
+};
+
+// Table treatment
+enum class TableStyle {
+    Default,  // header bg + full borders (default)
+    Striped,  // alternating row backgrounds
+    Bordered, // thicker borders, strong header
+    Minimal   // header underline only, no cell borders
 };
 
 } // namespace loom::theme
