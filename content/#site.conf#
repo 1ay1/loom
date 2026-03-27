@@ -1,0 +1,20 @@
+title = Loom
+description = A zero-dependency C++20 blog engine
+author = Ayush Bhat
+base_url = https://loom.ayushbhat.com
+theme = hacker0;11;31M0;11;31m
+
+nav = Home:/, Docs:/docs, Getting Started:/getting-started, Themes:/themes, Source:https://github.com/1ay1/loom
+
+sidebar_widgets = about, recent_posts, tag_cloud, series, archives
+sidebar_recent_count = 5
+sidebar_about = Single-binary blog engine. No dependencies, no frameworks — just C++20, epoll, and markdown.
+
+show_description = true
+show_theme_toggle = true
+show_excerpts = true
+show_reading_time = true
+post_list_style = list
+
+footer_copyright = &copy; 2024 Ayush Bhat — Built with Loom, served by Loom
+footer_links = GitHub:https://github.com/1ay1/loom

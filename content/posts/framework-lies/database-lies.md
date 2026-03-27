@@ -1,6 +1,6 @@
 ---
 title: "The ORM Delusion: Why Your Database Abstraction Is Making You Slow"
-date: 2026-04-02
+date: 2026-03-27
 slug: database-lies
 tags: architecture, databases, performance, series
 excerpt: "Object-Relational Mapping (ORM) was supposed to bridge the gap between code and data. Instead, it built a wall that hides the most expensive operations in your system."

@@ -1,6 +1,6 @@
 ---
 title: "The Template Language Fallacy: Why Your View Layer is a Performance Sinkhole"
-date: 2026-03-30
+date: 2026-03-27
 slug: no-more-templates
 tags: architecture, performance, compilers, web
 excerpt: "We use template engines because they feel like HTML. In reality, they are slow, interpreted languages that break your type safety and triple your latency."
