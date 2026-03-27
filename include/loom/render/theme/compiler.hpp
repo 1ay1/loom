@@ -13,7 +13,7 @@ namespace loom::theme
 namespace detail
 {
 
-// --- Color emission via fold expressions ---
+// ── Color emission via fold expressions ──
 
 template<typename Token, Color Palette::* Member>
 struct ColorBinding
@@ -41,31 +41,23 @@ void emit_palette(std::string& css, const Palette& p, std::tuple<Bs...>)
     (Bs::emit(css, p), ...);
 }
 
-// --- Typography emission ---
+// ── Typography ──
 
 inline void emit_typography(std::string& css, const ThemeDef& t)
 {
     if (!t.heading_font.value.empty())
-    {
-        css += "--heading-font:";
-        css += t.heading_font.value;
-        css += ';';
-    }
+        { css += "--heading-font:"; css += t.heading_font.value; css += ';'; }
     if (!t.code_font.value.empty())
-    {
-        css += "--code-font:";
-        css += t.code_font.value;
-        css += ';';
-    }
+        { css += "--code-font:"; css += t.code_font.value; css += ';'; }
     if (!t.line_height.empty())
-    {
-        css += "--line-height:";
-        css += t.line_height;
-        css += ';';
-    }
+        { css += "--line-height:"; css += t.line_height; css += ';'; }
+    if (!t.heading_weight.empty())
+        { css += "--heading-weight:"; css += t.heading_weight; css += ';'; }
+    if (!t.header_size.empty())
+        { css += "--header-size:"; css += t.header_size; css += ';'; }
 }
 
-// --- Structural emission: each enum -> CSS rules ---
+// ── Structural emitters ──
 
 inline void emit_corners(std::string& css, Corners c)
 {
@@ -101,6 +93,48 @@ inline void emit_density(std::string& css, Density d)
             css += ".post-content h3,.page-content h3{margin-top:28px;margin-bottom:10px;}";
             css += ".post-listing{padding:18px 10px;}";
             css += ".widget{margin-bottom:30px;}";
+            break;
+    }
+}
+
+inline void emit_border_weight(std::string& css, BorderWeight w)
+{
+    switch (w)
+    {
+        case BorderWeight::Normal: break;
+        case BorderWeight::Thin:
+            css += ":root{--header-border-width:0;--footer-border-width:0;}";
+            css += ".sidebar{border-left-width:0;}.sidebar-left .sidebar{border-right-width:0;}";
+            css += ".post-card{border-width:0;}";
+            break;
+        case BorderWeight::Thick:
+            css += ":root{--header-border-width:3px;--footer-border-width:3px;}";
+            css += ".sidebar{border-left-width:3px;}.sidebar-left .sidebar{border-right-width:3px;}";
+            css += ".post-card{border-width:2px;}";
+            css += ".series-nav{border-width:2px;}";
+            break;
+    }
+}
+
+inline void emit_nav_style(std::string& css, NavStyle s)
+{
+    switch (s)
+    {
+        case NavStyle::Default: break;
+        case NavStyle::Pills:
+            css += "nav a{padding:4px 12px;border-radius:var(--border-radius);"
+                   "transition:background 0.15s,color 0.15s;}";
+            css += "nav a:hover{background:color-mix(in srgb, var(--accent) 12%, var(--bg));"
+                   "color:var(--accent);}";
+            break;
+        case NavStyle::Underline:
+            css += "nav a{padding-bottom:4px;border-bottom:2px solid transparent;"
+                   "transition:border-color 0.15s,color 0.15s;}";
+            css += "nav a:hover{border-bottom-color:var(--accent);color:var(--accent);}";
+            break;
+        case NavStyle::Minimal:
+            css += "nav a{font-size:13px;letter-spacing:0.5px;text-transform:uppercase;}";
+            css += ":root{--nav-gap:14px;}";
             break;
     }
 }
@@ -166,6 +200,22 @@ inline void emit_code_style(std::string& css, CodeBlockStyle s)
     }
 }
 
+inline void emit_inline_code(std::string& css, InlineCodeStyle s)
+{
+    switch (s)
+    {
+        case InlineCodeStyle::Background: break; // base CSS default
+        case InlineCodeStyle::Bordered:
+            css += ".post-content :not(pre)>code,.page-content :not(pre)>code"
+                   "{border:1px solid var(--border);}";
+            break;
+        case InlineCodeStyle::Plain:
+            css += ".post-content :not(pre)>code,.page-content :not(pre)>code"
+                   "{background:none;padding:0;}";
+            break;
+    }
+}
+
 inline void emit_blockquote_style(std::string& css, BlockquoteStyle s)
 {
     switch (s)
@@ -212,7 +262,7 @@ inline void emit_card_hover(std::string& css, CardHover h)
 {
     switch (h)
     {
-        case CardHover::Lift: break; // base CSS default
+        case CardHover::Lift: break;
         case CardHover::Border:
             css += ":root{--card-hover-shadow:none;--card-hover-lift:none;}";
             break;
@@ -231,7 +281,7 @@ inline void emit_hr_style(std::string& css, HrStyle s)
 {
     switch (s)
     {
-        case HrStyle::Line: break; // base CSS default
+        case HrStyle::Line: break;
         case HrStyle::Dashed:
             css += ".post-content hr,.page-content hr{border-top-style:dashed;}";
             break;
@@ -269,6 +319,79 @@ inline void emit_table_style(std::string& css, TableStyle s)
     }
 }
 
+inline void emit_sidebar_style(std::string& css, SidebarStyle s)
+{
+    switch (s)
+    {
+        case SidebarStyle::Bordered: break; // base CSS default
+        case SidebarStyle::Clean:
+            css += ".sidebar{border-left:none;padding-left:0;}";
+            css += ".sidebar-left .sidebar{border-right:none;padding-right:0;}";
+            break;
+        case SidebarStyle::Card:
+            css += ".sidebar{border-left:none;padding-left:0;}";
+            css += ".sidebar-left .sidebar{border-right:none;padding-right:0;}";
+            css += ".widget{border:1px solid var(--border);border-radius:var(--border-radius);"
+                   "padding:16px;background:var(--card-bg);}";
+            break;
+    }
+}
+
+inline void emit_post_nav(std::string& css, PostNavStyle s)
+{
+    switch (s)
+    {
+        case PostNavStyle::Default: break;
+        case PostNavStyle::Arrows:
+            css += ".post-nav a{font-size:15px;font-weight:600;color:var(--text);}";
+            css += ".post-nav a:hover{color:var(--accent);}";
+            css += ".post-nav-prev::before{content:'\\2190  ';opacity:0.5;}";
+            css += ".post-nav-next::after{content:'  \\2192';opacity:0.5;}";
+            break;
+        case PostNavStyle::Minimal:
+            css += ".post-nav a{font-size:12px;text-transform:uppercase;"
+                   "letter-spacing:0.5px;color:var(--muted);}";
+            css += ".post-nav a:hover{color:var(--accent);}";
+            break;
+    }
+}
+
+inline void emit_scrollbar(std::string& css, Scrollbar s)
+{
+    switch (s)
+    {
+        case Scrollbar::Default: break;
+        case Scrollbar::Thin:
+            // Firefox
+            css += "*{scrollbar-width:thin;scrollbar-color:var(--border) var(--bg);}";
+            // WebKit
+            css += "::-webkit-scrollbar{width:6px;height:6px;}";
+            css += "::-webkit-scrollbar-track{background:var(--bg);}";
+            css += "::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}";
+            css += "::-webkit-scrollbar-thumb:hover{background:var(--muted);}";
+            break;
+        case Scrollbar::Hidden:
+            css += "*{scrollbar-width:none;}";
+            css += "::-webkit-scrollbar{display:none;}";
+            break;
+    }
+}
+
+inline void emit_focus_style(std::string& css, FocusStyle f)
+{
+    switch (f)
+    {
+        case FocusStyle::Outline: break; // base CSS default
+        case FocusStyle::Ring:
+            css += ":focus-visible{outline:3px solid var(--accent);"
+                   "outline-offset:3px;border-radius:2px;}";
+            break;
+        case FocusStyle::None:
+            css += ":focus-visible{outline:none;}";
+            break;
+    }
+}
+
 } // namespace detail
 
 // Theme -> CSS compiler
@@ -290,18 +413,27 @@ inline std::string compile(const ThemeDef& t)
     detail::emit_palette(css, t.dark, detail::ColorBindings{});
     css += '}';
 
-    // Structural rules
+    // Shape & density
     detail::emit_corners(css, t.corners);
     detail::emit_density(css, t.density);
+    detail::emit_border_weight(css, t.border_weight);
+
+    // Components
+    detail::emit_nav_style(css, t.nav_style);
     detail::emit_tag_style(css, t.tag_style);
     detail::emit_link_style(css, t.link_style);
     detail::emit_code_style(css, t.code_style);
+    detail::emit_inline_code(css, t.inline_code);
     detail::emit_blockquote_style(css, t.quote_style);
     detail::emit_heading_case(css, t.heading_case);
     detail::emit_image_style(css, t.image_style);
     detail::emit_card_hover(css, t.card_hover);
     detail::emit_hr_style(css, t.hr_style);
     detail::emit_table_style(css, t.table_style);
+    detail::emit_sidebar_style(css, t.sidebar_style);
+    detail::emit_post_nav(css, t.post_nav);
+    detail::emit_scrollbar(css, t.scrollbar);
+    detail::emit_focus_style(css, t.focus_style);
 
     // Escape hatch
     if (!t.extra_css.empty())

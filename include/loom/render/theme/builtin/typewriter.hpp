@@ -15,12 +15,16 @@ inline const ThemeDef typewriter = {
     .line_height = "1.8",
     .corners = Corners::Sharp,
     .density = Density::Airy,
+    .border_weight = BorderWeight::Thin,
+    .nav_style = NavStyle::Minimal,
     .tag_style = TagStyle::Outline,
     .link_style = LinkStyle::Dashed,
     .quote_style = BlockquoteStyle::MutedBorder,
     .heading_case = HeadingCase::Upper,
     .card_hover = CardHover::Border,
     .hr_style = HrStyle::Dashed,
+    .table_style = TableStyle::Minimal,
+    .post_nav = PostNavStyle::Minimal,
     .extra_css = R"CSS(
 ::selection {
   background: #222222;

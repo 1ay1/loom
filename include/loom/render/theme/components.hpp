@@ -3,19 +3,31 @@
 namespace loom::theme
 {
 
-// --- Shape ---
+// ── Shape ──────────────────────────────────────────────
 
-// Controls border-radius across all elements
+// Border-radius across all elements
 enum class Corners { Soft, Sharp, Round };
 
-// --- Spacing ---
+// Structural border thickness (header, footer, sidebar, cards)
+enum class BorderWeight { Thin, Normal, Thick };
 
-// Controls line-height, margins, padding site-wide
+// ── Spacing ────────────────────────────────────────────
+
+// Site-wide spacing rhythm: line-height, margins, padding
 enum class Density { Compact, Normal, Airy };
 
-// --- Component styles ---
+// ── Navigation ─────────────────────────────────────────
 
-// Tag badge appearance
+// Navigation link treatment
+enum class NavStyle {
+    Default,   // plain links, muted color, accent on hover
+    Pills,     // background pill on hover
+    Underline, // bottom border on hover
+    Minimal    // smaller font, tighter spacing
+};
+
+// ── Tags ───────────────────────────────────────────────
+
 enum class TagStyle {
     Pill,       // rounded bg, no border (default)
     Rect,       // square bg, no border
@@ -24,7 +36,8 @@ enum class TagStyle {
     Plain       // no bg, no border, just text
 };
 
-// Content link decoration
+// ── Content links ──────────────────────────────────────
+
 enum class LinkStyle {
     Underline,  // solid underline (default)
     Dotted,     // dotted underline, solid on hover
@@ -32,34 +45,47 @@ enum class LinkStyle {
     None        // no decoration, color only
 };
 
-// Code block treatment
+// ── Code ───────────────────────────────────────────────
+
+// Fenced code blocks
 enum class CodeBlockStyle {
     Plain,      // background only (default)
     Bordered,   // background + full border
     LeftAccent  // background + left accent-colored border
 };
 
-// Blockquote treatment
+// Inline `code` spans
+enum class InlineCodeStyle {
+    Background, // bg tint (default)
+    Bordered,   // bg tint + border
+    Plain       // no bg, no border
+};
+
+// ── Blockquotes ────────────────────────────────────────
+
 enum class BlockquoteStyle {
     AccentBorder, // left border in accent color (default)
     MutedBorder   // left border in muted color
 };
 
-// Heading text transform
+// ── Headings ───────────────────────────────────────────
+
 enum class HeadingCase {
     None,  // as written (default)
     Upper, // UPPERCASE + letter-spacing
     Lower  // lowercase
 };
 
-// Image treatment in content
+// ── Images ─────────────────────────────────────────────
+
 enum class ImageStyle {
     Default,  // just border-radius from Corners
     Bordered, // thin border in border color
     Shadow    // subtle drop shadow
 };
 
-// Post card hover interaction
+// ── Cards ──────────────────────────────────────────────
+
 enum class CardHover {
     Lift,   // translate up + shadow (default)
     Border, // border-color only, no motion
@@ -67,19 +93,53 @@ enum class CardHover {
     None    // no hover effect
 };
 
-// Horizontal rule style
+// ── Horizontal rules ───────────────────────────────────
+
 enum class HrStyle {
     Line,   // solid 1px border (default)
     Dashed, // dashed border
-    Fade    // gradient fade from transparent to border to transparent
+    Fade    // gradient fade to transparent
 };
 
-// Table treatment
+// ── Tables ─────────────────────────────────────────────
+
 enum class TableStyle {
-    Default,  // header bg + full borders (default)
+    Default,  // header bg + full borders
     Striped,  // alternating row backgrounds
     Bordered, // thicker borders, strong header
     Minimal   // header underline only, no cell borders
+};
+
+// ── Sidebar ────────────────────────────────────────────
+
+enum class SidebarStyle {
+    Bordered, // vertical border between content and sidebar (default)
+    Clean,    // no border, just gap
+    Card      // widgets in bordered cards
+};
+
+// ── Post navigation (prev/next) ────────────────────────
+
+enum class PostNavStyle {
+    Default,  // accent links, top border
+    Arrows,   // larger, bolder with arrow emphasis
+    Minimal   // smaller, muted
+};
+
+// ── Scrollbar ──────────────────────────────────────────
+
+enum class Scrollbar {
+    Default, // browser default
+    Thin,    // thin scrollbar, themed colors
+    Hidden   // hidden (scroll still works)
+};
+
+// ── Focus ring ─────────────────────────────────────────
+
+enum class FocusStyle {
+    Outline, // 2px accent outline (default)
+    Ring,    // thicker ring with offset
+    None     // no visible focus (accessibility concern)
 };
 
 } // namespace loom::theme

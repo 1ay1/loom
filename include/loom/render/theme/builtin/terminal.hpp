@@ -16,10 +16,14 @@ inline const ThemeDef terminal = {
     .tag_style = TagStyle::Bordered,
     .link_style = LinkStyle::Dotted,
     .code_style = CodeBlockStyle::LeftAccent,
+    .inline_code = InlineCodeStyle::Bordered,
     .quote_style = BlockquoteStyle::MutedBorder,
     .card_hover = CardHover::Border,
     .hr_style = HrStyle::Fade,
     .table_style = TableStyle::Minimal,
+    .sidebar_style = SidebarStyle::Clean,
+    .post_nav = PostNavStyle::Minimal,
+    .scrollbar = Scrollbar::Thin,
 };
 
 } // namespace loom::theme::builtin

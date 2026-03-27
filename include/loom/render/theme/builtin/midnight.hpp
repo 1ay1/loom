@@ -12,6 +12,12 @@ inline const ThemeDef midnight = {
     .font  = {"system-ui,-apple-system,Segoe UI,Roboto,sans-serif"},
     .font_size = "16px",
     .max_width = "740px",
+    .heading_weight = "800",
+    .corners = Corners::Round,
+    .nav_style = NavStyle::Pills,
+    .image_style = ImageStyle::Shadow,
+    .card_hover = CardHover::Glow,
+    .scrollbar = Scrollbar::Thin,
     .extra_css = R"CSS(
 :root {
   --tag-bg: color-mix(in srgb, #3b82f6 8%, var(--bg));

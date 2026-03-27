@@ -8,41 +8,49 @@
 namespace loom::theme
 {
 
-// Complete theme definition.
+// Complete theme definition — 31 typed fields across 5 axes.
 //
-// Only the first 5 fields (light, dark, font, font_size, max_width) are
-// required. Everything else has a default that matches the base CSS behavior.
-// A maximally opinionated theme can set every field; a minimal theme sets five.
+// Only the first 5 fields (light, dark, font, font_size, max_width) need
+// to be specified. Everything else defaults to the base CSS behavior.
 struct ThemeDef
 {
-    // --- Colors ---
+    // ── Colors ──
     Palette   light;
     Palette   dark;
 
-    // --- Typography ---
+    // ── Typography ──
     FontStack   font;
     std::string font_size;
     std::string max_width;
-    FontStack   heading_font = {};   // empty = inherit from font
-    FontStack   code_font    = {};   // empty = base CSS monospace stack
-    std::string line_height  = {};   // empty = base CSS default ("1.7")
+    FontStack   heading_font   = {};   // empty = inherit
+    FontStack   code_font      = {};   // empty = base CSS monospace
+    std::string line_height    = {};   // empty = "1.7"
+    std::string heading_weight = {};   // empty = "700"
+    std::string header_size    = {};   // empty = "42px"
 
-    // --- Shape & density ---
-    Corners  corners = Corners::Soft;
-    Density  density = Density::Normal;
+    // ── Shape & density ──
+    Corners      corners      = Corners::Soft;
+    Density      density      = Density::Normal;
+    BorderWeight border_weight = BorderWeight::Normal;
 
-    // --- Component styles ---
-    TagStyle        tag_style  = TagStyle::Pill;
-    LinkStyle       link_style = LinkStyle::Underline;
-    CodeBlockStyle  code_style = CodeBlockStyle::Plain;
-    BlockquoteStyle quote_style = BlockquoteStyle::AccentBorder;
+    // ── Components ──
+    NavStyle        nav_style    = NavStyle::Default;
+    TagStyle        tag_style    = TagStyle::Pill;
+    LinkStyle       link_style   = LinkStyle::Underline;
+    CodeBlockStyle  code_style   = CodeBlockStyle::Plain;
+    InlineCodeStyle inline_code  = InlineCodeStyle::Background;
+    BlockquoteStyle quote_style  = BlockquoteStyle::AccentBorder;
     HeadingCase     heading_case = HeadingCase::None;
-    ImageStyle      image_style = ImageStyle::Default;
-    CardHover       card_hover  = CardHover::Lift;
-    HrStyle         hr_style    = HrStyle::Line;
-    TableStyle      table_style = TableStyle::Default;
+    ImageStyle      image_style  = ImageStyle::Default;
+    CardHover       card_hover   = CardHover::Lift;
+    HrStyle         hr_style     = HrStyle::Line;
+    TableStyle      table_style  = TableStyle::Default;
+    SidebarStyle    sidebar_style = SidebarStyle::Bordered;
+    PostNavStyle    post_nav     = PostNavStyle::Default;
+    Scrollbar       scrollbar    = Scrollbar::Default;
+    FocusStyle      focus_style  = FocusStyle::Outline;
 
-    // --- Escape hatch ---
+    // ── Escape hatch ──
     std::string extra_css = {};
 };
 

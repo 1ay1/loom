@@ -13,9 +13,12 @@ inline const ThemeDef serif = {
     .font_size = "18px",
     .max_width = "680px",
     .line_height = "1.8",
+    .heading_weight = "600",
     .density = Density::Airy,
+    .nav_style = NavStyle::Underline,
     .image_style = ImageStyle::Shadow,
     .hr_style = HrStyle::Fade,
+    .sidebar_style = SidebarStyle::Card,
 };
 
 } // namespace loom::theme::builtin

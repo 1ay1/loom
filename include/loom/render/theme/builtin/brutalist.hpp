@@ -12,11 +12,14 @@ inline const ThemeDef brutalist = {
     .font  = {"system-ui,-apple-system,Segoe UI,Roboto,sans-serif"},
     .font_size = "16px",
     .max_width = "760px",
+    .heading_weight = "900",
     .corners = Corners::Sharp,
+    .border_weight = BorderWeight::Thick,
     .code_style = CodeBlockStyle::Bordered,
     .heading_case = HeadingCase::Upper,
     .image_style = ImageStyle::Bordered,
     .table_style = TableStyle::Bordered,
+    .focus_style = FocusStyle::Ring,
     .extra_css = R"CSS(
 ::selection {
   background: #ff0000;
@@ -28,25 +31,11 @@ inline const ThemeDef brutalist = {
   color: #000000;
 }
 
-header {
-  border-bottom-width: 3px;
-}
-
 header h1 {
   letter-spacing: 6px;
-  font-weight: 900;
-}
-
-footer {
-  border-top-width: 3px;
-}
-
-.post-full h1 {
-  font-weight: 900;
 }
 
 .post-card {
-  border-width: 2px;
   border-color: var(--text);
 }
 
@@ -81,7 +70,6 @@ footer {
 }
 
 .post-content pre, .page-content pre {
-  border-width: 2px;
   background: color-mix(in srgb, var(--text) 12%, var(--bg));
 }
 
@@ -94,10 +82,6 @@ footer {
   border-left: 6px solid var(--accent);
   font-weight: 700;
   color: var(--text);
-}
-
-.theme-toggle {
-  border: 2px solid var(--text);
 }
 
 .post-content img, .page-content img {
@@ -115,15 +99,6 @@ footer {
 .post-content a:hover, .page-content a:hover {
   background-size: 100% 100%;
   color: var(--bg);
-}
-
-.sidebar {
-  border-left: 3px solid var(--text);
-}
-
-.sidebar-left .sidebar {
-  border-right: 3px solid var(--text);
-  border-left: none;
 }
 )CSS",
 };

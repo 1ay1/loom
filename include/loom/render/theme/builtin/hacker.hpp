@@ -19,6 +19,9 @@ inline const ThemeDef hacker = {
     .quote_style = BlockquoteStyle::MutedBorder,
     .card_hover = CardHover::None,
     .table_style = TableStyle::Bordered,
+    .sidebar_style = SidebarStyle::Clean,
+    .post_nav = PostNavStyle::Arrows,
+    .scrollbar = Scrollbar::Thin,
     .extra_css = R"CSS(
 ::selection {
   background: #88c070;
