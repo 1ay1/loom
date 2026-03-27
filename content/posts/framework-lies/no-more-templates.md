@@ -3,98 +3,103 @@ title: "The Template Language Fallacy: Why Your View Layer is a Performance Sink
 date: 2026-03-27T01:02:00
 slug: no-more-templates
 tags: architecture, performance, compilers, web
-excerpt: "We use template engines because they feel like HTML. In reality, they are slow, interpreted languages that break your type safety and triple your latency."
+excerpt: Template engines exist so that designers can edit HTML. Designers haven't touched your Jinja files in two years.
 ---
 
-We have been conditioned to believe that "Logic" and "Presentation" must live in separate houses.
+Template engines were invented for a beautiful reason.
 
-To enforce this, we invented a monster: **The Template Language.**
+Separate logic from presentation. Developers write backend code. Designers edit HTML templates. Everyone does what they're good at. Clean, clear, modern.
 
-Jinja, Handlebars, EJS, Liquid, Blade—the list is endless. We tell ourselves these tools make our code cleaner. We tell ourselves they allow "designers" to edit the site without touching the backend.
+Here's what actually happens: developers write the backend, then they *also* convert the Figma mockups into templates, because designers don't know what `{% for item in items %}` means and shouldn't have to. The "separation" is complete. Designers edit Figma. Developers do everything else — including maintaining a second, worse programming language embedded in the HTML files.
 
-**Both of these are lies.**
+We got all the costs of template engines. We got none of the promised benefits.
 
-If you are building a modern, high-performance web system, the template engine is not your friend. It is a massive, interpreted performance sinkhole that turns your elegant backend into a sluggish mess the moment you need to render a list of 100 items.
+---
 
-## The Interpretation Tax
+## There's An Interpreter Running Inside Your Server
 
-When you use a template engine, you aren't just "rendering HTML." You are running an **interpreter inside your server.**
+When a request hits your templated endpoint, here is what happens before a single byte of HTML goes out:
 
-Every time a request hits your handler:
-1.  **Disk I/O:** The server reads a `.html` or `.tmpl` file from the disk.
-2.  **Parsing:** The engine scans the text for tags like `{{ user.name }}` or `{% if admin %}`.
-3.  **AST Generation:** It builds an Abstract Syntax Tree of the template.
-4.  **Execution:** It walks that tree, performs lookups in a dynamic dictionary (usually via reflection or hash map lookups), and concatenates strings.
+1. The engine reads the template file from disk.
+2. It scans the text for template tags (`{{ }}`, `{% %}`, `<%= %>`).
+3. It parses those tags into an Abstract Syntax Tree.
+4. It walks the tree, doing hash map lookups for every variable reference.
+5. It concatenates the results into a string.
+6. It sends that string.
 
-This is a **runtime cost** paid on every single request. Even with "caching," you are still performing dynamic string manipulation and type-erased lookups that the CPU hates.
+This is not "rendering HTML." This is running a programming language — a slow, interpreted, dynamically-typed programming language — on every single request, even when the output is identical to the last thousand requests.
 
-In a system like **Loom**, we don't interpret. We **compile**.
+Yes, there's caching. You can cache the parsed AST. You still walk it on every render, doing type-erased lookups and dynamic string concatenation in a loop. The CPU does not enjoy this.
 
-## The Type-Safety Void
+Your backend might be carefully written, compiled, optimized C++ or Rust. And then it feeds data into a Python-adjacent string interpolation engine and waits.
 
-Template languages are where types go to die.
+## Where Your Types Go to Die
 
-Your backend might be written in C++, Rust, or TypeScript. You have spent hours ensuring your data structures are correct. But the moment you pass that data to a template, you enter a **typeless wasteland.**
+You have a product with a price. Your backend has:
 
-```handlebars
-<!-- Is 'price' a float? A string? Is it even there? -->
-<p>Total: {{ order.price }}</p>
-```
-
-If you rename a field in your database, your compiler won't tell you the template is broken. Your IDE won't show you a red squiggly line. You won't know it's broken until a user sees a blank page or a `500 Internal Server Error` because the template engine couldn't find `order.price`.
-
-**Templates are a giant hole in your system's correctness.**
-
-## The "Designer" Myth
-
-The strongest argument for templates is that "designers can edit them."
-
-**When was the last time a designer opened a Git repo, pulled a branch, and edited a Jinja2 file?**
-
-It doesn't happen. In the real world, developers take a Figma file or a static HTML mock and manually convert it into the framework's template syntax. The "separation of concerns" is an illusion. You end up with logic in your templates anyway—`if/else` blocks, loops, and even formatters—but now that logic is written in a shitty, restricted, un-testable language.
-
-## A Better Way: The Compiled View
-
-What if your view layer was just **code**?
-
-Instead of an interpreted template, imagine a system where the HTML is generated by your language's native structures. 
-
-In Loom, we use **Template Literals and Compiled Layouts.** Because Loom is written in C++, the "view" is just a series of string buffers and stream operations.
-
-```cpp
-// This is not a template. This is a function.
-// It is type-checked at compile-time.
-// It is as fast as a string concatenation.
-std::string render_user(const User& u) {
-    return "<div class='user'>" + xml_escape(u.name) + "</div>";
+```rust
+struct Product {
+    name: String,
+    price_cents: i64,  // price in cents, integer, always present
 }
 ```
 
-### Why this wins:
-1.  **Zero Runtime Parsing:** There is no "engine." There is only your code running at native speed.
-2.  **Total Type Safety:** If `User` doesn't have a `name` field, the code won't compile. You catch bugs before they ever reach a server.
-3.  **No Context Switching:** You don't have to switch your brain (or your IDE) between "Backend Mode" and "Template Mode." It's all just logic.
-4.  **CPU Optimization:** Modern CPUs are incredible at moving contiguous memory. Compiled string builders are orders of magnitude faster than walking a tree of dynamic objects.
+Your template has:
 
-## The 100x Difference
+```handlebars
+<p>Price: ${{ product.price }}</p>
+```
 
-When we benchmarked Loom against traditional "interpreted" blog engines, the biggest bottleneck was never the database or the network. **It was the template engine.**
+The compiler cannot tell you that `price` doesn't exist on `Product` — only `price_cents` does. The linter won't catch it. Your IDE shows no red squiggly. Nobody finds out until a user loads the page and sees `Price: $` with nothing after it, or until the template engine throws a runtime error and someone gets paged.
 
-By moving the view layer into the compiled binary, we reduced response times from **35ms** to **0.4ms**. 
+Rename `price_cents` to `price_in_cents`? Your compiler will find every call site in the backend immediately. Your templates? That's a grep-and-pray operation, followed by manual testing of every page that might reference the field.
 
-We didn't just make it faster. We made it a different category of software. 
+Every template is a hole in your type system. Every `{{ variable }}` is a runtime bet that the data will be there, in the right shape, with the right name. Your compiler checked everything up to the template boundary and then washed its hands of the whole affair.
 
-## Stop The Madness
+## The Grammar Creep
 
-The next time you reach for a template engine, ask yourself: **What am I gaining?** 
+Template engines always start simple. `{{ user.name }}`. Clean. Readable.
 
-If the answer is "It feels familiar," realize that you are trading your system's performance and correctness for a warm, fuzzy feeling of familiarity. 
+Then someone needs a conditional. Fine: `{% if user.is_admin %}`. Then a loop. `{% for item in cart.items %}`. Then a filter. `{{ price | format_currency }}`. Then a *custom* filter, because the built-in ones aren't enough. Now you're writing Python inside your HTML files.
 
-The web doesn't need more "magic" abstractions. It needs systems that are fast, explicit, and correct. It needs you to stop writing templates and start writing code.
+Then the logic gets complex enough that someone puts a calculation directly in the template because it was easier than passing a pre-computed value from the backend. Now you have business logic in a string file with no debugger, no unit tests, no type system, and no compiler to tell you when you break it.
+
+Every template language eventually re-implements a programming language, but worse. The endpoint is always the same: `.jinja2` files with 200 lines of conditional logic that nobody wants to touch.
+
+## Views Are Functions
+
+What does a template actually do?
+
+It takes data. It returns HTML.
+
+That's a function. You already have a language for writing functions. It has a type checker, a compiler, a debugger, IDE support, first-class error messages, and decades of performance optimization. It's the language your backend is already written in.
+
+```cpp
+std::string render_product(const Product& p) {
+    return "<div class='product'>"
+           "<h2>" + xml_escape(p.name) + "</h2>"
+           "<p>$" + format_price(p.price_cents) + "</p>"
+           "</div>";
+}
+```
+
+Not clever. Not exciting. A function that takes a struct and returns a string. The compiler verifies that `p.name` exists and is a string. The compiler verifies that `format_price` takes an `i64`. If you rename `price_cents`, every call site — including this one — breaks at compile time.
+
+And it's fast. No parsing, no tree-walking, no hash map lookups. Just memory, moving around at native speed, the way CPUs have been doing since before most of us were born.
+
+When Loom's view layer was rewritten as compiled functions instead of an interpreted template pass, response time for a typical blog post dropped from 35ms to under 1ms. Not from any clever optimization — from eliminating the interpretation overhead that was there for no good reason.
+
+## The Familiarity Trap
+
+"But I can read templates at a glance. HTML with variables is natural."
+
+You can read a paper map at a glance too. That doesn't make it better than GPS.
+
+The comfort you feel in a template language comes from years of working around its limitations. You got good at Jinja because you had no alternative. The filter syntax is familiar because you've written it hundreds of times while wishing you could just call a function. The perceived naturalness is learned helplessness with good branding.
+
+The alternative isn't ugly. String builders are readable. Native control flow is cleaner than `{% if %}...{% endif %}`. The initial 20 minutes of "this feels weird" is a small price for a view layer you can type-check, test, and actually trust at 3am when the site is down.
 
 ---
 
-### Series: Rebuilding the Web Without Frameworks
-*Part 3: The Template Language Fallacy*
-
-**Up Next:** [The ORM Delusion: Why Your Database Abstraction Is Making You Slow](/post/database-lies)
+*Part 3 of the "Rebuilding the Web" series.*
+**Next:** [The ORM Delusion: Why Your Database Abstraction Is Making You Slow](/post/database-lies)
