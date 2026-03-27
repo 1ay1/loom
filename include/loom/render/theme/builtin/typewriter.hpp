@@ -12,6 +12,11 @@ inline const ThemeDef typewriter = {
     .font  = {"Courier New,Courier,monospace"},
     .font_size = "16px",
     .max_width = "640px",
+    .corners = Corners::Sharp,
+    .tag_style = TagStyle::Outline,
+    .link_style = LinkStyle::Dashed,
+    .quote_style = BlockquoteStyle::MutedBorder,
+    .heading_case = HeadingCase::Upper,
     .extra_css = R"CSS(
 ::selection {
   background: #222222;
@@ -23,61 +28,27 @@ inline const ThemeDef typewriter = {
   color: #1a1814;
 }
 
-header h1 {
-  text-transform: uppercase;
-  letter-spacing: 4px;
-  font-weight: 400;
-}
-
-.post-full h1 {
-  text-transform: uppercase;
-  letter-spacing: 2px;
-}
-
-:root {
-  --tag-bg: transparent;
-  --tag-text: var(--text);
-  --tag-radius: 0;
-}
-
 .tag {
-  border: 1px solid var(--text);
   text-transform: uppercase;
   font-size: 11px;
   letter-spacing: 1px;
 }
 
+header h1 {
+  letter-spacing: 4px;
+  font-weight: 400;
+}
+
 .post-card {
-  border-radius: 0;
   border-style: dashed;
 }
 
 .post-content pre, .page-content pre {
-  border-radius: 0;
   border: 1px dashed var(--border);
 }
 
-.post-content :not(pre) > code, .page-content :not(pre) > code {
-  border-radius: 0;
-}
-
 .post-content blockquote, .page-content blockquote {
-  border-left: 2px solid var(--text);
   font-style: italic;
-}
-
-.theme-toggle {
-  border-radius: 0;
-}
-
-.post-content img, .page-content img {
-  border-radius: 0;
-}
-
-.post-content a, .page-content a {
-  text-decoration: underline;
-  text-decoration-style: dashed;
-  text-underline-offset: 3px;
 }
 )CSS",
 };

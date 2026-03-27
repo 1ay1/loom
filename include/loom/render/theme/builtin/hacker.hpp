@@ -12,38 +12,11 @@ inline const ThemeDef hacker = {
     .font  = {"ui-monospace,SFMono-Regular,Menlo,Consolas,monospace"},
     .font_size = "14px",
     .max_width = "800px",
+    .corners = Corners::Sharp,
+    .tag_style = TagStyle::Outline,
+    .code_style = CodeBlockStyle::Bordered,
+    .quote_style = BlockquoteStyle::MutedBorder,
     .extra_css = R"CSS(
-:root {
-  --tag-bg: transparent;
-  --tag-text: var(--muted);
-  --tag-radius: 0;
-}
-
-.tag {
-  border: 1px solid var(--muted);
-}
-
-.tag:hover {
-  border-color: var(--accent);
-}
-
-.post-card {
-  border-radius: 0;
-}
-
-.theme-toggle {
-  border-radius: 0;
-}
-
-.post-content pre, .page-content pre {
-  border: 1px solid var(--muted);
-  border-radius: 0;
-}
-
-.post-content :not(pre) > code, .page-content :not(pre) > code {
-  border-radius: 0;
-}
-
 ::selection {
   background: #88c070;
   color: #0c0c0c;

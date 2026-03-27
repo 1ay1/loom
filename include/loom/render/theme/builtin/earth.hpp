@@ -12,7 +12,6 @@ inline const ThemeDef earth = {
     .font  = {"Charter,Georgia,Cambria,serif"},
     .font_size = "17px",
     .max_width = "700px",
-    .extra_css = {},
 };
 
 } // namespace loom::theme::builtin

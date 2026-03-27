@@ -12,7 +12,6 @@ inline const ThemeDef serif = {
     .font  = {"Georgia,Garamond,Times New Roman,serif"},
     .font_size = "18px",
     .max_width = "680px",
-    .extra_css = {},
 };
 
 } // namespace loom::theme::builtin

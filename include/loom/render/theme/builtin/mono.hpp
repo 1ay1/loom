@@ -12,7 +12,6 @@ inline const ThemeDef mono = {
     .font  = {"ui-monospace,SFMono-Regular,Menlo,Consolas,monospace"},
     .font_size = "15px",
     .max_width = "760px",
-    .extra_css = {},
 };
 
 } // namespace loom::theme::builtin

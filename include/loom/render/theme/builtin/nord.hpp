@@ -12,7 +12,6 @@ inline const ThemeDef nord = {
     .font  = {"Inter,system-ui,-apple-system,sans-serif"},
     .font_size = "16px",
     .max_width = "720px",
-    .extra_css = {},
 };
 
 } // namespace loom::theme::builtin

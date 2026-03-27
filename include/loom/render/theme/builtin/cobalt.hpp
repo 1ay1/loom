@@ -12,7 +12,6 @@ inline const ThemeDef cobalt = {
     .font  = {"system-ui,-apple-system,Segoe UI,Roboto,sans-serif"},
     .font_size = "17px",
     .max_width = "720px",
-    .extra_css = {},
 };
 
 } // namespace loom::theme::builtin

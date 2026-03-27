@@ -12,6 +12,9 @@ inline const ThemeDef brutalist = {
     .font  = {"system-ui,-apple-system,Segoe UI,Roboto,sans-serif"},
     .font_size = "16px",
     .max_width = "760px",
+    .corners = Corners::Sharp,
+    .code_style = CodeBlockStyle::Bordered,
+    .heading_case = HeadingCase::Upper,
     .extra_css = R"CSS(
 ::selection {
   background: #ff0000;
@@ -28,7 +31,6 @@ header {
 }
 
 header h1 {
-  text-transform: uppercase;
   letter-spacing: 6px;
   font-weight: 900;
 }
@@ -38,13 +40,10 @@ footer {
 }
 
 .post-full h1 {
-  text-transform: uppercase;
-  letter-spacing: 2px;
   font-weight: 900;
 }
 
 .post-card {
-  border-radius: 0;
   border-width: 2px;
   border-color: var(--text);
 }
@@ -80,13 +79,11 @@ footer {
 }
 
 .post-content pre, .page-content pre {
-  border-radius: 0;
-  border: 2px solid var(--text);
+  border-width: 2px;
   background: color-mix(in srgb, var(--text) 12%, var(--bg));
 }
 
 .post-content :not(pre) > code, .page-content :not(pre) > code {
-  border-radius: 0;
   border: 1px solid var(--text);
   background: color-mix(in srgb, var(--text) 8%, var(--bg));
 }
@@ -112,12 +109,10 @@ footer {
 }
 
 .theme-toggle {
-  border-radius: 0;
   border: 2px solid var(--text);
 }
 
 .post-content img, .page-content img {
-  border-radius: 0;
   border: 2px solid var(--text);
 }
 
