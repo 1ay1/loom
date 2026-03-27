@@ -5,7 +5,7 @@ slug: themes
 
 ## Built-in Themes
 
-Set `theme = name` in `site.conf`. All 21 themes support dark and light mode.
+Set `theme = name` in `site.conf`. All 22 themes support dark and light mode. Changes take effect instantly via hot reload.
 
 ### Classic
 
@@ -14,8 +14,8 @@ Set `theme = name` in `site.conf`. All 21 themes support dark and light mode.
 | `default` | System sans-serif | Clean, neutral grays, blue accent |
 | `serif` | Georgia / Garamond | Editorial, warm tones, literary feel |
 | `mono` | Monospace | Terminal aesthetic, green accent |
-| `typewriter` | Courier New | Old-school ink-on-paper, raw and minimal |
-| `brutalist` | System sans-serif | Anti-design, bold borders, red accent, uppercase |
+| `typewriter` | Courier New | Old-school ink-on-paper, dashed borders, uppercase headers |
+| `brutalist` | System sans-serif | Anti-design, bold borders, red accent, inverted tags |
 
 ### Editor Palettes
 
@@ -23,7 +23,7 @@ Set `theme = name` in `site.conf`. All 21 themes support dark and light mode.
 |-------|------|-------|
 | `nord` | Inter / sans-serif | Arctic palette, muted blues |
 | `solarized` | System sans-serif | Ethan Schoonover's precision-engineered palette |
-| `dracula` | System sans-serif | The beloved dark-first theme, purple accent |
+| `dracula` | System sans-serif | Dark-first purple, pink highlights |
 | `gruvbox` | System sans-serif | Retro groove, warm earthy contrast, orange accent |
 | `catppuccin` | System sans-serif | Soothing pastels, purple accent |
 | `tokyonight` | System sans-serif | Neon-tinged Tokyo evening palette |
@@ -34,7 +34,7 @@ Set `theme = name` in `site.conf`. All 21 themes support dark and light mode.
 | Theme | Font | Style |
 |-------|------|-------|
 | `earth` | Charter / Georgia | Warm organic tones, olive accent |
-| `warm` | Georgia / Charter | Golden amber palette, cozy reading feel |
+| `warm` | Georgia / Charter | Golden amber palette, cozy serif reading |
 
 ### Cool & Blue
 
@@ -42,7 +42,7 @@ Set `theme = name` in `site.conf`. All 21 themes support dark and light mode.
 |-------|------|-------|
 | `cobalt` | System sans-serif | Deep blue developer theme |
 | `ocean` | System sans-serif | Deep blue, calm and professional |
-| `midnight` | System sans-serif | Rich dark-first, electric blue, polished |
+| `midnight` | System sans-serif | Rich dark-first, electric blue, subtle lift on hover |
 
 ### Soft & Colorful
 
@@ -57,60 +57,111 @@ Set `theme = name` in `site.conf`. All 21 themes support dark and light mode.
 | Theme | Font | Style |
 |-------|------|-------|
 | `hacker` | Monospace | Green on black, no border-radius, no frills |
+| `terminal` | Monospace | Phosphor green, `<angle>` tags, `--flag` nav, scanlines, cursor blink |
 
-## Overriding Variables
+---
 
-Tweak a built-in theme without replacing it entirely:
+## Choosing the Right Theme
+
+**Writing long-form essays?** Try `serif`, `warm`, or `kanagawa` — serif fonts and generous spacing make paragraphs easy to read.
+
+**Technical blog with lots of code?** Try `terminal`, `hacker`, `mono`, or `tokyonight` — monospace fonts and wider layouts give code blocks room to breathe.
+
+**Want a recognizable editor look?** Try `dracula`, `gruvbox`, `catppuccin`, or `solarized` — your readers will feel at home.
+
+**Want something bold and opinionated?** Try `brutalist` or `typewriter` — these break from blog conventions on purpose.
+
+**Playing it safe?** `default` or `nord` work for everyone.
+
+---
+
+## Customizing a Theme
+
+### Step 1: Override Variables
+
+Every theme is built on CSS custom properties. Override any from `site.conf` without writing CSS:
 
 ```
 theme = nord
-theme_accent = #e06c75
-theme_dark-accent = #e06c75
+theme_accent = #bf616a
+theme_dark-accent = #bf616a
 theme_font_size = 18px
-theme_max_width = 800px
 ```
 
-Underscores in key names become hyphens in CSS. Prefix with `dark-` for dark-mode-only overrides.
+The naming rule: `theme_` + variable name, hyphens as underscores. Prefix with `dark-` for dark-mode-only.
 
-### Available Variables
+### Step 2: Available Variables
 
-| Variable | Description |
-|----------|-------------|
-| `bg` | Background color |
-| `text` | Primary text color |
-| `muted` | Secondary/muted text |
-| `border` | Border and separator color |
-| `accent` | Links, highlights, active elements |
-| `font` | Font family stack |
-| `font-size` | Base font size |
-| `max-width` | Content area max width |
-| `heading-font` | Heading font (defaults to `inherit`) |
-| `code-font` | Code/monospace font |
-| `line-height` | Body line height |
-| `heading-weight` | Heading font weight |
-| `border-radius` | Default border radius |
-| `sidebar-width` | Sidebar width |
-| `sidebar-gap` | Gap between content and sidebar |
-| `nav-gap` | Gap between nav items |
-| `header-size` | Site title font size |
-| `tag-radius` | Tag badge border radius |
-| `tag-bg` | Tag background |
-| `tag-text` | Tag text color |
-| `link-decoration` | Link text decoration |
-| `card-bg` | Card background (cards layout) |
-| `card-border` | Card border color |
-| `card-radius` | Card border radius |
-| `card-padding` | Card padding |
+**Colors** — the five core tokens every theme defines:
+
+| Variable | Controls |
+|----------|----------|
+| `bg` | Page background |
+| `text` | Primary text |
+| `muted` | Dates, secondary text, meta |
+| `border` | Lines, separators, card borders |
+| `accent` | Links, active states, highlights |
+
+**Typography:**
+
+| Variable | Default |
+|----------|---------|
+| `font` | Varies by theme |
+| `font-size` | 14px–18px |
+| `heading-font` | `inherit` |
+| `heading-weight` | `700` |
+| `line-height` | `1.7` |
+| `code-font` | Monospace stack |
+
+**Layout:**
+
+| Variable | Default |
+|----------|---------|
+| `max-width` | 640px–820px |
+| `content-width` | Same as max-width |
+| `sidebar-width` | `260px` |
+| `sidebar-gap` | `32px` |
+| `container-padding` | `40px 20px` |
+
+**Components:**
+
+| Variable | Controls |
+|----------|----------|
+| `border-radius` | Global corner rounding |
+| `card-bg`, `card-border`, `card-radius`, `card-padding` | Post cards |
+| `tag-bg`, `tag-text`, `tag-radius` | Tag badges |
+| `tag-hover-bg`, `tag-hover-text` | Tag hover state |
+| `header-border-width` | Header line (set `0` to hide) |
+| `footer-border-width` | Footer line |
+| `link-decoration` | Link underline style |
 | `accent-hover` | Accent color on hover |
-| `header-border-width` | Header bottom border (set `0` to remove) |
-| `footer-border-width` | Footer top border |
-| `content-width` | Content column max width |
 
-All variables have `dark-` counterparts (e.g., `dark-bg`, `dark-accent`).
+Every variable has a `dark-` counterpart for independent dark mode control.
+
+### Step 3: Custom CSS (optional)
+
+For changes beyond variables, add `custom_css` in `site.conf`:
+
+```
+custom_css = .post-content blockquote { border-left-color: orange; font-style: normal; }
+```
+
+This is injected after the theme and overrides it.
+
+### Step 4: Google Fonts (optional)
+
+Load an external font with `custom_head_html`, then reference it:
+
+```
+custom_head_html = <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono&display=swap" rel="stylesheet">
+theme_code_font = JetBrains Mono, monospace
+```
+
+---
 
 ## Full CSS Override
 
-Drop a `style.css` in `content/theme/`:
+For total control, drop a `style.css` in `content/theme/`:
 
 ```
 content/
@@ -118,22 +169,61 @@ content/
     style.css    # Replaces the entire default stylesheet
 ```
 
-This completely replaces the built-in CSS. You're responsible for all layout, typography, and responsive design.
+This replaces all built-in CSS. You own everything: layout, typography, responsive breakpoints, dark mode. The theme you set in `site.conf` still applies on top (its variable overrides and extra CSS), so you can combine a custom base with a built-in theme's color palette.
 
-## Custom CSS Additions
+---
 
-For small tweaks without replacing everything:
+## How Theme Injection Works
+
+Every page is a single HTML document. CSS is injected in this order:
+
+1. **Base CSS** — full layout, typography, responsive rules (or your `style.css` override)
+2. **Theme** — color variables + extra CSS from the selected theme
+3. **Variable overrides** — your `theme_*` keys from `site.conf`
+4. **Custom CSS** — your `custom_css` value
+
+Each layer overrides the previous. Dark mode uses `[data-theme="dark"]` selectors — a tiny inline script in `<head>` detects the user's preference before paint, so there's no flash.
+
+---
+
+## Recipes
+
+### Make any theme wider with a larger font
 
 ```
-custom_css = .post-full h1 { font-size: 2.2em; } .sidebar { display: none; }
+theme = catppuccin
+theme_max_width = 860px
+theme_font_size = 18px
 ```
 
-This CSS is injected after the theme, so it overrides theme styles.
-
-## Custom Head HTML
-
-Inject anything into `<head>` — Google Fonts, analytics, meta tags:
+### Remove all border-radius
 
 ```
-custom_head_html = <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+theme = default
+theme_border_radius = 0
+theme_card_radius = 0
+theme_tag_radius = 0
+```
+
+### Hide the header and footer borders
+
+```
+theme_header_border_width = 0
+theme_footer_border_width = 0
+```
+
+### Use a different heading font
+
+```
+custom_head_html = <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+theme_heading_font = Playfair Display, Georgia, serif
+```
+
+### Dark background, light text (force dark feel in light mode)
+
+```
+theme_bg = #0f0f0f
+theme_text = #e0e0e0
+theme_muted = #888888
+theme_border = #222222
 ```

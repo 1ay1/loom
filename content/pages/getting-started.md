@@ -36,7 +36,7 @@ base_url = https://yourdomain.com
 theme = nord
 ```
 
-Pick any theme: `default`, `mono`, `serif`, `nord`, `rose`, `cobalt`, `earth`, `dracula`, `gruvbox`, `catppuccin`, `tokyonight`, `kanagawa`, `typewriter`, `brutalist`, `lavender`, `warm`, `ocean`, `sakura`, `midnight`, `hacker`. See them all on the [Themes](/themes) page.
+Pick any theme: `default`, `mono`, `serif`, `nord`, `rose`, `cobalt`, `earth`, `dracula`, `gruvbox`, `catppuccin`, `tokyonight`, `kanagawa`, `typewriter`, `brutalist`, `lavender`, `warm`, `ocean`, `sakura`, `midnight`, `hacker`, `terminal`. See them all on the [Themes](/themes) page.
 
 Run your blog:
 
@@ -53,7 +53,7 @@ Create `myblog/posts/hello.md`:
 ```
 ---
 title: Hello World
-date: 2024-01-01
+date: 2025-10-01
 tags: meta
 excerpt: The first post.
 ---

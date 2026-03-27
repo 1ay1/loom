@@ -45,7 +45,7 @@ In all three cases, you write the same path in your markdown. Nothing changes on
 ```
 ---
 title: My Post Title
-date: 2024-01-15
+date: 2025-10-15
 slug: my-post
 tags: systems, cpp, linux
 excerpt: A one-line summary for listings and SEO.
@@ -109,7 +109,7 @@ Series appear in the sidebar widget and at `/series` and `/series/:name`.
 | `description` | Site description |
 | `author` | Author name (used in meta tags, RSS, JSON-LD) |
 | `base_url` | Full base URL for canonical links, sitemap, RSS |
-| `theme` | Theme name — 21 built-in: `default`, `serif`, `mono`, `nord`, `solarized`, `dracula`, `gruvbox`, `catppuccin`, `tokyonight`, `kanagawa`, `typewriter`, `brutalist`, `lavender`, `warm`, `ocean`, `sakura`, `midnight`, `rose`, `cobalt`, `earth`, `hacker` |
+| `theme` | Theme name — 22 built-in: `default`, `serif`, `mono`, `nord`, `solarized`, `dracula`, `gruvbox`, `catppuccin`, `tokyonight`, `kanagawa`, `typewriter`, `brutalist`, `lavender`, `warm`, `ocean`, `sakura`, `midnight`, `rose`, `cobalt`, `earth`, `hacker`, `terminal` |
 
 ### Navigation
 
@@ -151,7 +151,7 @@ Available widgets: `recent_posts`, `tag_cloud`, `archives`, `series`, `about`.
 ### Footer
 
 ```
-footer_copyright = &copy; 2024 Your Name
+footer_copyright = &copy; 2025 Your Name
 footer_links = GitHub:https://github.com, Twitter:https://twitter.com
 ```
 
