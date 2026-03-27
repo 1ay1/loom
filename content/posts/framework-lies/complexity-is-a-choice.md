@@ -1,5 +1,5 @@
 ---
-title: "Complexity Is a Choice: Why Your Stack Is 100x Heavier Than It Needs To Be"
+title: Complexity Is a Choice: Why Your Stack Is 100x Heavier Than It Needs To Be
 date: 2026-03-27T01:05:00
 slug: complexity-is-a-choice
 tags: architecture, philosophy, systems, web
