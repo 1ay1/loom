@@ -63,7 +63,7 @@ std::vector<std::string> FileSystemSource::list_files(const std::string& dir, co
 static std::chrono::system_clock::time_point parse_date(const std::string& date_str)
 {
     std::tm tm{};
-    tm.tm_isdst = -1;
+    tm.tm_isdst = 0;
     // Parse YYYY-MM-DD
     if (date_str.size() >= 10)
     {
@@ -71,8 +71,15 @@ static std::chrono::system_clock::time_point parse_date(const std::string& date_
         tm.tm_mon  = std::stoi(date_str.substr(5, 2)) - 1;
         tm.tm_mday = std::stoi(date_str.substr(8, 2));
     }
+    // Parse optional THH:MM:SS
+    if (date_str.size() >= 19 && date_str[10] == 'T')
+    {
+        tm.tm_hour = std::stoi(date_str.substr(11, 2));
+        tm.tm_min  = std::stoi(date_str.substr(14, 2));
+        tm.tm_sec  = std::stoi(date_str.substr(17, 2));
+    }
 
-    auto time = mktime(&tm);
+    auto time = timegm(&tm);
     return std::chrono::system_clock::from_time_t(time);
 }
 
