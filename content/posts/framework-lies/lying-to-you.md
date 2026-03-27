@@ -1,6 +1,6 @@
 ---
 title: Your Web Framework Is Lying to You
-date: 2026-03-27
+date: 2026-03-27T01:00:00
 slug: frameworks-are-lying
 tags: feature, architecture, systems, web
 excerpt: Web frameworks promise simplicity. What they actually do is hide complexity until it becomes your problem.

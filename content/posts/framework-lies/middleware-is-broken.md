@@ -1,6 +1,6 @@
 ---
 title: "Middleware: The Hidden Enemy of Your Web Server"
-date: 2026-03-27
+date: 2026-03-27T01:01:00
 slug: middleware-is-broken
 tags: architecture, systems, series, performance
 excerpt: "We think middleware is the ultimate abstraction for modular web servers. In reality, it's a performance killer and a debugging nightmare that hides the true flow of your application."

@@ -1,6 +1,6 @@
 ---
 title: "Complexity Is a Choice: Why Your Stack Is 100x Heavier Than It Needs To Be"
-date: 2026-03-27
+date: 2026-03-27T01:05:00
 slug: complexity-is-a-choice
 tags: architecture, philosophy, systems, web
 excerpt: "The modern web stack is a 100-story skyscraper built on a swamp. We keep adding floors because we're afraid to admit that the foundation is sinking."

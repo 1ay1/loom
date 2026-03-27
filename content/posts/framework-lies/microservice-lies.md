@@ -1,6 +1,6 @@
 ---
 title: "The Distributed Systems Lie: You Don't Need Microservices"
-date: 2026-03-27
+date: 2026-03-27T01:04:00
 slug: microservice-lies
 tags: architecture, microservices, systems, devops
 excerpt: "We were told that microservices were the only way to scale. In reality, they are a distributed systems tax that costs you performance, reliability, and sanity."
