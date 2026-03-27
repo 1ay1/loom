@@ -110,7 +110,7 @@ std::string render_post(const Post& post, const LayoutConfig& layout, const Post
                 ctx.nav.next
                     ? a(class_("post-nav-next"), href("/post/" + ctx.nav.next->slug.get()),
                         raw(ctx.nav.next->title.get() + " &rarr;"))
-                    : Node{Node::Fragment})),
+                    : Node{Node::Fragment, {}, {}, {}, {}})),
 
         // Related posts
         when(!ctx.related.empty(),

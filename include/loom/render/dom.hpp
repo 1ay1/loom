@@ -347,20 +347,20 @@ Node document(Args&&... args)
 // Conditional rendering: when(condition, node)
 inline Node when(bool cond, Node n)
 {
-    return cond ? std::move(n) : Node{Node::Fragment};
+    return cond ? std::move(n) : Node{Node::Fragment, {}, {}, {}, {}};
 }
 
 // Lazy conditional: when(condition, []{ return node; })
 template<typename Fn>
 Node when(bool cond, Fn&& fn)
 {
-    return cond ? fn() : Node{Node::Fragment};
+    return cond ? fn() : Node{Node::Fragment, {}, {}, {}, {}};
 }
 
 // Unless (inverse conditional)
 inline Node unless(bool cond, Node n)
 {
-    return cond ? Node{Node::Fragment} : std::move(n);
+    return cond ? Node{Node::Fragment, {}, {}, {}, {}} : std::move(n);
 }
 
 // Iteration: each(collection, [](auto& item) { return node; })

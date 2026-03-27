@@ -32,7 +32,7 @@ static Node render_recent_posts(const Site& site, const SidebarData& data)
     int i = 0;
     return widget("Recent Posts",
         ul(each(data.recent_posts, [&](const PostSummary& post) -> Node {
-            if (i++ >= count) return Node{Node::Fragment};
+            if (i++ >= count) return Node{Node::Fragment, {}, {}, {}, {}};
             return li(
                 a(href("/post/" + post.slug.get()), post.title.get()),
                 span(class_("date"),
@@ -60,7 +60,7 @@ static Node render_archives_widget()
 
 static Node render_series_widget(const SidebarData& data)
 {
-    if (data.series.empty()) return Node{Node::Fragment};
+    if (data.series.empty()) return Node{Node::Fragment, {}, {}, {}, {}};
     return widget("Series",
         ul(each(data.series, [](const Series& s) {
             return li(a(href("/series/" + s.get()), s.get()));
@@ -88,7 +88,7 @@ std::string render_sidebar(const Site& site, const SidebarData& data)
             if (w == "series")       return render_series_widget(data);
             if (w == "about" && !site.sidebar.about_text.empty())
                 return render_about(site);
-            return Node{Node::Fragment};
+            return Node{Node::Fragment, {}, {}, {}, {}};
         })
     );
 
