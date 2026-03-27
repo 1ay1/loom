@@ -1,6 +1,6 @@
 ---
 title: Pre-Rendering and the Atomic Cache — How Loom Serves Sub-Millisecond HTML
-date: 2024-02-05
+date: 2025-10-20
 slug: cache-and-rendering
 tags: internals, architecture, cpp
 excerpt: Every page is rendered once at startup, gzip-compressed, and stored in memory. Requests are hash table lookups. The cache swaps atomically on content changes.

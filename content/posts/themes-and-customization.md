@@ -1,6 +1,6 @@
 ---
 title: 21 Themes, Full Customization, Zero JavaScript Frameworks
-date: 2024-02-15
+date: 2025-11-03
 slug: themes-and-customization
 tags: feature, themes, architecture
 excerpt: 21 built-in themes with dark mode, CSS variable overrides, and full stylesheet replacement. All inlined — no external requests.

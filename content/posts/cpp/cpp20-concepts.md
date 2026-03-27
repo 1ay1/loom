@@ -1,6 +1,6 @@
 ---
 title: C++20 Concepts in Loom — Constraints Without SFINAE
-date: 2024-03-10
+date: 2025-11-17
 slug: cpp20-concepts
 tags: cpp, internals
 excerpt: Loom uses C++20 Concepts to constrain template parameters for content sources and watch policies. Here's what concepts are, how they work, and why they're better than SFINAE.

@@ -1,6 +1,6 @@
 ---
 title: The HTTP Server — epoll, Keep-Alive, and Zero-Copy Responses
-date: 2024-01-20
+date: 2025-09-29
 slug: http-server
 tags: internals, architecture, cpp
 excerpt: How Loom's HTTP server uses Linux epoll with edge-triggered I/O to handle concurrent connections in a single thread without blocking.

@@ -1,6 +1,6 @@
 ---
 title: Complexity Is a Choice: Why Your Stack Is 100x Heavier Than It Needs To Be
-date: 2026-03-27T01:05:00
+date: 2026-03-21
 slug: complexity-is-a-choice
 tags: architecture, philosophy, systems, web
 excerpt: It now takes 500MB of software to display the words "Hello, World." We did this to ourselves. We can undo it.

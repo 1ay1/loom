@@ -1,6 +1,6 @@
 ---
 title: SEO Out of the Box
-date: 2025-01-15
+date: 2026-01-06
 slug: seo
 tags: feature
 excerpt: Canonical URLs, Open Graph, Twitter Cards, JSON-LD, RSS, sitemap — all generated automatically.

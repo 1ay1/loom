@@ -1,6 +1,6 @@
 ---
 title: Markdown Rendering Overhaul — Heading Anchors, Fence Fixes, and Performance
-date: 2026-03-19
+date: 2026-03-03
 slug: markdown-rendering-overhaul
 tags: changelog, markdown, rendering, release
 excerpt: Major improvements to the markdown parser — proper fenced code block handling, heading IDs with anchor links, lazy image loading, and performance tuning across the board.

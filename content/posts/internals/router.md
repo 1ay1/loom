@@ -1,6 +1,6 @@
 ---
 title: The Trie Router — O(segments) Path Matching
-date: 2024-01-25
+date: 2025-10-06
 slug: router
 tags: internals, architecture, cpp
 excerpt: Loom uses a trie to match URL paths. Each segment is one node traversal. Parameters like :slug are first-class citizens, not regex afterthoughts.

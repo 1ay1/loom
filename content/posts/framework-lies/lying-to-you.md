@@ -1,6 +1,6 @@
 ---
 title: Your Web Framework Is Lying to You
-date: 2026-03-27T01:00:00
+date: 2026-03-10
 slug: frameworks-are-lying
 tags: feature, architecture, systems, web
 excerpt: Your framework didn't remove complexity. It hid it somewhere you can't find at 3am when everything is on fire.

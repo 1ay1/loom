@@ -1,6 +1,6 @@
 ---
 title: "The Distributed Systems Lie: You Don't Need Microservices"
-date: 2026-03-27T01:04:00
+date: 2026-03-19
 slug: microservice-lies
 tags: architecture, microservices, systems, devops
 excerpt: Stack Overflow serves 1.3 billion page views a month with 9 web servers. You have 500 users and three Kubernetes clusters.

@@ -1,6 +1,6 @@
 ---
 title: Directory-Based Series and Archive Pages
-date: 2025-02-01
+date: 2026-01-14
 slug: series-and-archives
 tags: feature
 excerpt: Series are now defined by directory structure, not frontmatter. Plus archive pages grouped by year.

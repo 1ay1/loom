@@ -1,6 +1,6 @@
 ---
 title: "The ORM Delusion: Why Your Database Abstraction Is Making You Slow"
-date: 2026-03-27T01:03:00
+date: 2026-03-17
 slug: database-lies
 tags: architecture, databases, performance, series
 excerpt: Your ORM is quietly sending 300 database queries to render one page. It just never mentioned that.

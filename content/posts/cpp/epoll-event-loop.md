@@ -1,6 +1,6 @@
 ---
 title: Linux epoll — The Event Loop That Powers Loom
-date: 2024-03-01
+date: 2025-11-10
 slug: epoll-event-loop
 tags: cpp, linux, internals
 excerpt: epoll lets a single thread watch thousands of file descriptors for I/O readiness without polling. Here's how it works and how Loom uses it.

@@ -1,6 +1,6 @@
 ---
 title: Hand-Written Markdown Parser — Two Passes, No Regex
-date: 2024-01-15
+date: 2025-09-22
 slug: markdown-parser
 tags: internals, architecture, cpp
 excerpt: Loom's markdown parser is ~1200 lines of C++ with no regex engine and no external library. A first pass collects references and footnotes; a second pass renders HTML.

@@ -1,6 +1,6 @@
 ---
 title: Using Loom as a Project Documentation Platform
-date: 2024-03-20
+date: 2026-01-22
 slug: loom-as-docs-platform
 tags: feature, architecture
 excerpt: Loom isn't just for blogs. Its series, tags, pages, and navigation make it a capable project documentation platform — and it's already serving its own docs.

@@ -1,6 +1,6 @@
 ---
 title: "The Template Language Fallacy: Why Your View Layer is a Performance Sinkhole"
-date: 2026-03-27T01:02:00
+date: 2026-03-14
 slug: no-more-templates
 tags: architecture, performance, compilers, web
 excerpt: Template engines exist so that designers can edit HTML. Designers haven't touched your Jinja files in two years.

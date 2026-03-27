@@ -1,6 +1,6 @@
 ---
 title: Static Asset Serving — Disk, Git Objects, and GitHub Redirects
-date: 2026-03-19
+date: 2026-02-24
 slug: static-asset-serving
 tags: internals, architecture, git
 excerpt: How Loom serves images and other static files — and why it offloads them to GitHub's CDN instead of piping bytes through your server.

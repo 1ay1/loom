@@ -1,6 +1,6 @@
 ---
 title: Introducing Loom
-date: 2024-01-01
+date: 2025-09-15
 slug: introducing-loom
 tags: release, architecture
 excerpt: A blog engine that just works. Clone, make, run — your blog is live in 30 seconds with themes, RSS, SEO, and hot reload built in.

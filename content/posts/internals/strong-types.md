@@ -1,6 +1,6 @@
 ---
 title: Strong Types — Making Illegal States Unrepresentable
-date: 2024-02-10
+date: 2025-10-27
 slug: strong-types
 tags: internals, cpp, architecture
 excerpt: A slug is not a title is not a tag. Loom wraps every domain value in a StrongType<T, Tag> so the compiler catches misuse that code review misses.

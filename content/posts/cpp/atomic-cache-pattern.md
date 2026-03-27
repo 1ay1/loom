@@ -1,6 +1,6 @@
 ---
 title: The Atomic Cache Pattern — Lock-Free Reads with shared_ptr
-date: 2024-03-15
+date: 2025-11-24
 slug: atomic-cache-pattern
 tags: cpp, internals, architecture
 excerpt: Loom serves HTML from a shared_ptr<const SiteCache>. Reads are lock-free. Writes swap the pointer under a tiny mutex. Here's why this works and when to use it.

@@ -1,6 +1,6 @@
 ---
 title: "Middleware: The Hidden Enemy of Your Web Server"
-date: 2026-03-27T01:01:00
+date: 2026-03-12
 slug: middleware-is-broken
 tags: architecture, systems, series, performance
 excerpt: Every call to app.use() is a promise that something, somewhere, will call next(). Whether that happens correctly is between your middleware and God.
