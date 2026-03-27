@@ -1,26 +1,18 @@
 #include "../../include/loom/render/navigation.hpp"
+#include "../../include/loom/render/dom.hpp"
 
 namespace loom
 {
 
-std::string render_navigation(const Navigation& nav)
+using namespace dom;
+
+std::string render_navigation(const Navigation& navigation)
 {
-    std::string html;
-
-    html += "<nav><ul>";
-
-    for(const auto& item : nav.items)
-    {
-        html += "<li>";
-        html += "<a href=\"" + item.url + "\">";
-        html += item.title;
-        html += "</a>";
-        html += "</li>";
-    }
-
-    html += "</ul></nav>";
-
-    return html;
+    return nav(
+        ul(each(navigation.items, [](const auto& item) {
+            return li(a(href(item.url), item.title));
+        }))
+    ).render();
 }
 
 }
