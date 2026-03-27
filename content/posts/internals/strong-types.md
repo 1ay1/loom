@@ -211,18 +211,43 @@ struct Palette {
 
 Now you can't assign a `FontStack` to a `Color` field. And you can't forget a color — the struct requires all five.
 
-The full theme definition composes these:
+The full theme definition composes these with structural types — enums that control the shape and behavior of UI components:
 
 ```cpp
+// Sum types for structural choices
+enum class Corners { Soft, Sharp, Round };
+enum class TagStyle { Pill, Rect, Bordered, Outline, Plain };
+enum class LinkStyle { Underline, Dotted, Dashed, None };
+enum class CodeBlockStyle { Plain, Bordered, LeftAccent };
+enum class BlockquoteStyle { AccentBorder, MutedBorder };
+enum class HeadingCase { None, Upper, Lower };
+
 struct ThemeDef {
+    // Colors
     Palette   light;
     Palette   dark;
+
+    // Typography
     FontStack font;
     std::string font_size;
     std::string max_width;
-    std::string extra_css;
+
+    // Structure (all have defaults)
+    Corners        corners    = Corners::Soft;
+    TagStyle       tag_style  = TagStyle::Pill;
+    LinkStyle      link_style = LinkStyle::Underline;
+    CodeBlockStyle code_style = CodeBlockStyle::Plain;
+    BlockquoteStyle quote_style = BlockquoteStyle::AccentBorder;
+    HeadingCase    heading_case = HeadingCase::None;
+
+    // Escape hatch
+    std::string extra_css = {};
 };
 ```
+
+This is the key insight: **themes aren't just color palettes — they're structural programs.** `Corners::Sharp` eliminates all border-radius site-wide. `TagStyle::Bordered` renders tags as accent-colored rectangles. `HeadingCase::Upper` transforms all headings to uppercase. Each enum variant maps to a coherent set of CSS rules via the compiler.
+
+A theme that specifies only colors gets the default structure. A theme that specifies structural fields gets a radically different UI without writing any CSS.
 
 ### Token Types for CSS Variables
 
@@ -283,21 +308,53 @@ Adding a new color token means adding one line to `ColorBindings`. The compiler 
 
 ### Theme Definitions as Data
 
-Each builtin theme is a header file with a single `inline const ThemeDef`:
+Each builtin theme is a header file with a single `inline const ThemeDef`. A minimal theme only specifies colors and typography — structural fields default to the base CSS behavior:
 
 ```cpp
-// builtin/gruvbox.hpp
+// builtin/gruvbox.hpp — uses default structure, only colors + extra_css
 inline const ThemeDef gruvbox = {
     .light = {{"#fbf1c7"}, {"#3c3836"}, {"#766a60"}, {"#d5c4a1"}, {"#d65d0e"}},
     .dark  = {{"#282828"}, {"#ebdbb2"}, {"#a89984"}, {"#3c3836"}, {"#fe8019"}},
     .font  = {"system-ui,-apple-system,Segoe UI,Roboto,sans-serif"},
     .font_size = "17px",
     .max_width = "720px",
-    .extra_css = R"CSS(...)CSS",
 };
 ```
 
-C++20 designated initializers make the mapping explicit. Miss a field and the compiler warns. Swap `.light` and `.dark` and the type system catches it — `Palette` expects `Color` values, not `FontStack`.
+Structural themes override the defaults to radically change the UI. Compare hacker and terminal — same monospace DNA, completely different structure:
+
+```cpp
+// hacker: muted outline tags, bordered code blocks, plain links
+inline const ThemeDef hacker = {
+    .light = {{"#f0f0e8"}, {"#1a1a1a"}, {"#5a5a5a"}, {"#c8c8b8"}, {"#2d8a2d"}},
+    .dark  = {{"#0c0c0c"}, {"#b5b5b5"}, {"#7b7b7b"}, {"#1a1a1a"}, {"#88c070"}},
+    .font  = {"ui-monospace,..."},
+    .font_size = "14px",
+    .max_width = "800px",
+    .corners = Corners::Sharp,
+    .tag_style = TagStyle::Outline,
+    .code_style = CodeBlockStyle::Bordered,
+    .quote_style = BlockquoteStyle::MutedBorder,
+};
+
+// terminal: accent-bordered tags, dotted links, left-accent code
+inline const ThemeDef terminal = {
+    .light = {{"#fafaf8"}, {"#1c1c1c"}, {"#737373"}, {"#e5e5e0"}, {"#0c4a6e"}},
+    .dark  = {{"#0c0c0c"}, {"#d4d4d4"}, {"#737373"}, {"#252525"}, {"#7dd3fc"}},
+    .font  = {"ui-monospace,..."},
+    .font_size = "14px",
+    .max_width = "820px",
+    .corners = Corners::Sharp,
+    .tag_style = TagStyle::Bordered,
+    .link_style = LinkStyle::Dotted,
+    .code_style = CodeBlockStyle::LeftAccent,
+    .quote_style = BlockquoteStyle::MutedBorder,
+};
+```
+
+Same `Corners::Sharp`, different everything else. The type system makes the differences explicit and the compiler generates different CSS for each. No raw CSS needed — terminal has zero `extra_css`.
+
+C++20 designated initializers make the mapping explicit. Miss a required field and the compiler warns. Swap `.light` and `.dark` and the type system catches it — `Palette` expects `Color` values, not `FontStack`. Skip a structural field and it defaults to the base behavior.
 
 ### Theme Composition
 
@@ -324,6 +381,7 @@ Strong types are one instance of a broader C++ idiom: encode invariants in types
 Other examples in Loom:
 - `Color` vs `FontStack` — a color can't become a font family
 - `Palette` requires all five color tokens — you can't define a theme with a missing `muted`
+- `Corners`, `TagStyle`, `LinkStyle` — structural choices are sum types, not CSS strings
 - Token types carry their CSS variable names — rename `--bg` in one place and it updates everywhere
 - `const Site&` parameter to renderers — the site is read-only during rendering
 - `std::shared_ptr<const SiteCache>` — the cache is immutable once built

@@ -56,8 +56,8 @@ Set `theme = name` in `site.conf`. All 22 themes support dark and light mode. Ch
 
 | Theme | Font | Style |
 |-------|------|-------|
-| `hacker` | Monospace | Green on black, no border-radius, no frills |
-| `terminal` | Monospace | Phosphor green, `<angle>` tags, `--flag` nav, scanlines, cursor blink |
+| `hacker` | Monospace | Green accent, sharp corners, outlined tags, bordered code |
+| `terminal` | Monospace | Teal/sky accent, sharp corners, bordered tags, dotted links, left-accent code |
 
 ---
 
@@ -72,6 +72,34 @@ Set `theme = name` in `site.conf`. All 22 themes support dark and light mode. Ch
 **Want something bold and opinionated?** Try `brutalist` or `typewriter` — these break from blog conventions on purpose.
 
 **Playing it safe?** `default` or `nord` work for everyone.
+
+---
+
+## How Themes Differ
+
+Themes aren't just color palettes. Each theme defines **structural choices** that change how UI components look and behave:
+
+| Property | What it controls | Example variants |
+|----------|-----------------|-----------------|
+| Corners | Border-radius across all elements | Soft (rounded), Sharp (square), Round (pill-shaped) |
+| Tag style | Tag badge appearance | Pill, Rectangle, Bordered, Outlined, Plain text |
+| Link style | Content link decoration | Solid underline, Dotted, Dashed, None |
+| Code blocks | Code block treatment | Plain background, Full border, Left accent stripe |
+| Blockquotes | Blockquote left border | Accent-colored, Muted |
+| Headings | Heading text transform | Normal, UPPERCASE, lowercase |
+
+This is why `hacker` and `terminal` look different despite both being monospace themes:
+
+| Property | hacker | terminal |
+|----------|--------|----------|
+| Corners | Sharp | Sharp |
+| Tags | Outlined (muted border) | Bordered (accent border) |
+| Links | Solid underline | Dotted underline |
+| Code blocks | Full border | Left accent stripe |
+| Blockquotes | Muted border | Muted border |
+| Accent | Green | Teal / sky blue |
+
+Same shape language (sharp corners), completely different component treatments.
 
 ---
 

@@ -31,7 +31,16 @@ Here's every available theme:
 | Soft & colorful | `rose`, `sakura`, `lavender` |
 | Minimal & raw | `hacker`, `terminal` |
 
-Each theme defines a light palette, a dark palette, a font stack, font size, content width, and optional extra CSS for things like custom selection colors, tag shapes, or link styles.
+Each theme defines a light palette, a dark palette, a font stack, font size, and content width. But themes go beyond colors — they also define **structural choices** that change the shape and behavior of UI components:
+
+- **Corners** — Soft (rounded), Sharp (square), or Round (pill-shaped). Affects every element site-wide.
+- **Tag style** — Pill badges, bordered rectangles, outlined with muted borders, or plain text.
+- **Link style** — Solid underline, dotted, dashed, or none.
+- **Code blocks** — Plain background, full border, or a left accent stripe.
+- **Blockquotes** — Accent-colored or muted left border.
+- **Headings** — Normal, UPPERCASE, or lowercase.
+
+This is why `hacker` and `terminal` feel different despite both being monospace sharp-cornered themes — hacker uses outlined tags and bordered code, while terminal uses accent-bordered tags, dotted links, and left-accent code blocks.
 
 ## Override Individual Variables
 
