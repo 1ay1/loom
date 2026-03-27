@@ -18,19 +18,21 @@ inline const ThemeDef warm = {
     .image_style = ImageStyle::Shadow,
     .hr_style = HrStyle::Fade,
     .styles = sheet(
-        root() | set("tag-bg", mix(hex("#c47a20"), 10, v::bg)) | set("tag-text", hex("#a06418")) | set("tag-hover-bg", hex("#c47a20")) | set("tag-hover-text", hex("#ffffff")) | set("tag-radius", px(4)) | set("heading-weight", raw("600")),
+        root() | set("tag-bg", mix(hex("#c47a20"), 10, v::bg)) | set("tag-text", hex("#a06418")) | set("tag-hover-bg", hex("#c47a20")) | set("tag-hover-text", hex("#ffffff")) | set("tag-radius", 4_px) | set("heading-weight", raw("600")),
         dark_root() | set("tag-bg", mix(hex("#dda040"), 10, v::bg)) | set("tag-text", hex("#dda040")) | set("tag-hover-bg", hex("#dda040")) | set("tag-hover-text", hex("#1a1510")),
-        sel("::selection") | bg(hex("#c47a20")) | color(hex("#ffffff")),
-        dark(sel("::selection")) | bg(hex("#dda040")) | color(hex("#1a1510")),
-        sel("header h1") | font_weight(600),
-        sel(".post-card") | border_radius(px(6)) | transition(raw("border-color 0.2s, box-shadow 0.2s")),
-        sel(".post-card:hover") | box_shadow(raw("0 2px 10px color-mix(in srgb, #c47a20 8%, transparent)")),
-        sel(".post-listing a") | font_weight(500),
-        sel(".post-full h1") | font_weight(600) | line_height(num(1.25)),
-        sel(".post-content blockquote", ".page-content blockquote") | border_left(px(3), solid, hex("#c47a20")) | font_style(italic),
-        dark(sel(".post-content blockquote", ".page-content blockquote")) | border_left_color(hex("#dda040")),
-        sel(".post-content a", ".page-content a") | color(hex("#a06418")),
-        dark(sel(".post-content a", ".page-content a")) | color(hex("#e8b060"))
+        "::selection"_s        | bg(hex("#c47a20")) | color(hex("#ffffff")),
+        "::selection"_s.dark() | bg(hex("#dda040")) | color(hex("#1a1510")),
+        "header h1"_s | font_weight(600),
+        ".post-card"_s | border_radius(6_px) | transition(raw("border-color 0.2s, box-shadow 0.2s")),
+        ".post-card:hover"_s | box_shadow(raw("0 2px 10px color-mix(in srgb, #c47a20 8%, transparent)")),
+        ".post-listing a"_s | font_weight(500),
+        ".post-full h1"_s | font_weight(600) | line_height(num(1.25)),
+        ".post-content"_s.also(".page-content").nest(
+            "blockquote"_s        | border_left(3_px, solid, hex("#c47a20")) | font_style(italic),
+            "blockquote"_s.dark() | border_left_color(hex("#dda040")),
+            "a"_s                 | color(hex("#a06418")),
+            "a"_s.dark()          | color(hex("#e8b060"))
+        )
     ),
 };
 

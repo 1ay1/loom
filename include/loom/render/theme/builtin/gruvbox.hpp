@@ -14,12 +14,14 @@ inline const ThemeDef gruvbox = {
     .font_size = "17px",
     .max_width = "720px",
     .styles = sheet(
-        sel("::selection") | bg(hex("#d65d0e")) | color(hex("#fbf1c7")),
-        dark(sel("::selection")) | bg(hex("#fe8019")) | color(hex("#282828")),
-        sel(".post-content blockquote", ".page-content blockquote") | border_left_color(hex("#b8bb26")),
-        dark(sel(".post-content blockquote", ".page-content blockquote")) | border_left_color(hex("#b8bb26")),
-        sel(".post-content a", ".page-content a") | color(hex("#458588")),
-        dark(sel(".post-content a", ".page-content a")) | color(hex("#83a598"))
+        "::selection"_s        | bg(hex("#d65d0e")) | color(hex("#fbf1c7")),
+        "::selection"_s.dark() | bg(hex("#fe8019")) | color(hex("#282828")),
+        ".post-content"_s.also(".page-content").nest(
+            "blockquote"_s        | border_left_color(hex("#b8bb26")),
+            "blockquote"_s.dark() | border_left_color(hex("#b8bb26")),
+            "a"_s                 | color(hex("#458588")),
+            "a"_s.dark()          | color(hex("#83a598"))
+        )
     ),
 };
 

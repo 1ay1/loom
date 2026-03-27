@@ -14,13 +14,15 @@ inline const ThemeDef dracula = {
     .font_size = "17px",
     .max_width = "720px",
     .styles = sheet(
-        sel("::selection") | bg(hex("#44475a")) | color(hex("#f8f8f2")),
-        sel(".post-content blockquote", ".page-content blockquote") | border_left_color(hex("#ff79c6")),
+        "::selection"_s | bg(hex("#44475a")) | color(hex("#f8f8f2")),
         root() | set("tag-bg", mix(hex("#7c3aed"), 12, v::bg)) | set("tag-text", hex("#7c3aed")),
         dark_root() | set("tag-bg", mix(hex("#bd93f9"), 20, hex("#282a36"))) | set("tag-text", hex("#bd93f9")),
-        sel(".post-content a", ".page-content a") | color(hex("#6838b2")),
-        dark(sel(".post-content a", ".page-content a")) | color(hex("#8be9fd")),
-        sel(".post-card:hover") | border_color(hex("#ff79c6"))
+        ".post-card:hover"_s | border_color(hex("#ff79c6")),
+        ".post-content"_s.also(".page-content").nest(
+            "blockquote"_s        | border_left_color(hex("#ff79c6")),
+            "a"_s                 | color(hex("#6838b2")),
+            "a"_s.dark()          | color(hex("#8be9fd"))
+        )
     ),
 };
 

@@ -27,12 +27,12 @@ inline const ThemeDef typewriter = {
     .table_style = TableStyle::Minimal,
     .post_nav = PostNavStyle::Minimal,
     .styles = sheet(
-        sel("::selection") | bg(hex("#222222")) | color(hex("#f4f1ea")),
-        dark(sel("::selection")) | bg(hex("#c8c0b0")) | color(hex("#1a1814")),
-        sel(".tag") | text_transform(uppercase) | font_size(px(11)) | letter_spacing(px(1)),
-        sel("header h1") | letter_spacing(px(4)) | font_weight(400),
-        sel(".post-card") | border_style(dashed),
-        sel(".post-content blockquote", ".page-content blockquote") | font_style(italic)
+        "::selection"_s        | bg(hex("#222222")) | color(hex("#f4f1ea")),
+        "::selection"_s.dark() | bg(hex("#c8c0b0")) | color(hex("#1a1814")),
+        ".tag"_s | text_transform(uppercase) | font_size(11_px) | letter_spacing(1_px),
+        "header h1"_s | letter_spacing(4_px) | font_weight(400),
+        ".post-card"_s | border_style(dashed),
+        ".post-content blockquote"_s.also(".page-content blockquote") | font_style(italic)
     ),
 };
 

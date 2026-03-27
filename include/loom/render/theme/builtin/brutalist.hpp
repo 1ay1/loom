@@ -22,21 +22,23 @@ inline const ThemeDef brutalist = {
     .table_style = TableStyle::Bordered,
     .focus_style = FocusStyle::Ring,
     .styles = sheet(
-        sel("::selection") | bg(hex("#ff0000")) | color(hex("#ffffff")),
-        dark(sel("::selection")) | bg(hex("#ff4444")) | color(hex("#000000")),
-        sel("header h1") | letter_spacing(px(6)),
-        sel(".post-card") | border_color(v::text),
-        sel(".post-card:hover") | border_color(v::accent) | bg(v::accent) | color(v::bg),
-        sel(".post-card:hover a") | color(v::bg),
-        sel(".post-card:hover .date") | color(v::bg) | opacity(0.7),
+        "::selection"_s        | bg(hex("#ff0000")) | color(hex("#ffffff")),
+        "::selection"_s.dark() | bg(hex("#ff4444")) | color(hex("#000000")),
+        "header h1"_s | letter_spacing(6_px),
+        ".post-card"_s | border_color(v::text),
+        ".post-card:hover"_s | border_color(v::accent) | bg(v::accent) | color(v::bg),
+        ".post-card:hover a"_s | color(v::bg),
+        ".post-card:hover .date"_s | color(v::bg) | opacity(0.7),
         root() | set("tag-bg", v::text) | set("tag-text", v::bg) | set("tag-radius", raw("0")) | set("tag-hover-bg", v::accent) | set("tag-hover-text", v::bg),
-        sel(".tag") | text_transform(uppercase) | font_weight(700) | font_size(px(11)) | letter_spacing(px(1)),
-        sel(".post-content pre", ".page-content pre") | bg(mix(v::text, 12, v::bg)),
-        sel(".post-content :not(pre) > code", ".page-content :not(pre) > code") | border(px(1), solid, v::text) | bg(mix(v::text, 8, v::bg)),
-        sel(".post-content blockquote", ".page-content blockquote") | border_left(px(6), solid, v::accent) | font_weight(700) | color(v::text),
-        sel(".post-content img", ".page-content img") | border_width(px(2)) | border_color(v::text),
-        sel(".post-content a", ".page-content a") | text_decoration(none) | bg(raw("linear-gradient(var(--accent), var(--accent)) no-repeat 0 100%")) | background_size(raw("100% 2px")) | padding_bottom(px(1)),
-        sel(".post-content a:hover", ".page-content a:hover") | background_size(raw("100% 100%")) | color(v::bg)
+        ".tag"_s | text_transform(uppercase) | font_weight(700) | font_size(11_px) | letter_spacing(1_px),
+        ".post-content"_s.also(".page-content").nest(
+            "pre"_s               | bg(mix(v::text, 12, v::bg)),
+            ":not(pre) > code"_s  | border(1_px, solid, v::text) | bg(mix(v::text, 8, v::bg)),
+            "blockquote"_s        | border_left(6_px, solid, v::accent) | font_weight(700) | color(v::text),
+            "img"_s               | border_width(2_px) | border_color(v::text),
+            "a"_s                 | text_decoration(none) | bg(raw("linear-gradient(var(--accent), var(--accent)) no-repeat 0 100%")) | background_size(raw("100% 2px")) | padding_bottom(1_px),
+            "a:hover"_s           | background_size(raw("100% 100%")) | color(v::bg)
+        )
     ),
 };
 

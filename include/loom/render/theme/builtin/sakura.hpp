@@ -14,18 +14,20 @@ inline const ThemeDef sakura = {
     .font_size = "17px",
     .max_width = "720px",
     .styles = sheet(
-        root() | set("tag-bg", mix(hex("#d4447a"), 7, v::bg)) | set("tag-text", hex("#c03868")) | set("tag-hover-bg", hex("#d4447a")) | set("tag-hover-text", hex("#ffffff")) | set("tag-radius", px(14)),
+        root() | set("tag-bg", mix(hex("#d4447a"), 7, v::bg)) | set("tag-text", hex("#c03868")) | set("tag-hover-bg", hex("#d4447a")) | set("tag-hover-text", hex("#ffffff")) | set("tag-radius", 14_px),
         dark_root() | set("tag-bg", mix(hex("#f07098"), 10, v::bg)) | set("tag-text", hex("#f07098")) | set("tag-hover-bg", hex("#f07098")) | set("tag-hover-text", hex("#1c1218")),
-        sel("::selection") | bg(hex("#d4447a")) | color(hex("#ffffff")),
-        dark(sel("::selection")) | bg(hex("#f07098")) | color(hex("#1c1218")),
-        sel(".post-card") | border_radius(px(10)) | transition(raw("border-color 0.2s, box-shadow 0.2s")),
-        sel(".post-card:hover") | border_color(mix(hex("#d4447a"), 30, v::border)) | box_shadow(raw("0 2px 12px color-mix(in srgb, #d4447a 8%, transparent)")),
-        sel(".post-listing") | transition(raw("background 0.15s")) | padding(px(14), px(10)) | margin(raw("0 -10px")) | border_radius(px(6)),
-        sel(".post-listing:hover") | bg(mix(hex("#d4447a"), 3, v::bg)),
-        sel(".post-content blockquote", ".page-content blockquote") | border_left_color(hex("#d4447a")),
-        dark(sel(".post-content blockquote", ".page-content blockquote")) | border_left_color(hex("#f07098")),
-        sel(".post-content a", ".page-content a") | color(hex("#c03868")),
-        dark(sel(".post-content a", ".page-content a")) | color(hex("#f48aaa"))
+        "::selection"_s        | bg(hex("#d4447a")) | color(hex("#ffffff")),
+        "::selection"_s.dark() | bg(hex("#f07098")) | color(hex("#1c1218")),
+        ".post-card"_s | border_radius(10_px) | transition(raw("border-color 0.2s, box-shadow 0.2s")),
+        ".post-card:hover"_s | border_color(mix(hex("#d4447a"), 30, v::border)) | box_shadow(raw("0 2px 12px color-mix(in srgb, #d4447a 8%, transparent)")),
+        ".post-listing"_s | transition(raw("background 0.15s")) | padding(14_px, 10_px) | margin(raw("0 -10px")) | border_radius(6_px),
+        ".post-listing:hover"_s | bg(mix(hex("#d4447a"), 3, v::bg)),
+        ".post-content"_s.also(".page-content").nest(
+            "blockquote"_s        | border_left_color(hex("#d4447a")),
+            "blockquote"_s.dark() | border_left_color(hex("#f07098")),
+            "a"_s                 | color(hex("#c03868")),
+            "a"_s.dark()          | color(hex("#f48aaa"))
+        )
     ),
 };
 

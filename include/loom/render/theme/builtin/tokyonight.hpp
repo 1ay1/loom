@@ -14,14 +14,16 @@ inline const ThemeDef tokyonight = {
     .font_size = "16px",
     .max_width = "720px",
     .styles = sheet(
-        sel("::selection") | bg(hex("#7aa2f7")) | color(hex("#1a1b26")),
-        sel(".post-content blockquote", ".page-content blockquote") | border_left_color(hex("#ff9e64")),
-        dark(sel(".post-content blockquote", ".page-content blockquote")) | border_left_color(hex("#ff9e64")),
-        sel(".post-content a", ".page-content a") | color(hex("#7aa2f7")),
-        dark(sel(".post-content a", ".page-content a")) | color(hex("#7dcfff")),
-        sel(".post-card:hover") | border_color(hex("#bb9af7")),
+        "::selection"_s | bg(hex("#7aa2f7")) | color(hex("#1a1b26")),
+        ".post-card:hover"_s | border_color(hex("#bb9af7")),
         root() | set("tag-bg", mix(hex("#7aa2f7"), 12, v::bg)) | set("tag-text", hex("#7aa2f7")),
-        dark_root() | set("tag-bg", mix(hex("#7aa2f7"), 15, hex("#1a1b26"))) | set("tag-text", hex("#7dcfff"))
+        dark_root() | set("tag-bg", mix(hex("#7aa2f7"), 15, hex("#1a1b26"))) | set("tag-text", hex("#7dcfff")),
+        ".post-content"_s.also(".page-content").nest(
+            "blockquote"_s        | border_left_color(hex("#ff9e64")),
+            "blockquote"_s.dark() | border_left_color(hex("#ff9e64")),
+            "a"_s                 | color(hex("#7aa2f7")),
+            "a"_s.dark()          | color(hex("#7dcfff"))
+        )
     ),
 };
 

@@ -14,10 +14,10 @@ inline const ThemeDef solarized = {
     .font_size = "17px",
     .max_width = "720px",
     .styles = sheet(
-        sel("::selection") | bg(hex("#268bd2")) | color(hex("#fdf6e3")),
-        dark(sel("::selection")) | bg(hex("#2aa198")) | color(hex("#002b36")),
-        sel(".post-content blockquote", ".page-content blockquote") | border_left_color(hex("#cb4b16")),
-        dark(sel(".post-content blockquote", ".page-content blockquote")) | border_left_color(hex("#cb4b16"))
+        "::selection"_s        | bg(hex("#268bd2")) | color(hex("#fdf6e3")),
+        "::selection"_s.dark() | bg(hex("#2aa198")) | color(hex("#002b36")),
+        ".post-content blockquote"_s.also(".page-content blockquote")        | border_left_color(hex("#cb4b16")),
+        ".post-content blockquote"_s.also(".page-content blockquote").dark() | border_left_color(hex("#cb4b16"))
     ),
 };
 

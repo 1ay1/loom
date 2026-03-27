@@ -24,7 +24,7 @@ inline const ThemeDef hacker = {
     .post_nav = PostNavStyle::Arrows,
     .scrollbar = Scrollbar::Thin,
     .styles = sheet(
-        sel("::selection") | bg(hex("#88c070")) | color(hex("#0c0c0c"))
+        "::selection"_s | bg(hex("#88c070")) | color(hex("#0c0c0c"))
     ),
 };
 

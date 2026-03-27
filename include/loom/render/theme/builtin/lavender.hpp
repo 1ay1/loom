@@ -14,18 +14,20 @@ inline const ThemeDef lavender = {
     .font_size = "17px",
     .max_width = "720px",
     .styles = sheet(
-        root() | set("tag-bg", mix(hex("#7c5cbf"), 8, v::bg)) | set("tag-text", hex("#7c5cbf")) | set("tag-hover-bg", hex("#7c5cbf")) | set("tag-hover-text", hex("#ffffff")) | set("tag-radius", px(14)),
+        root() | set("tag-bg", mix(hex("#7c5cbf"), 8, v::bg)) | set("tag-text", hex("#7c5cbf")) | set("tag-hover-bg", hex("#7c5cbf")) | set("tag-hover-text", hex("#ffffff")) | set("tag-radius", 14_px),
         dark_root() | set("tag-bg", mix(hex("#a78bfa"), 10, v::bg)) | set("tag-text", hex("#a78bfa")) | set("tag-hover-bg", hex("#a78bfa")) | set("tag-hover-text", hex("#1a1724")),
-        sel("::selection") | bg(hex("#7c5cbf")) | color(hex("#ffffff")),
-        dark(sel("::selection")) | bg(hex("#a78bfa")) | color(hex("#1a1724")),
-        sel(".post-card") | border_radius(px(10)) | transition(raw("border-color 0.2s, box-shadow 0.2s")),
-        sel(".post-card:hover") | box_shadow(raw("0 2px 12px color-mix(in srgb, #7c5cbf 10%, transparent)")),
-        sel(".post-listing") | transition(raw("background 0.15s")) | padding(px(14), px(10)) | margin(raw("0 -10px")) | border_radius(px(6)),
-        sel(".post-listing:hover") | bg(mix(hex("#7c5cbf"), 4, v::bg)),
-        sel(".post-content blockquote", ".page-content blockquote") | border_left_color(hex("#7c5cbf")),
-        dark(sel(".post-content blockquote", ".page-content blockquote")) | border_left_color(hex("#a78bfa")),
-        sel(".post-content a", ".page-content a") | color(hex("#6d4dab")),
-        dark(sel(".post-content a", ".page-content a")) | color(hex("#b49afa"))
+        "::selection"_s        | bg(hex("#7c5cbf")) | color(hex("#ffffff")),
+        "::selection"_s.dark() | bg(hex("#a78bfa")) | color(hex("#1a1724")),
+        ".post-card"_s | border_radius(10_px) | transition(raw("border-color 0.2s, box-shadow 0.2s")),
+        ".post-card:hover"_s | box_shadow(raw("0 2px 12px color-mix(in srgb, #7c5cbf 10%, transparent)")),
+        ".post-listing"_s | transition(raw("background 0.15s")) | padding(14_px, 10_px) | margin(raw("0 -10px")) | border_radius(6_px),
+        ".post-listing:hover"_s | bg(mix(hex("#7c5cbf"), 4, v::bg)),
+        ".post-content"_s.also(".page-content").nest(
+            "blockquote"_s        | border_left_color(hex("#7c5cbf")),
+            "blockquote"_s.dark() | border_left_color(hex("#a78bfa")),
+            "a"_s                 | color(hex("#6d4dab")),
+            "a"_s.dark()          | color(hex("#b49afa"))
+        )
     ),
 };
 
