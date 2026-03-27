@@ -1201,7 +1201,7 @@ std::string render_layout(
         auto& themes = builtin_themes();
         auto it = themes.find(site.theme.name);
         if (it != themes.end())
-            html += "<style>" + theme_to_css(it->second) + "</style>";
+            html += "<style>" + theme::compile(it->second) + "</style>";
     }
 
     // Emit theme variable overrides from site.conf theme_* keys
