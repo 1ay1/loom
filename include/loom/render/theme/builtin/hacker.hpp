@@ -174,19 +174,15 @@ inline const ThemeDef hacker = {
         // ── Series nav — tree style ──
         ".series-nav"_s | border_color(gray) | border_left_color(dim_p) | bg(transparent),
         ".series-label"_s | color(dim_txt) | font_size(13_px),
-        ".series-list"_s | list_style(none) | padding_left(28_px),
-        ".series-list li"_s | padding_left(0_px) | margin_left(raw("-28px"))
-                            | padding_left(28_px),
-        ".series-list li::before"_s | prop("content", raw("'\\251C\\2500 '"))
-                                    | color(gray) | margin_left(raw("-28px"))
-                                    | display(raw("inline-block")) | width(28_px),
-        ".series-list li:last-child::before"_s | prop("content", raw("'\\2514\\2500 '"))
-                                               | color(gray),
+        ".series-list"_s | list_style(none) | padding_left(0_px),
+        ".series-list li"_s | padding(4_px, 0_px)
+                           | display(flex) | flex_direction(column),
         ".series-list a"_s | color(phosphor) | font_size(13_px) | text_transform(none),
         ".series-current"_s | color(phosphor) | font_weight(400) | text_transform(none),
         ".series-current::after"_s | prop("content", raw("' *'"))
                                    | color(dim_p),
-        ".series-list .date"_s | display(block) | font_size(12_px) | color(dim_txt),
+        ".series-list .date"_s | display(block) | font_size(12_px) | color(dim_txt)
+                               | order(raw("-1")),
 
         // ── Sidebar ──
         ".sidebar"_s | font_size(13_px),
