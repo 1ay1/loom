@@ -84,7 +84,7 @@ inline const ThemeDef hacker = {
         // ── Header — same size as everything, hierarchy via color ──
         "header"_s | border_bottom(none) | padding_bottom(0_px)
                    | margin_bottom(0_px),
-        "header h1"_s | font_size(24_px) | font_weight(700) | letter_spacing(2_px)
+        "header h1"_s | font_size(36_px) | font_weight(700) | letter_spacing(4_px)
                       | margin_bottom(0_px) | color(phosphor)
                       | prop("text-shadow", glow),
         "header h1 a"_s | color(phosphor) | text_decoration(none),
