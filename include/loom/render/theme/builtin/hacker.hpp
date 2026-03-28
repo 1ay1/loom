@@ -229,13 +229,13 @@ inline const ThemeDef hacker = {
 
         // ── Blinking cursor ──
         keyframes("blink",
-            from() | opacity(1.0),
-            to()   | opacity(0.0)
+            frame(raw("0%,50%")) | opacity(1.0),
+            frame(raw("50.01%,100%")) | opacity(0.0)
         ),
         "header h1 a::after"_s
             | prop("content", raw("'\\2588'")) | color(phosphor)
             | margin_left(2_px)
-            | prop("animation", raw("blink 1s step-end infinite")),
+            | prop("animation", raw("blink 1s infinite")),
 
         // ── Selection ──
         "::selection"_s | bg(phosphor) | color(black)
