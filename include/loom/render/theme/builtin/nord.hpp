@@ -10,8 +10,8 @@ using namespace css;
 inline const ThemeDef nord = {
     .light = {{"#eceff4"}, {"#2e3440"}, {"#4c566a"}, {"#d8dee9"}, {"#5e81ac"}},
     .dark  = {{"#2e3440"}, {"#eceff4"}, {"#d8dee9"}, {"#3b4252"}, {"#88c0d0"}},
-    .font  = {"Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif"},
-    .font_size = "16px",
+    .font  = {"Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,sans-serif"},
+    .font_size = "15px",
     .max_width = "740px",
     .line_height = "1.7",
     .corners = Corners::Soft,

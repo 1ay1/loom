@@ -10,10 +10,10 @@ using namespace css;
 inline const ThemeDef rose = {
     .light = {{"#fffbfc"}, {"#1a1118"}, {"#8e7a86"}, {"#f0dde4"}, {"#c2185b"}},
     .dark  = {{"#1a1118"}, {"#f5e6ec"}, {"#b09aa6"}, {"#2d2028"}, {"#f06292"}},
-    .font  = {"system-ui,-apple-system,Segoe UI,Roboto,sans-serif"},
-    .font_size = "17px",
-    .max_width = "720px",
-    .line_height = "1.75",
+    .font  = {"Optima,Candara,Noto Sans,-apple-system,BlinkMacSystemFont,sans-serif"},
+    .font_size = "15.5px",
+    .max_width = "700px",
+    .line_height = "1.7",
     .corners = Corners::Round,
     .nav_style = NavStyle::Pills,
     .tag_style = TagStyle::Pill,
@@ -26,8 +26,10 @@ inline const ThemeDef rose = {
 
         // Soft code blocks
         content_area().nest(
-            "pre"_s | bg(hex("#fdf2f5")) | border(1_px, solid, hex("#f0dde4")),
-            "pre"_s.dark() | bg(hex("#231a1f")) | border(1_px, solid, hex("#2d2028")),
+            "pre"_s | bg(hex("#fdf2f5")) | border(1_px, solid, hex("#f0dde4")) | color(hex("#3d2b35")),
+            "pre code"_s | color(hex("#3d2b35")),
+            "pre"_s.dark() | bg(hex("#231a1f")) | border(1_px, solid, hex("#2d2028")) | color(hex("#e8d0da")),
+            "pre code"_s.dark() | color(hex("#e8d0da")),
             ":not(pre)>code"_s | bg(hex("#fdf2f5")) | color(hex("#c2185b")) | padding(2_px, 6_px),
             ":not(pre)>code"_s.dark() | bg(hex("#231a1f")) | color(hex("#f06292")) | padding(2_px, 6_px),
             "blockquote"_s | border_left(3_px, solid, hex("#c2185b")) | color(hex("#8e7a86"))

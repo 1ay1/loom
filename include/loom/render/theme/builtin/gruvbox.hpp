@@ -17,8 +17,8 @@ namespace {
 inline const ThemeDef gruvbox = {
     .light = {{gruvbox_cream.v}, {"#3c3836"}, {"#7c6f64"}, {"#d5c4a1"}, {gruvbox_orange.v}},
     .dark  = {{gruvbox_dark.v},  {"#ebdbb2"}, {"#a89984"}, {"#3c3836"}, {gruvbox_borange.v}},
-    .font  = {"system-ui,-apple-system,Segoe UI,Roboto,sans-serif"},
-    .font_size = "17px",
+    .font  = {"-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial,sans-serif"},
+    .font_size = "15.5px",
     .max_width = "720px",
     .line_height = "1.7",
     .corners = Corners::Soft,
