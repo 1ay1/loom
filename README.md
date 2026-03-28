@@ -14,6 +14,16 @@ The `content/` directory in this repo is a working example site — it's what yo
 
 ![Loom screenshot](content/images/loom.png)
 
+## Getting Started
+
+```bash
+curl -L -o loom https://github.com/1ay1/loom/releases/latest/download/loom
+chmod +x loom
+./loom --git https://github.com/1ay1/loom.git main content
+```
+
+Open `http://localhost:8080`. That's it.
+
 ---
 
 ## Why
