@@ -14,9 +14,9 @@ inline const ThemeDef rose = {
     .light = {{"#fffbfc"}, {"#2a1f25"}, {"#8e7a86"}, {"#f0dde4"}, {"#c2185b"}},
     .dark  = {{"#1a1118"}, {"#f5e6ec"}, {"#b09aa6"}, {"#2d2028"}, {"#f06292"}},
     .font  = {"'Georgia','Times New Roman',serif"},
-    .font_size = "16px",
+    .font_size = "15px",
     .max_width = "680px",
-    .heading_font = {"'Helvetica Neue',Helvetica,Arial,sans-serif"},
+    .heading_font = {"'Georgia','Times New Roman',serif"},
     .line_height = "1.8",
     .heading_weight = "700",
     .header_size = "28px",
@@ -41,13 +41,13 @@ inline const ThemeDef rose = {
                               | color(raw("var(--muted)")) | margin_top(4_px),
 
         // ── Nav pills — rosy tint on hover ──
-        "nav a"_s | font_family(raw("'Helvetica Neue',Helvetica,Arial,sans-serif"))
+        "nav a"_s
                   | font_size(13_px) | letter_spacing(raw("0.3px")),
         "nav a:hover"_s | bg(raw("color-mix(in srgb, var(--accent) 8%, var(--bg))")),
 
         // ── Post listings — editorial style ──
         ".post-listing"_s | padding(18_px, 0_px),
-        ".post-listing > a"_s | font_family(raw("'Helvetica Neue',Helvetica,Arial,sans-serif"))
+        ".post-listing > a"_s
                               | font_size(raw("1.15em")) | font_weight(600)
                               | letter_spacing(raw("-0.3px")),
         ".post-listing .excerpt"_s | font_size(14_px) | line_height(num(1.6))
@@ -55,27 +55,27 @@ inline const ThemeDef rose = {
         ".post-listing .post-tags"_s | margin_top(8_px),
 
         // ── Section headings — sans-serif, uppercase, delicate ──
-        "h2"_s | font_family(raw("'Helvetica Neue',Helvetica,Arial,sans-serif"))
+        "h2"_s
                | font_size(11_px) | font_weight(600) | text_transform(uppercase)
                | letter_spacing(2_px) | color(raw("var(--muted)"))
                | border_bottom(none) | margin_bottom(16_px) | padding_bottom(0_px),
 
         // ── Tags — soft pills ──
         vars({{"tag-radius", raw("999px")}}),
-        ".tag"_s | font_family(raw("'Helvetica Neue',Helvetica,Arial,sans-serif"))
+        ".tag"_s
                  | font_size(11_px) | letter_spacing(raw("0.3px")),
 
         // ── Cards — soft shadow, generous padding ──
         ".post-card"_s | padding(22_px)
                        | box_shadow(raw("0 1px 6px color-mix(in srgb, var(--text) 6%, transparent)")),
-        ".post-card a"_s | font_family(raw("'Helvetica Neue',Helvetica,Arial,sans-serif"))
+        ".post-card a"_s
                          | font_weight(600) | font_size(raw("1.1em")),
         ".post-card .excerpt"_s | font_size(13_px) | margin_top(8_px),
 
         // ── Post page ──
         ".post-full h1"_s | font_size(28_px) | letter_spacing(raw("-0.5px"))
                           | line_height(num(1.3)) | margin_bottom(10_px),
-        ".post-meta"_s | font_family(raw("'Helvetica Neue',Helvetica,Arial,sans-serif"))
+        ".post-meta"_s
                        | font_size(13_px) | letter_spacing(raw("0.2px")),
         ".heading-anchor"_s | opacity(0.15),
 
@@ -111,7 +111,7 @@ inline const ThemeDef rose = {
 
         // ── Post nav ──
         ".post-nav"_s | margin_top(36_px) | padding_top(16_px),
-        ".post-nav a"_s | font_family(raw("'Helvetica Neue',Helvetica,Arial,sans-serif"))
+        ".post-nav a"_s
                         | font_size(13_px),
         ".related-posts h2"_s | font_size(11_px) | text_transform(uppercase)
                               | letter_spacing(2_px) | color(raw("var(--muted)")),
@@ -122,13 +122,13 @@ inline const ThemeDef rose = {
                         | bg(raw("color-mix(in srgb, var(--accent) 4%, var(--bg))"))
                         | border(1_px, solid, raw("var(--border)"))
                         | padding(16_px, 20_px),
-        ".series-label"_s | font_family(raw("'Helvetica Neue',Helvetica,Arial,sans-serif"))
+        ".series-label"_s
                           | font_size(12_px) | letter_spacing(raw("0.3px")),
         ".series-list a"_s | font_size(14_px),
 
         // ── Sidebar — refined ──
         ".sidebar"_s | font_size(14_px),
-        ".widget h3"_s | font_family(raw("'Helvetica Neue',Helvetica,Arial,sans-serif"))
+        ".widget h3"_s
                        | font_size(11_px) | font_weight(600) | text_transform(uppercase)
                        | letter_spacing(2_px) | color(raw("var(--muted)"))
                        | border_bottom(1_px, solid, raw("var(--border)"))
@@ -138,11 +138,11 @@ inline const ThemeDef rose = {
         ".widget p"_s | font_size(14_px) | line_height(num(1.7)),
 
         // ── Footer ──
-        "footer"_s | font_family(raw("'Helvetica Neue',Helvetica,Arial,sans-serif"))
+        "footer"_s
                    | font_size(12_px) | letter_spacing(raw("0.2px")),
 
         // ── Breadcrumbs ──
-        "nav.breadcrumb"_s | font_family(raw("'Helvetica Neue',Helvetica,Arial,sans-serif"))
+        "nav.breadcrumb"_s
                            | font_size(12_px)
     ),
 };
