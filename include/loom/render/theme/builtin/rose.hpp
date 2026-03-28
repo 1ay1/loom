@@ -24,28 +24,15 @@ inline const ThemeDef rose = {
         "::selection"_s | bg(hex("#c2185b")) | color(hex("#fffbfc")),
         "::selection"_s.dark() | bg(hex("#f06292")) | color(hex("#1a1118")),
 
-        // Soft code blocks — light
+        // Code blocks & blockquotes — uses palette vars
         content_area().nest(
-            "pre"_s | bg(hex("#fdf2f5")) | border(1_px, solid, hex("#f0dde4")) | color(hex("#3d2b35")),
-            "pre code"_s | color(hex("#3d2b35")),
-            "blockquote"_s | border_left(3_px, solid, hex("#c2185b")) | color(hex("#8e7a86"))
-                           | bg(hex("#fdf2f5")) | padding(10_px, 16_px)
-        ),
-        // Soft code blocks — dark
-        content_area().dark().nest(
-            "pre"_s | bg(hex("#231a1f")) | border(1_px, solid, hex("#2d2028")) | color(hex("#e8d0da")),
-            "pre code"_s | color(hex("#e8d0da")),
-            "blockquote"_s | border_left(3_px, solid, hex("#f06292")) | color(hex("#b09aa6"))
-                           | bg(hex("#231a1f"))
+            "pre"_s | border(1_px, solid, raw("var(--border)")),
+            "blockquote"_s | border_left(3_px, solid, raw("var(--accent)"))
+                           | color(raw("var(--muted)")) | padding(10_px, 16_px)
         ),
 
-        // Cards with blush tint
-        ".post-card"_s | bg(hex("#fdf6f8")),
-        ".post-card"_s.dark() | bg(hex("#231a1f")) | border_color(hex("#2d2028")),
-
-        // Pill nav hover with rose tint
-        "nav a:hover"_s | bg(hex("#fdf2f5")),
-        "nav a:hover"_s.dark() | bg(hex("#2d2028"))
+        // Pill nav hover
+        "nav a:hover"_s | bg(raw("color-mix(in srgb, var(--accent) 8%, var(--bg))"))
     ),
 };
 

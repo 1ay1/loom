@@ -22,23 +22,12 @@ inline const ThemeDef nord = {
         "::selection"_s | bg(hex("#5e81ac")) | color(hex("#eceff4")),
         "::selection"_s.dark() | bg(hex("#88c0d0")) | color(hex("#2e3440")),
 
-        // Soften code blocks — light
+        // Code blocks & blockquotes — uses palette vars
         content_area().nest(
-            "pre"_s | bg(hex("#e5e9f0")) | color(hex("#2e3440")) | border(1_px, solid, hex("#d8dee9")),
-            "pre code"_s | color(hex("#2e3440")),
-            "blockquote"_s | border_left(3_px, solid, hex("#5e81ac"))
-                           | color(hex("#4c566a")) | bg(hex("#e5e9f0")) | padding(10_px, 16_px)
-        ),
-        // Soften code blocks — dark
-        content_area().dark().nest(
-            "pre"_s | bg(hex("#3b4252")) | color(hex("#d8dee9")) | border(1_px, solid, hex("#434c5e")),
-            "pre code"_s | color(hex("#d8dee9")),
-            "blockquote"_s | border_left(3_px, solid, hex("#88c0d0"))
-                           | color(hex("#d8dee9")) | bg(hex("#3b4252"))
-        ),
-
-        // Cards with frost background — dark
-        ".post-card"_s.dark() | bg(hex("#3b4252")) | border_color(hex("#434c5e"))
+            "pre"_s | border(1_px, solid, raw("var(--border)")),
+            "blockquote"_s | border_left(3_px, solid, raw("var(--accent)"))
+                           | color(raw("var(--muted)")) | padding(10_px, 16_px)
+        )
     ),
 };
 
