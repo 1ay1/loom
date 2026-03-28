@@ -187,18 +187,25 @@ inline const ThemeDef hacker = {
         ".related-posts li a"_s | color(phosphor) | font_size(13_px),
         ".related-posts li a:hover"_s | color(raw("#50ff80")),
 
-        // ── Series nav — tree style ──
-        ".series-nav"_s | border_color(gray) | border_left_color(dim_p) | bg(transparent),
-        ".series-label"_s | color(dim_txt) | font_size(13_px),
-        ".series-list"_s | list_style(none) | padding_left(0_px),
-        ".series-list li"_s | padding(4_px, 0_px)
-                           | display(flex) | flex_direction(column),
-        ".series-list a"_s | color(phosphor) | font_size(13_px) | text_transform(none),
+        // ── Series nav — line-numbered file style ──
+        ".series-nav"_s | border(1_px, dashed, gray) | bg(raw("#060d06"))
+                        | padding(12_px, 16_px),
+        ".series-label"_s | color(dim_txt) | font_size(12_px) | margin_bottom(8_px),
+        ".series-list"_s | padding_left(0_px)
+                         | prop("counter-reset", raw("line")),
+        ".series-list li"_s | padding(3_px, 0_px) | padding_left(36_px)
+                            | prop("counter-increment", raw("line"))
+                            | text_transform(none),
+        ".series-list li::before"_s | prop("content", raw("counter(line)"))
+                                    | color(dim_txt) | display(raw("inline-block"))
+                                    | width(24_px) | margin_left(raw("-36px"))
+                                    | text_align(right) | margin_right(12_px),
+        ".series-list a"_s | color(dim_p) | font_size(13_px) | text_transform(none),
+        ".series-list a:hover"_s | color(phosphor),
         ".series-current"_s | color(phosphor) | font_weight(400) | text_transform(none),
-        ".series-current::after"_s | prop("content", raw("' *'"))
-                                   | color(dim_p),
-        ".series-list .date"_s | display(block) | font_size(12_px) | color(dim_txt)
-                               | order(raw("-1")),
+        ".series-current::after"_s | prop("content", raw("'  \\2190'"))
+                                   | color(dim_txt) | font_size(11_px),
+        ".series-list .date"_s | display(none),
 
         // ── Sidebar ──
         ".sidebar"_s | font_size(13_px),
