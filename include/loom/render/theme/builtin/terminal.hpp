@@ -89,13 +89,15 @@ inline const ThemeDef terminal = {
             | bg(hex("#212121")) | padding(10_px, 16_px),
         ".post-content a,.page-content a"_s | color(hex("#5fba7d")),
         ".post-content a:hover,.page-content a:hover"_s | text_decoration(underline),
-        ".post-content pre,.page-content pre"_s | bg(hex("#212121")) | border(1_px, solid, hex("#2e2e2e")),
-        ".post-content :not(pre)>code,.page-content :not(pre)>code"_s | bg(hex("#262626"))
-            | padding(2_px, 5_px),
+        ".post-content pre,.page-content pre"_s | bg(hex("#1e1e1e"))
+            | border_left(3_px, solid, hex("#5fba7d")) | border_top(none) | border_right(none) | border_bottom(none),
+        ".post-content pre code,.page-content pre code"_s | color(hex("#c8d0d8")),
+        ".post-content :not(pre)>code,.page-content :not(pre)>code"_s | bg(hex("#2a2a2a"))
+            | color(hex("#5fba7d")) | padding(2_px, 6_px),
         ".post-content h1,.post-content h2,.post-content h3,.post-content h4,.page-content h1,.page-content h2,.page-content h3,.page-content h4"_s
-            | color(hex("#eeeeee")),
-        ".post-content h2,.page-content h2"_s | font_size(20_px) | margin_top(28_px) | border_bottom(none),
-        ".post-content h3,.page-content h3"_s | font_size(16_px),
+            | color(hex("#5fba7d")),
+        ".post-content h2,.page-content h2"_s | font_size(20_px) | margin_top(32_px) | border_bottom(none),
+        ".post-content h3,.page-content h3"_s | font_size(16_px) | color(hex("#f0f0f0")),
         ".post-content hr,.page-content hr"_s | border_top(1_px, solid, hex("#2e2e2e")),
         ".post-content table th,.page-content table th"_s | bg(hex("#212121")),
         ".post-content table th,.post-content table td,.page-content table th,.page-content table td"_s
