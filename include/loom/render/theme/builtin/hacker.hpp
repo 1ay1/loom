@@ -19,7 +19,7 @@ namespace {
     const auto black    = hex("#0a0a0a");
     const auto dark_g   = hex("#0d1a0d");
     const auto gray     = hex("#2a2a2a");
-    const auto dim_txt  = hex("#3a6a3a");
+    const auto dim_txt  = hex("#5a9a5a");
     const auto glow     = raw("0 0 8px rgba(0,255,65,0.3)");
 
     std::string fmt_date_short(std::chrono::system_clock::time_point tp) {
@@ -37,8 +37,8 @@ namespace {
 }
 
 inline const ThemeDef hacker = {
-    .light = {{black.v}, {phosphor.v}, {dim_p.v}, {gray.v}, {phosphor.v}},
-    .dark  = {{black.v}, {phosphor.v}, {dim_p.v}, {gray.v}, {phosphor.v}},
+    .light = {{black.v}, {phosphor.v}, {dim_txt.v}, {gray.v}, {phosphor.v}},
+    .dark  = {{black.v}, {phosphor.v}, {dim_txt.v}, {gray.v}, {phosphor.v}},
     .font  = {"'Courier New',Courier,ui-monospace,'SF Mono',monospace"},
     .font_size = "13px",
     .max_width = "740px",
@@ -97,21 +97,21 @@ inline const ThemeDef hacker = {
         "nav a::before"_s | prop("content", raw("'./'")),
         "nav a:hover"_s | color(phosphor),
 
-        // ── Post listings — clean columnar layout ──
-        ".post-listing"_s | padding(6_px, 0_px) | border_bottom(none)
+        // ── Post listings ──
+        ".post-listing"_s | padding(8_px, 0_px) | border_bottom(1_px, dashed, gray)
                           | font_size(13_px) | line_height(num(1.5)),
         ".post-listing:hover"_s | bg(dark_g),
         ".post-listing > a"_s | color(phosphor) | font_weight(400)
-                              | font_size(13_px) | display(block),
+                              | font_size(13_px) | display(raw("inline")),
         ".post-listing > a:hover"_s | color(raw("#50ff80")),
         ".post-listing-meta"_s | display(none),
         ".post-listing .excerpt"_s | display(none),
         ".post-listing .post-tags"_s | display(none),
-        // Custom ls-style spans (from component override)
-        ".ls-meta"_s | color(dim_txt) | font_size(12_px) | margin_top(1_px),
-        ".ls-size"_s | display(raw("inline-block")) | width(40_px)
-                     | text_align(right) | margin_right(12_px) | color(dim_p),
-        ".ls-date"_s | margin_right(12_px),
+        // Custom spans from component override
+        ".ls-inline"_s | color(dim_txt) | font_size(11_px) | margin_left(10_px),
+        ".ls-excerpt"_s | color(dim_txt) | font_size(12_px) | margin_top(3_px)
+                        | line_height(num(1.45)),
+        ".ls-tags"_s | color(dim_txt) | font_size(11_px) | margin_top(3_px),
 
         // ── Section headings ──
         "h2"_s | border_bottom(none) | font_size(12_px) | font_weight(400)
@@ -189,14 +189,14 @@ inline const ThemeDef hacker = {
         ".widget h3"_s | font_size(11_px) | color(dim_txt) | font_weight(400)
                        | letter_spacing(1_px) | text_transform(uppercase)
                        | border_bottom(1_px, dashed, gray) | padding_bottom(4_px),
-        ".widget li a"_s | color(dim_p) | font_size(12_px),
+        ".widget li a"_s | color(phosphor) | font_size(12_px),
         ".widget li a:hover"_s | color(phosphor),
         ".widget .date"_s | color(dim_txt) | font_size(11_px),
         ".widget p"_s | color(dim_txt) | font_size(12_px),
 
         // ── Footer ──
         "footer"_s | border_top(1_px, dashed, gray) | color(dim_txt) | font_size(11_px),
-        ".footer-links a"_s | color(dim_txt),
+        ".footer-links a"_s | color(dim_p),
         ".footer-links a:hover"_s | color(phosphor),
 
         // ── Breadcrumbs ──
@@ -246,15 +246,28 @@ inline const ThemeDef hacker = {
                                 return a(href(l.url), l.title); })))));
         },
 
-        // ── Clean ls-style listing: size  date  title ──
         .post_listing = [](const PostListing& props, const Ctx&, Children) {
             if (!props.post) return empty();
             const auto& p = *props.post;
+
+            std::string tags_str;
+            for (const auto& t : p.tags) {
+                if (!tags_str.empty()) tags_str += "  ";
+                tags_str += "--" + t.get();
+            }
+
             return article(class_("post-listing"),
+                // Line 1: title  date  size — all inline
                 a(href("/post/" + p.slug.get()), p.title.get()),
-                div(class_("ls-meta"),
-                    span(class_("ls-size"), fmt_size(p.reading_time_minutes)),
-                    span(class_("ls-date"), fmt_date_short(p.published))));
+                span(class_("ls-inline"),
+                    fmt_date_short(p.published) + "  "
+                    + fmt_size(p.reading_time_minutes)),
+                // Line 2: excerpt
+                when(!p.excerpt.empty(),
+                    p_(class_("ls-excerpt"), p.excerpt)),
+                // Line 3: tags
+                when(!tags_str.empty(),
+                    div(class_("ls-tags"), tags_str)));
         },
 
         .index = [](const Index& props, const Ctx& ctx, Children) {
