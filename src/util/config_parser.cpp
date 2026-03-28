@@ -86,6 +86,12 @@ ParsedDocument parse_frontmatter(const std::string& text)
         trim(key);
         trim(val);
 
+        // Strip surrounding quotes (YAML-style)
+        if (val.size() >= 2 &&
+            ((val.front() == '"' && val.back() == '"') ||
+             (val.front() == '\'' && val.back() == '\'')))
+            val = val.substr(1, val.size() - 2);
+
         if (!key.empty())
             doc.meta[key] = val;
     }
