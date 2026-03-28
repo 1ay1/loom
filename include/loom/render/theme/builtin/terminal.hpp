@@ -129,7 +129,17 @@ inline const ThemeDef terminal = {
         ".series-label"_s | color(dim),
         ".series-list a"_s | color(green),
         ".series-current"_s | color(bright),
-        "::selection"_s | bg(green) | color(dark)
+        "::selection"_s | bg(green) | color(dark),
+
+        // ── Blinking cursor after site title ──
+        keyframes("blink",
+            from() | opacity(1.0),
+            to()   | opacity(0.0)
+        ),
+        "header h1 a::after"_s
+            | prop("content", raw("'\\2588'")) | color(green)
+            | margin_left(2_px)
+            | prop("animation", raw("blink 1s step-end infinite"))
     ),
 };
 
