@@ -159,17 +159,21 @@ inline css::Sheet base_listings()
 {
     return sheet(
         ".post-listing"_s
-            | padding(px(14), px(10)) | prop("margin-inline", raw("-10px"))
+            | display(block) | padding(px(16), px(0))
             | prop("border-bottom", raw("1px solid var(--border)"))
-            | display(raw("flex")) | prop("flex-wrap", raw("wrap"))
-            | prop("align-items", raw("baseline")) | gap(px(6))
-            | border_radius(px(4)) | transition(raw("background 0.15s")),
-        ".post-listing:hover"_s | bg(raw("color-mix(in srgb, var(--text) 3%, var(--bg))")),
-        ".post-listing a"_s | color(raw("var(--text)")) | text_decoration(none) | font_weight(500),
-        ".post-listing a:hover"_s | color(raw("var(--accent-hover)")),
-        ".post-listing .post-tags"_s | margin_top(px(0)),
+            | transition(raw("background 0.15s")),
+        ".post-listing:hover"_s | bg(raw("color-mix(in srgb, var(--text) 2%, var(--bg))")),
+        ".post-listing > a"_s
+            | color(raw("var(--text)")) | text_decoration(none) | font_weight(600)
+            | font_size(raw("1.05em")) | display(block) | line_height(raw("1.35")),
+        ".post-listing > a:hover"_s | color(raw("var(--accent-hover)")),
+        ".post-listing-meta"_s | margin_top(px(4)) | font_size(px(13)) | color(raw("var(--muted)")),
+        ".post-listing .date"_s | display(raw("inline")),
+        ".post-listing .reading-time"_s | display(raw("inline")),
+        ".post-listing .post-tags"_s | margin_top(px(6)),
         ".post-listing .tag"_s | color(raw("var(--tag-text)")) | text_decoration(none),
-        ".post-listing .tag:hover"_s | color(raw("var(--tag-hover-text)"))
+        ".post-listing .tag:hover"_s | color(raw("var(--tag-hover-text)")),
+        ".post-listing .excerpt"_s | margin_top(px(4))
     );
 }
 

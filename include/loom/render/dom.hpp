@@ -415,4 +415,7 @@ Node each_i(const Container& items, Fn&& fn)
 // Use std::function or function pointers in theme definitions.
 // The dom:: namespace provides the building blocks; themes compose them.
 
+// ── Empty node (renders nothing) ──
+inline Node empty() { return {Node::Fragment, {}, {}, {}, {}}; }
+
 } // namespace loom::dom

@@ -1,18 +1,27 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include "palette.hpp"
 #include "types.hpp"
 #include "components.hpp"
 #include "css.hpp"
 
+// Forward-declare to avoid pulling component.hpp into every theme header.
+// The full definition lives in loom/render/component.hpp.
+namespace loom::component { struct ComponentOverrides; }
+
 namespace loom::theme
 {
 
-// Complete theme definition — 31 typed fields across 5 axes.
+// Complete theme definition — typed fields across 6 axes.
 //
 // Only the first 5 fields (light, dark, font, font_size, max_width) need
 // to be specified. Everything else defaults to the base CSS behavior.
+//
+// The `components` field enables WordPress-style structural overrides:
+// themes can replace the HTML of any component (Header, Footer, PostCard,
+// etc.) while the rest falls back to Loom's built-in defaults.
 struct ThemeDef
 {
     // ── Colors ──
@@ -34,7 +43,7 @@ struct ThemeDef
     Density      density      = Density::Normal;
     BorderWeight border_weight = BorderWeight::Normal;
 
-    // ── Components ──
+    // ── Component styles (CSS-level) ──
     NavStyle        nav_style    = NavStyle::Default;
     TagStyle        tag_style    = TagStyle::Pill;
     LinkStyle       link_style   = LinkStyle::Underline;
@@ -56,6 +65,25 @@ struct ThemeDef
 
     // ── Raw escape hatch (prefer styles above) ──
     std::string extra_css = {};
+
+    // ── Component overrides (structural / HTML-level) ──
+    //
+    // WordPress-style: replace any component's render function.
+    // Uses shared_ptr so ThemeDef stays copyable/movable without
+    // pulling in the full ComponentOverrides definition.
+    //
+    //   #include "loom/render/component.hpp"
+    //
+    //   .components = std::make_shared<component::ComponentOverrides>(
+    //       component::ComponentOverrides{
+    //           .header = [](const component::Header&, const component::Ctx& ctx,
+    //                        component::Children ch) -> dom::Node {
+    //               using namespace dom;
+    //               return header(class_("custom"), h1(ctx.site.title));
+    //           }
+    //       })
+    //
+    std::shared_ptr<component::ComponentOverrides> components = {};
 };
 
 // Derive a new theme by copying a base and applying overrides in-place

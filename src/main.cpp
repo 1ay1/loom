@@ -14,11 +14,7 @@
 #include "loom/content/git_source.hpp"
 #include "loom/engine/site_builder.hpp"
 #include "loom/engine/blog_engine.hpp"
-#include "loom/render/layout.hpp"
-#include "loom/render/navigation.hpp"
-#include "loom/render/post_renderer.hpp"
-#include "loom/render/page_renderer.hpp"
-#include "loom/render/sidebar.hpp"
+#include "loom/render/component.hpp"
 #include "loom/http/server.hpp"
 #include "loom/http/response.hpp"
 
@@ -131,18 +127,28 @@ static std::string xml_escape(const std::string& s)
 }
 
 // Build the entire SiteCache from a source. Pure function — no side effects.
+// Uses the component system (Ctx) for all rendering — theme component
+// overrides are automatically resolved and applied.
 template<loom::ContentSource Source>
 static std::shared_ptr<const SiteCache> build_cache(Source& source)
 {
+    namespace c = loom::component;
+
     auto config = source.site_config();
     auto site = loom::build_site(source, std::move(config));
     loom::BlogEngine engine(site);
 
-    auto nav = loom::render_navigation(site.navigation);
+    // Create the render context — resolves theme component overrides
+    auto ctx = c::Ctx::from(site);
+
     auto all_tags = engine.all_tags();
     auto all_series = engine.all_series();
-    loom::SidebarData sidebar_data{engine.list_posts(), all_tags, all_series};
-    auto sidebar_html = loom::render_sidebar(site, sidebar_data);
+    c::SidebarData sidebar_data{engine.list_posts(), all_tags, all_series};
+
+    // Helper: render a full page through the component system
+    auto render_page = [&](loom::PageMeta meta, loom::dom::Node content) -> std::string {
+        return ctx.page(meta, std::move(content), &sidebar_data).render();
+    };
 
     auto cache = std::make_shared<SiteCache>();
 
@@ -150,7 +156,8 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
     {
         loom::PageMeta meta;
         meta.canonical_path = "/";
-        cache->pages["/"] = make_cached(loom::render_layout(site, nav, loom::render_index(engine.list_posts(), site.layout), sidebar_html, meta));
+        auto posts = engine.list_posts();
+        cache->pages["/"] = make_cached(render_page(meta, ctx(c::Index{.posts = &posts})));
     }
 
     // Posts
@@ -178,31 +185,32 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         {
             std::string plain;
             bool in_html_tag = false;
-            for (char c : post.content.get())
+            for (char ch : post.content.get())
             {
-                if (c == '<') { in_html_tag = true; continue; }
-                if (c == '>') { in_html_tag = false; continue; }
+                if (ch == '<') { in_html_tag = true; continue; }
+                if (ch == '>') { in_html_tag = false; continue; }
                 if (!in_html_tag)
                 {
-                    if (c == '\n') c = ' ';
-                    plain += c;
+                    if (ch == '\n') ch = ' ';
+                    plain += ch;
                 }
                 if (plain.size() >= 160) break;
             }
             meta.description = plain;
         }
 
-        loom::PostContext ctx;
+        c::PostContext pctx;
         auto [prev, next] = engine.prev_next(post);
-        ctx.nav = {prev, next};
-        ctx.related = engine.related_posts(post, 3);
+        pctx.nav = {prev, next};
+        pctx.related = engine.related_posts(post, 3);
         if (!post.series.empty())
         {
-            ctx.series_name = post.series;
-            ctx.series_posts = engine.posts_in_series(post.series);
+            pctx.series_name = post.series;
+            pctx.series_posts = engine.posts_in_series(post.series);
         }
 
-        cache->pages["/post/" + post.slug.get()] = make_cached(loom::render_layout(site, nav, loom::render_post(post, site.layout, ctx), sidebar_html, meta));
+        cache->pages["/post/" + post.slug.get()] = make_cached(
+            render_page(meta, ctx(c::PostFull{.post = &post, .context = &pctx})));
     }
 
     // Tag pages
@@ -213,14 +221,16 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         meta.title = "Posts tagged \"" + tag.get() + "\"";
         meta.canonical_path = "/tag/" + tag.get();
         meta.description = "All posts tagged with " + tag.get() + " on " + site.title;
-        cache->pages["/tag/" + tag.get()] = make_cached(loom::render_layout(site, nav, loom::render_tag_page(tag, tag_posts, site.layout), sidebar_html, meta));
+        cache->pages["/tag/" + tag.get()] = make_cached(
+            render_page(meta, ctx(c::TagPage{.tag = tag, .posts = &tag_posts})));
     }
     {
         loom::PageMeta meta;
         meta.title = "Tags";
         meta.canonical_path = "/tags";
         meta.description = "Browse all tags on " + site.title;
-        cache->pages["/tags"] = make_cached(loom::render_layout(site, nav, loom::render_tag_index(all_tags), sidebar_html, meta));
+        cache->pages["/tags"] = make_cached(
+            render_page(meta, ctx(c::TagIndex{.tags = &all_tags})));
     }
 
     // Archives
@@ -230,7 +240,8 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         meta.title = "Archives";
         meta.canonical_path = "/archives";
         meta.description = "All posts on " + site.title;
-        cache->pages["/archives"] = make_cached(loom::render_layout(site, nav, loom::render_archives(by_year, site.layout), sidebar_html, meta));
+        cache->pages["/archives"] = make_cached(
+            render_page(meta, ctx(c::Archives{.by_year = &by_year})));
     }
 
     // Series
@@ -241,7 +252,8 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         meta.title = "Series: " + series.get();
         meta.canonical_path = "/series/" + series.get();
         meta.description = "Posts in the " + series.get() + " series on " + site.title;
-        cache->pages["/series/" + series.get()] = make_cached(loom::render_layout(site, nav, loom::render_series_page(series, series_posts, site.layout), sidebar_html, meta));
+        cache->pages["/series/" + series.get()] = make_cached(
+            render_page(meta, ctx(c::SeriesPage{.series = series, .posts = &series_posts})));
     }
     if (!all_series.empty())
     {
@@ -249,7 +261,8 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         meta.title = "Series";
         meta.canonical_path = "/series";
         meta.description = "Browse all series on " + site.title;
-        cache->pages["/series"] = make_cached(loom::render_layout(site, nav, loom::render_series_index(all_series), sidebar_html, meta));
+        cache->pages["/series"] = make_cached(
+            render_page(meta, ctx(c::SeriesIndex{.all_series = &all_series})));
     }
 
     // Static pages
@@ -259,15 +272,16 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         meta.title = page.title.get();
         meta.canonical_path = "/" + page.slug.get();
         meta.og_image = page.image;
-        cache->pages["/" + page.slug.get()] = make_cached(loom::render_layout(site, nav, loom::render_page(page), sidebar_html, meta));
+        cache->pages["/" + page.slug.get()] = make_cached(
+            render_page(meta, ctx(c::PageView{.page = &page})));
     }
 
     // 404
     {
         loom::PageMeta meta;
-        meta.title = "404 — Not Found";
+        meta.title = "404 \xe2\x80\x94 Not Found";
         meta.noindex = true;
-        cache->not_found = make_cached(loom::render_layout(site, nav, "<section><h2>404 — Not Found</h2><p>The page you're looking for doesn't exist.</p></section>", sidebar_html, meta));
+        cache->not_found = make_cached(render_page(meta, ctx(c::NotFound{})));
     }
 
     // Sitemap

@@ -95,6 +95,27 @@ inline const Val hidden{"hidden"};
 inline const Val underline{"underline"};
 inline const Val block{"block"};
 inline const Val center{"center"};
+inline const Val auto_{"auto"};
+inline const Val pointer{"pointer"};
+inline const Val relative{"relative"};
+inline const Val absolute{"absolute"};
+inline const Val fixed{"fixed"};
+inline const Val flex{"flex"};
+inline const Val grid{"grid"};
+inline const Val column{"column"};
+inline const Val row{"row"};
+inline const Val wrap{"wrap"};
+inline const Val nowrap{"nowrap"};
+inline const Val space_between{"space-between"};
+inline const Val space_around{"space-around"};
+inline const Val flex_start{"flex-start"};
+inline const Val flex_end{"flex-end"};
+inline const Val baseline{"baseline"};
+inline const Val stretch{"stretch"};
+inline const Val left{"left"};
+inline const Val right{"right"};
+inline const Val collapse{"collapse"};
+inline const Val smooth{"smooth"};
 
 // ── CSS variable references ──
 
@@ -109,11 +130,22 @@ namespace v
 
 // ── Compound value helpers ──
 
+// ── CSS variable reference: var("accent") → var(--accent) ──
+inline Val var(const char* name)        { return {"var(--" + std::string(name) + ")"}; }
+inline Val var(const std::string& name) { return {"var(--" + name + ")"}; }
+
+// ── Compound value helpers ──
 inline Val mix(const Val& color, int p, const Val& base) {
     return {"color-mix(in srgb, " + color.v + " " + std::to_string(p) + "%, " + base.v + ")"};
 }
 inline Val gradient(const Val& from, const Val& to) {
     return {"linear-gradient(" + from.v + ", " + to.v + ")"};
+}
+inline Val gradient(int deg, const Val& from, const Val& to) {
+    return {"linear-gradient(" + std::to_string(deg) + "deg, " + from.v + ", " + to.v + ")"};
+}
+inline Val radial(const Val& from, const Val& to) {
+    return {"radial-gradient(" + from.v + ", " + to.v + ")"};
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -137,7 +169,9 @@ inline Decl border(const Val& v)              { return {"border", v.v}; }
 inline Decl border_left(const Val& w, const Val& s, const Val& c) { return {"border-left", w.v + " " + s.v + " " + c.v}; }
 inline Decl border_left(const Val& v)         { return {"border-left", v.v}; }
 inline Decl border_right(const Val& w, const Val& s, const Val& c) { return {"border-right", w.v + " " + s.v + " " + c.v}; }
-inline Decl border_top(const Val& w, const Val& s, const Val& c) { return {"border-top", w.v + " " + s.v + " " + c.v}; }
+inline Decl border_top(const Val& v)                                { return {"border-top", v.v}; }
+inline Decl border_top(const Val& w, const Val& s, const Val& c)    { return {"border-top", w.v + " " + s.v + " " + c.v}; }
+inline Decl border_bottom(const Val& v)                              { return {"border-bottom", v.v}; }
 inline Decl border_bottom(const Val& w, const Val& s, const Val& c) { return {"border-bottom", w.v + " " + s.v + " " + c.v}; }
 inline Decl border_color(const Val& c)        { return {"border-color", c.v}; }
 inline Decl border_left_color(const Val& c)   { return {"border-left-color", c.v}; }
@@ -185,12 +219,64 @@ inline Decl box_shadow(const Val& v)  { return {"box-shadow", v.v}; }
 inline Decl transition(const Val& v)  { return {"transition", v.v}; }
 
 // ── Layout ──
-inline Decl display(const Val& v)   { return {"display", v.v}; }
-inline Decl width(const Val& v)     { return {"width", v.v}; }
-inline Decl max_width(const Val& v) { return {"max-width", v.v}; }
-inline Decl gap(const Val& v)       { return {"gap", v.v}; }
-inline Decl order(const Val& v)     { return {"order", v.v}; }
-inline Decl content(const Val& v)   { return {"content", v.v}; }
+inline Decl display(const Val& v)        { return {"display", v.v}; }
+inline Decl position(const Val& v)       { return {"position", v.v}; }
+inline Decl top(const Val& v)            { return {"top", v.v}; }
+inline Decl bottom(const Val& v)         { return {"bottom", v.v}; }
+inline Decl left_(const Val& v)          { return {"left", v.v}; }
+inline Decl right_(const Val& v)         { return {"right", v.v}; }
+inline Decl inset(const Val& v)          { return {"inset", v.v}; }
+inline Decl z_index(int n)               { return {"z-index", std::to_string(n)}; }
+inline Decl width(const Val& v)          { return {"width", v.v}; }
+inline Decl height(const Val& v)         { return {"height", v.v}; }
+inline Decl min_width(const Val& v)      { return {"min-width", v.v}; }
+inline Decl min_height(const Val& v)     { return {"min-height", v.v}; }
+inline Decl max_width(const Val& v)      { return {"max-width", v.v}; }
+inline Decl max_height(const Val& v)     { return {"max-height", v.v}; }
+inline Decl overflow(const Val& v)       { return {"overflow", v.v}; }
+inline Decl overflow_x(const Val& v)     { return {"overflow-x", v.v}; }
+inline Decl overflow_y(const Val& v)     { return {"overflow-y", v.v}; }
+inline Decl gap(const Val& v)            { return {"gap", v.v}; }
+inline Decl order(const Val& v)          { return {"order", v.v}; }
+inline Decl content(const Val& v)        { return {"content", v.v}; }
+inline Decl float_(const Val& v)         { return {"float", v.v}; }
+inline Decl cursor(const Val& v)         { return {"cursor", v.v}; }
+inline Decl pointer_events(const Val& v) { return {"pointer-events", v.v}; }
+
+// ── Flexbox ──
+inline Decl flex_direction(const Val& v)  { return {"flex-direction", v.v}; }
+inline Decl flex_wrap(const Val& v)       { return {"flex-wrap", v.v}; }
+inline Decl justify_content(const Val& v) { return {"justify-content", v.v}; }
+inline Decl align_items(const Val& v)     { return {"align-items", v.v}; }
+inline Decl align_self(const Val& v)      { return {"align-self", v.v}; }
+
+// ── Grid ──
+inline Decl grid_template_columns(const Val& v) { return {"grid-template-columns", v.v}; }
+inline Decl grid_template_rows(const Val& v)    { return {"grid-template-rows", v.v}; }
+
+// ── Text ──
+inline Decl text_align(const Val& v)           { return {"text-align", v.v}; }
+inline Decl text_indent(const Val& v)          { return {"text-indent", v.v}; }
+inline Decl text_decoration_thickness(const Val& v) { return {"text-decoration-thickness", v.v}; }
+inline Decl white_space(const Val& v)          { return {"white-space", v.v}; }
+inline Decl word_break(const Val& v)           { return {"word-break", v.v}; }
+inline Decl overflow_wrap(const Val& v)        { return {"overflow-wrap", v.v}; }
+inline Decl font_family(const Val& v)          { return {"font-family", v.v}; }
+inline Decl font_variant_numeric(const Val& v) { return {"font-variant-numeric", v.v}; }
+
+// ── Table ──
+inline Decl border_collapse(const Val& v) { return {"border-collapse", v.v}; }
+
+// ── Misc ──
+inline Decl list_style(const Val& v)      { return {"list-style", v.v}; }
+inline Decl outline(const Val& v)         { return {"outline", v.v}; }
+inline Decl outline_offset(const Val& v)  { return {"outline-offset", v.v}; }
+inline Decl transform(const Val& v)       { return {"transform", v.v}; }
+inline Decl backdrop_filter(const Val& v) { return {"backdrop-filter", v.v}; }
+inline Decl scroll_behavior(const Val& v) { return {"scroll-behavior", v.v}; }
+inline Decl margin_inline(const Val& v)   { return {"margin-inline", v.v}; }
+inline Decl background_clip(const Val& v) { return {"background-clip", v.v}; }
+inline Decl background_image(const Val& v){ return {"background-image", v.v}; }
 
 // ─────────────────────────────────────────────────────────────────────
 //  Rules
