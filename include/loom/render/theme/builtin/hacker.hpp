@@ -116,7 +116,7 @@ inline const ThemeDef hacker = {
         // ── Section headings ──
         "h2"_s | border_bottom(none) | font_size(13_px) | font_weight(400)
                | color(dim_p) | letter_spacing(1_px) | text_transform(uppercase)
-               | margin_top(24_px) | margin_bottom(8_px) | padding_bottom(0_px),
+               | margin_top(0_px) | margin_bottom(8_px) | padding_bottom(0_px),
 
         // ── Tags ──
         vars({{"tag-bg", transparent}, {"tag-text", dim_txt}, {"tag-radius", raw("0")},
