@@ -5,73 +5,27 @@ slug: themes
 
 ## Built-in Themes
 
-Set `theme = name` in `site.conf`. All 22 themes support dark and light mode. Changes take effect instantly via hot reload.
-
-### Classic
+Set `theme = name` in `site.conf`. All 5 themes support dark and light mode. Changes take effect instantly via hot reload.
 
 | Theme | Font | Style |
 |-------|------|-------|
-| `default` | System sans-serif | Clean, neutral grays, blue accent |
-| `serif` | Georgia / Garamond | Editorial, warm tones, literary feel |
-| `mono` | Monospace | Terminal aesthetic, green accent |
-| `typewriter` | Courier New | Old-school ink-on-paper, dashed borders, uppercase headers |
-| `brutalist` | System sans-serif | Anti-design, bold borders, red accent, inverted tags |
-
-### Editor Palettes
-
-| Theme | Font | Style |
-|-------|------|-------|
-| `nord` | Inter / sans-serif | Arctic palette, muted blues |
-| `solarized` | System sans-serif | Ethan Schoonover's precision-engineered palette |
-| `dracula` | System sans-serif | Dark-first purple, pink highlights |
-| `gruvbox` | System sans-serif | Retro groove, warm earthy contrast, orange accent |
-| `catppuccin` | System sans-serif | Soothing pastels, purple accent |
-| `tokyonight` | System sans-serif | Neon-tinged Tokyo evening palette |
-| `kanagawa` | Charter / Georgia | Inspired by Hokusai's The Great Wave |
-
-### Warm & Earthy
-
-| Theme | Font | Style |
-|-------|------|-------|
-| `earth` | Charter / Georgia | Warm organic tones, olive accent |
-| `warm` | Georgia / Charter | Golden amber palette, cozy serif reading |
-
-### Cool & Blue
-
-| Theme | Font | Style |
-|-------|------|-------|
-| `cobalt` | System sans-serif | Deep blue developer theme |
-| `ocean` | System sans-serif | Deep blue, calm and professional |
-| `midnight` | System sans-serif | Rich dark-first, electric blue, subtle lift on hover |
-
-### Soft & Colorful
-
-| Theme | Font | Style |
-|-------|------|-------|
-| `rose` | System sans-serif | Soft pinks, elegant, magenta accent |
-| `sakura` | System sans-serif | Cherry blossom pinks, delicate and refined |
-| `lavender` | System sans-serif | Soft purple tones, warm and inviting |
-
-### Minimal & Raw
-
-| Theme | Font | Style |
-|-------|------|-------|
-| `hacker` | Monospace | Green accent, sharp corners, outlined tags, bordered code |
-| `terminal` | Monospace | Teal/sky accent, sharp corners, bordered tags, dotted links, left-accent code |
+| `default` | System sans-serif | Clean, neutral grays, blue accent, soft corners |
+| `terminal` | Monospace | Dark hacker aesthetic, green accent, sharp corners, custom date format |
+| `nord` | Inter / sans-serif | Arctic frost palette, muted blues, soft glow on card hover |
+| `gruvbox` | System sans-serif | Retro groove, warm earthy contrast, orange accent, bordered tags |
+| `rose` | System sans-serif | Soft pinks, magenta accent, pill-shaped nav and tags, round corners |
 
 ---
 
 ## Choosing the Right Theme
 
-**Writing long-form essays?** Try `serif`, `warm`, or `kanagawa` — serif fonts and generous spacing make paragraphs easy to read.
+**Technical blog with lots of code?** Try `terminal` — monospace font and a dark aesthetic give code blocks room to breathe.
 
-**Technical blog with lots of code?** Try `terminal`, `hacker`, `mono`, or `tokyonight` — monospace fonts and wider layouts give code blocks room to breathe.
+**Want a familiar editor palette?** Try `nord` or `gruvbox` — your readers will feel at home.
 
-**Want a recognizable editor look?** Try `dracula`, `gruvbox`, `catppuccin`, or `solarized` — your readers will feel at home.
+**Want something soft and elegant?** Try `rose` — round corners, pill-shaped navigation, and a warm magenta accent.
 
-**Want something bold and opinionated?** Try `brutalist` or `typewriter` — these break from blog conventions on purpose.
-
-**Playing it safe?** `default` or `nord` work for everyone.
+**Playing it safe?** `default` works for everyone.
 
 ---
 
@@ -88,18 +42,20 @@ Themes aren't just color palettes. Each theme defines **structural choices** tha
 | Blockquotes | Blockquote left border | Accent-colored, Muted |
 | Headings | Heading text transform | Normal, UPPERCASE, lowercase |
 
-This is why `hacker` and `terminal` look different despite both being monospace themes:
+Compare how `terminal` and `rose` use the same structural system to achieve completely different feels:
 
-| Property | hacker | terminal |
-|----------|--------|----------|
-| Corners | Sharp | Sharp |
-| Tags | Outlined (muted border) | Bordered (accent border) |
-| Links | Solid underline | Dotted underline |
-| Code blocks | Full border | Left accent stripe |
-| Blockquotes | Muted border | Muted border |
-| Accent | Green | Teal / sky blue |
+| Property | terminal | rose |
+|----------|----------|------|
+| Corners | Sharp (square) | Round (pill-shaped) |
+| Tags | Bordered rectangles | Pill badges |
+| Nav style | Default | Pills |
+| Card hover | Border highlight | Lift effect |
+| Links | No decoration | Underline |
+| Accent | Green (#5fba7d) | Magenta (#c2185b) |
 
-Same shape language (sharp corners), completely different component treatments.
+Same theme system, radically different UI.
+
+Themes can also override content-level defaults like date formatting and index headings — the terminal theme uses `"%b %d"` dates and a lowercase "posts" heading without needing any component overrides.
 
 ---
 
@@ -219,7 +175,7 @@ Each layer overrides the previous. Dark mode uses `[data-theme="dark"]` selector
 ### Make any theme wider with a larger font
 
 ```
-theme = catppuccin
+theme = gruvbox
 theme_max_width = 860px
 theme_font_size = 18px
 ```

@@ -221,6 +221,9 @@ enum class LinkStyle { Underline, Dotted, Dashed, None };
 enum class CodeBlockStyle { Plain, Bordered, LeftAccent };
 enum class BlockquoteStyle { AccentBorder, MutedBorder };
 enum class HeadingCase { None, Upper, Lower };
+enum class NavStyle { Default, Pills, Underline, Minimal };
+enum class CardHover { Lift, Border, Glow, None };
+// ... and more
 
 struct ThemeDef {
     // Colors
@@ -236,12 +239,19 @@ struct ThemeDef {
     Corners        corners    = Corners::Soft;
     TagStyle       tag_style  = TagStyle::Pill;
     LinkStyle      link_style = LinkStyle::Underline;
-    CodeBlockStyle code_style = CodeBlockStyle::Plain;
-    BlockquoteStyle quote_style = BlockquoteStyle::AccentBorder;
-    HeadingCase    heading_case = HeadingCase::None;
+    NavStyle       nav_style  = NavStyle::Default;
+    CardHover      card_hover = CardHover::Lift;
+    // ... 15 structural enums total
 
-    // Escape hatch
-    std::string extra_css = {};
+    // Content overrides — change component behavior without code
+    std::string date_format   = {};   // e.g. "%b %d"
+    std::string index_heading = {};   // e.g. "posts"
+
+    // Custom styles via type-safe CSS DSL
+    css::Sheet styles = {};
+
+    // Component overrides — replace HTML structure of any component
+    std::shared_ptr<component::ComponentOverrides> components = {};
 };
 ```
 
@@ -321,38 +331,47 @@ inline const ThemeDef gruvbox = {
 };
 ```
 
-Structural themes override the defaults to radically change the UI. Compare hacker and terminal — same monospace DNA, completely different structure:
+Structural themes override the defaults to radically change the UI. Compare terminal and rose — completely different structure from the same system:
 
 ```cpp
-// hacker: muted outline tags, bordered code blocks, plain links
-inline const ThemeDef hacker = {
-    .light = {{"#f0f0e8"}, {"#1a1a1a"}, {"#5a5a5a"}, {"#c8c8b8"}, {"#2d8a2d"}},
-    .dark  = {{"#0c0c0c"}, {"#b5b5b5"}, {"#7b7b7b"}, {"#1a1a1a"}, {"#88c070"}},
-    .font  = {"ui-monospace,..."},
-    .font_size = "14px",
-    .max_width = "800px",
-    .corners = Corners::Sharp,
-    .tag_style = TagStyle::Outline,
-    .code_style = CodeBlockStyle::Bordered,
-    .quote_style = BlockquoteStyle::MutedBorder,
-};
-
-// terminal: accent-bordered tags, dotted links, left-accent code
+// terminal: monospace, sharp corners, bordered tags, green accent
+// Uses the CSS DSL for custom styling + content overrides for date format
 inline const ThemeDef terminal = {
-    .light = {{"#fafaf8"}, {"#1c1c1c"}, {"#737373"}, {"#e5e5e0"}, {"#0c4a6e"}},
-    .dark  = {{"#0c0c0c"}, {"#d4d4d4"}, {"#737373"}, {"#252525"}, {"#7dd3fc"}},
-    .font  = {"ui-monospace,..."},
+    .light = {{"#1a1a1a"}, {"#d8d8d8"}, {"#777777"}, {"#2e2e2e"}, {"#5fba7d"}},
+    .dark  = {{"#1a1a1a"}, {"#d8d8d8"}, {"#777777"}, {"#2e2e2e"}, {"#5fba7d"}},
+    .font  = {"ui-monospace,'SF Mono',Menlo,Consolas,monospace"},
     .font_size = "14px",
-    .max_width = "820px",
+    .max_width = "720px",
     .corners = Corners::Sharp,
     .tag_style = TagStyle::Bordered,
-    .link_style = LinkStyle::Dotted,
-    .code_style = CodeBlockStyle::LeftAccent,
-    .quote_style = BlockquoteStyle::MutedBorder,
+    .link_style = LinkStyle::None,
+    .card_hover = CardHover::Border,
+    .date_format = "%b %d",
+    .index_heading = "posts",
+    .styles = sheet(
+        content_area().nest(
+            "a"_s | color(green),
+            "pre"_s | bg(panel) | border(1_px, solid, line)
+        ),
+        // ... more type-safe CSS rules
+    ),
+};
+
+// rose: round corners, pill nav, magenta accent, lift on hover
+inline const ThemeDef rose = {
+    .light = {{"#fffbfc"}, {"#1a1118"}, {"#8e7a86"}, {"#f0dde4"}, {"#c2185b"}},
+    .dark  = {{"#1a1118"}, {"#f5e6ec"}, {"#b09aa6"}, {"#2d2028"}, {"#f06292"}},
+    .font  = {"system-ui,-apple-system,Segoe UI,Roboto,sans-serif"},
+    .font_size = "17px",
+    .max_width = "720px",
+    .corners = Corners::Round,
+    .nav_style = NavStyle::Pills,
+    .card_hover = CardHover::Lift,
+    // ... styles for code blocks, cards, etc.
 };
 ```
 
-Same `Corners::Sharp`, different everything else. The type system makes the differences explicit and the compiler generates different CSS for each. No raw CSS needed — terminal has zero `extra_css`.
+Same type system, radically different UI. Terminal uses `content_area().nest()` to scope CSS rules to `.post-content,.page-content` in one expression, `link_colors()` to generate color + hover pairs, and `vars()` for CSS variable shorthand. Rose uses `Corners::Round` and `NavStyle::Pills` to get pill-shaped UI elements with zero custom CSS. The type system makes the differences explicit and the compiler generates different CSS for each.
 
 C++20 designated initializers make the mapping explicit. Miss a required field and the compiler warns. Swap `.light` and `.dark` and the type system catches it — `Palette` expects `Color` values, not `FontStack`. Skip a structural field and it defaults to the base behavior.
 

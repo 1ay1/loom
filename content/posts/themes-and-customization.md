@@ -6,7 +6,7 @@ tags: feature, themes, tutorial
 excerpt: "A complete guide to Loom's theming system: pick a built-in theme, override individual variables, inject custom CSS, or replace the stylesheet entirely."
 ---
 
-Loom ships with 22 built-in themes. Every theme supports light and dark mode, switches instantly via hot reload, and ships inlined — zero external requests.
+Loom ships with 5 built-in themes. Every theme supports light and dark mode, switches instantly via hot reload, and ships inlined — zero external requests.
 
 This post walks through every layer of customization, from the simplest one-line change to building your own theme from scratch.
 
@@ -22,14 +22,13 @@ Save. If Loom is running, the change is live immediately — no restart needed.
 
 Here's every available theme:
 
-| Category | Themes |
-|----------|--------|
-| Classic | `default`, `serif`, `mono`, `typewriter`, `brutalist` |
-| Editor palettes | `nord`, `solarized`, `dracula`, `gruvbox`, `catppuccin`, `tokyonight`, `kanagawa` |
-| Warm & earthy | `earth`, `warm` |
-| Cool & blue | `cobalt`, `ocean`, `midnight` |
-| Soft & colorful | `rose`, `sakura`, `lavender` |
-| Minimal & raw | `hacker`, `terminal` |
+| Theme | Vibe |
+|-------|------|
+| `default` | Clean, neutral grays, blue accent |
+| `terminal` | Monospace hacker aesthetic, green accent, sharp corners |
+| `nord` | Arctic frost palette, muted blues |
+| `gruvbox` | Retro groove, warm earthy contrast, orange accent |
+| `rose` | Soft pinks, magenta accent, round corners |
 
 Each theme defines a light palette, a dark palette, a font stack, font size, and content width. But themes go beyond colors — they also define **structural choices** that change the shape and behavior of UI components:
 
@@ -40,7 +39,7 @@ Each theme defines a light palette, a dark palette, a font stack, font size, and
 - **Blockquotes** — Accent-colored or muted left border.
 - **Headings** — Normal, UPPERCASE, or lowercase.
 
-This is why `hacker` and `terminal` feel different despite both being monospace sharp-cornered themes — hacker uses outlined tags and bordered code, while terminal uses accent-bordered tags, dotted links, and left-accent code blocks.
+This is why `terminal` and `rose` feel completely different — terminal uses sharp corners, bordered tags, and no link decoration, while rose uses round corners, pill-shaped tags, and pill-shaped nav links. Themes can also override content defaults like date format and index headings without writing component code.
 
 ## Override Individual Variables
 
@@ -124,7 +123,7 @@ This gives you Nord's arctic palette with rosy accent links and serif headings. 
 ### Example: Make Any Theme Wider
 
 ```
-theme = solarized
+theme = nord
 theme_max_width = 900px
 theme_font_size = 16px
 ```

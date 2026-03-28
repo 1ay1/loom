@@ -182,58 +182,17 @@ Loom uses CSS custom properties for all visual styling. There are three ways to 
 theme = default
 ```
 
-Loom ships with 21 themes. Each sets colors, fonts, and sizing for both light and dark modes.
-
-**Classic**
+Loom ships with 5 built-in themes. Each sets colors, fonts, sizing, and structural choices for both light and dark modes.
 
 | Theme | Description |
 |---|---|
 | `default` | Clean neutral grays, blue accent, system sans-serif |
-| `serif` | Georgia/Garamond, warm tones, literary feel |
-| `mono` | Monospace font, terminal aesthetic, green accent |
-| `typewriter` | Courier New, old-school ink-on-paper, raw and minimal |
-| `brutalist` | Anti-design, bold borders, red accent, uppercase headings |
+| `terminal` | Monospace, dark hacker aesthetic, green accent, sharp corners |
+| `nord` | Arctic color palette, Inter font, frost blues, soft glow on hover |
+| `gruvbox` | Retro groove, warm earthy contrast, orange accent, bordered tags |
+| `rose` | Soft pinks, magenta accent, pill-shaped elements, rounded corners |
 
-**Editor Palettes**
-
-| Theme | Description |
-|---|---|
-| `nord` | Arctic color palette, Inter font |
-| `solarized` | Ethan Schoonover's precision-engineered palette |
-| `dracula` | The beloved dark-first theme, purple accent |
-| `gruvbox` | Retro groove, warm earthy contrast, orange accent |
-| `catppuccin` | Soothing pastels, purple accent |
-| `tokyonight` | Neon-tinged Tokyo evening palette |
-| `kanagawa` | Inspired by Hokusai's The Great Wave, Charter/Georgia serif |
-
-**Warm & Earthy**
-
-| Theme | Description |
-|---|---|
-| `earth` | Warm organic tones, Charter/Georgia serif |
-| `warm` | Golden amber palette, Georgia serif, cozy reading feel |
-
-**Cool & Blue**
-
-| Theme | Description |
-|---|---|
-| `cobalt` | Deep blue developer theme |
-| `ocean` | Deep blue, calm and professional |
-| `midnight` | Rich dark-first, electric blue, polished |
-
-**Soft & Colorful**
-
-| Theme | Description |
-|---|---|
-| `rose` | Soft pinks, elegant, magenta accent |
-| `sakura` | Cherry blossom pinks, delicate and refined |
-| `lavender` | Soft purple tones, warm and inviting |
-
-**Minimal & Raw**
-
-| Theme | Description |
-|---|---|
-| `hacker` | Monospace, green on black, no border-radius, no frills |
+Themes define more than colors — they set structural choices like corner rounding (`Corners::Sharp` vs `Round`), tag styles, link decoration, card hover effects, and more. See the [Themes](/themes) page for details.
 
 ### 2. Theme Variable Overrides
 

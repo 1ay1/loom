@@ -28,7 +28,7 @@ Every static site generator needs a build step, a deploy pipeline, and a runtime
 - **Gzip + ETag** — compressed responses with HTTP 304 support out of the box
 - **HTML minification** — automatic, zero config
 - **Hot reload** — inotify-based filesystem watching with 500ms debounce, or git polling for commit-driven updates
-- **21 built-in themes** — default, serif, mono, nord, solarized, dracula, gruvbox, catppuccin, tokyonight, kanagawa, and more — all with light/dark mode
+- **5 built-in themes** — default, terminal, nord, gruvbox, rose — all with light/dark mode
 - **RSS, sitemap, robots.txt** — generated automatically
 - **Tags, series, archives** — first-class content organization with dedicated pages
 - **Sidebar widgets** — recent posts, tag cloud, about text
@@ -142,7 +142,7 @@ base_url = https://example.com
 # Navigation bar
 nav = Home:/, Archives:/archives, About:/about
 
-# Theme (21 built-in — see Themes section below)
+# Theme (5 built-in — see Themes section below)
 theme = nord
 
 # Override individual theme variables
@@ -193,31 +193,17 @@ custom_head_html = <link rel="icon" href="/favicon.ico">
 
 ## Themes
 
-All 21 themes ship with light and dark variants. The toggle is automatic (respects `prefers-color-scheme`, with manual override persisted to localStorage).
+All 5 themes ship with light and dark variants. The toggle is automatic (respects `prefers-color-scheme`, with manual override persisted to localStorage).
 
 | Theme | Font | Vibe |
 |-------|------|------|
 | `default` | System sans-serif | Clean, neutral grays, blue accent |
-| `serif` | Georgia / Garamond | Editorial, warm tones, literary feel |
-| `mono` | Monospace | Terminal aesthetic, green accent |
-| `nord` | Inter / sans-serif | Arctic color palette, muted blues |
-| `rose` | System sans-serif | Soft pinks, elegant, magenta accent |
-| `cobalt` | System sans-serif | Deep blue, developer-friendly |
-| `earth` | Charter / Georgia | Warm organic tones, olive accent |
-| `hacker` | Monospace | Green on black, no border-radius, no frills |
-| `solarized` | System sans-serif | Ethan Schoonover's precision-engineered palette |
-| `dracula` | System sans-serif | The beloved dark-first theme, purple accent |
+| `terminal` | Monospace | Dark hacker aesthetic, green accent, sharp corners |
+| `nord` | Inter / sans-serif | Arctic color palette, muted frost blues |
 | `gruvbox` | System sans-serif | Retro groove, warm earthy contrast, orange accent |
-| `catppuccin` | System sans-serif | Soothing pastels, purple accent |
-| `tokyonight` | System sans-serif | Neon-tinged Tokyo evening palette |
-| `kanagawa` | Charter / Georgia | Inspired by Hokusai's The Great Wave |
-| `typewriter` | Courier New | Old-school ink-on-paper, raw and minimal |
-| `brutalist` | System sans-serif | Anti-design, bold borders, red accent, uppercase |
-| `lavender` | System sans-serif | Soft purple tones, warm and inviting |
-| `warm` | Georgia / Charter | Golden amber palette, cozy reading feel |
-| `ocean` | System sans-serif | Deep blue, calm and professional |
-| `sakura` | System sans-serif | Cherry blossom pinks, delicate and refined |
-| `midnight` | System sans-serif | Rich dark-first, electric blue, polished |
+| `rose` | System sans-serif | Soft pinks, elegant, magenta accent, pill-shaped elements |
+
+Themes go beyond colors — they define structural choices like corner rounding, tag styles, link decoration, and more. The theme DSL makes it easy to create new themes purely in C++ with type-safe CSS helpers.
 
 Override any theme with `content/theme/style.css` — it replaces the built-in CSS entirely.
 

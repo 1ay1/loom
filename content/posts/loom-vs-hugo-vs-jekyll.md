@@ -132,7 +132,7 @@ Hugo and Jekyll have years of development and thousands of contributors. Loom do
 
 | Feature | Loom | Hugo | Jekyll |
 |---|---|---|---|
-| Themes | 21 built-in | 400+ community themes | 200+ community themes |
+| Themes | 5 built-in | 400+ community themes | 200+ community themes |
 | Plugins / extensions | None | Shortcodes, modules, pipes | Plugin system, Liquid filters |
 | Multilingual | No | Yes, first-class | Via plugins |
 | Taxonomy | Tags, series | Fully custom taxonomies | Categories, tags |
