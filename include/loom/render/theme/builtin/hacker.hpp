@@ -50,7 +50,7 @@ inline const ThemeDef hacker = {
     .sidebar_style = SidebarStyle::Clean,
     .scrollbar = Scrollbar::Hidden,
     .focus_style = FocusStyle::None,
-    .date_format = "%Y-%m-%d %H:%M",
+    .date_format = "%Y-%m-%d",
     .index_heading = "> ls -lt ./posts/",
     .styles = sheet(
         // ── Kill dark toggle ──
@@ -90,19 +90,17 @@ inline const ThemeDef hacker = {
         "nav a:hover"_s | color(phosphor),
 
         // ── Post listings as file listing ──
-        ".post-listing"_s | padding(4_px, 0_px) | border_bottom(none)
+        ".post-listing"_s | padding(3_px, 0_px) | border_bottom(none)
                           | font_size(13_px) | line_height(num(1.4)),
         ".post-listing:hover"_s | bg(dark_g),
         ".post-listing > a"_s | color(phosphor) | font_weight(400)
-                              | font_size(13_px) | display(raw("inline")),
+                              | font_size(13_px) | display(block),
         ".post-listing > a:hover"_s | color(raw("#50ff80")),
-        ".post-listing-meta"_s | display(raw("inline")) | gap(0_px)
-                               | margin_top(0_px) | font_size(12_px) | color(dim_p),
+        ".post-listing-meta"_s | display(flex) | gap(8_px)
+                               | margin_top(1_px) | font_size(11_px) | color(dim_p),
         ".post-listing .reading-time::before"_s | prop("content", none),
-        ".post-listing .reading-time"_s | display(raw("inline")) | margin_left(8_px),
-        ".post-listing .date"_s | display(raw("inline")) | margin_right(8_px),
         ".post-listing .excerpt"_s | display(none),
-        ".post-listing .post-tags"_s | display(raw("inline")) | margin_top(0_px) | margin_left(8_px),
+        ".post-listing .post-tags"_s | display(raw("inline")) | margin_top(0_px) | margin_left(0_px),
 
         // ── Section headings as comments ──
         "h2"_s | border_bottom(none) | font_size(12_px) | font_weight(400)
