@@ -42,9 +42,9 @@ inline const ThemeDef hacker = {
     .font  = {"'Courier New',Courier,ui-monospace,'SF Mono',monospace"},
     .font_size = "13px",
     .max_width = "740px",
-    .line_height = "1.55",
+    .line_height = "1.6",
     .heading_weight = "400",
-    .header_size = "15px",
+    .header_size = "13px",
     .corners = Corners::Sharp,
     .density = Density::Compact,
     .border_weight = BorderWeight::Thin,
@@ -81,61 +81,61 @@ inline const ThemeDef hacker = {
         "a"_s | color(phosphor),
         "a:hover"_s | color(raw("#50ff80")) | text_decoration(none),
 
-        // ── Header ──
+        // ── Header — same size as everything, hierarchy via color ──
         "header"_s | border_bottom(none) | padding_bottom(12_px)
                    | margin_bottom(8_px),
-        "header h1"_s | font_size(15_px) | font_weight(400) | letter_spacing(0_px)
+        "header h1"_s | font_size(14_px) | font_weight(400) | letter_spacing(0_px)
                       | margin_bottom(0_px) | color(phosphor)
                       | prop("text-shadow", glow),
         "header h1 a"_s | color(phosphor) | text_decoration(none),
         "header h1 a::before"_s | prop("content", raw("'~$ '")),
         "header h1 a:hover"_s | color(raw("#50ff80")),
-        ".site-description"_s | color(dim_txt) | font_size(12_px) | margin_top(4_px),
+        ".site-description"_s | color(dim_txt) | font_size(13_px) | margin_top(4_px),
         ".site-description::before"_s | prop("content", raw("'# '")),
         "nav"_s | margin_top(8_px),
-        "nav a"_s | color(dim_p) | font_size(12_px),
+        "nav a"_s | color(dim_p) | font_size(13_px),
         "nav a::before"_s | prop("content", raw("'./'")),
         "nav a:hover"_s | color(phosphor),
 
         // ── Post listings ──
         ".post-listing"_s | padding(8_px, 0_px) | border_bottom(1_px, dashed, gray)
-                          | font_size(13_px) | line_height(num(1.5)),
+                          | line_height(num(1.5)),
         ".post-listing:hover"_s | bg(dark_g),
         ".post-listing > a"_s | color(phosphor) | font_weight(400)
-                              | font_size(13_px) | display(raw("inline")),
+                              | font_size(14_px) | display(raw("inline")),
         ".post-listing > a:hover"_s | color(raw("#50ff80")),
         ".post-listing-meta"_s | display(none),
         ".post-listing .excerpt"_s | display(none),
         ".post-listing .post-tags"_s | display(none),
         // Custom spans from component override
-        ".ls-inline"_s | color(dim_txt) | font_size(11_px) | margin_left(10_px),
+        ".ls-inline"_s | color(dim_txt) | font_size(12_px) | margin_left(10_px),
         ".ls-excerpt"_s | color(dim_txt) | font_size(12_px) | margin_top(3_px)
-                        | line_height(num(1.45)),
-        ".ls-tags"_s | color(dim_txt) | font_size(11_px) | margin_top(3_px),
+                        | line_height(num(1.5)),
+        ".ls-tags"_s | color(dim_txt) | font_size(12_px) | margin_top(3_px),
 
         // ── Section headings ──
-        "h2"_s | border_bottom(none) | font_size(12_px) | font_weight(400)
+        "h2"_s | border_bottom(none) | font_size(13_px) | font_weight(400)
                | color(dim_p) | letter_spacing(1_px) | text_transform(uppercase)
                | margin_top(24_px) | margin_bottom(8_px) | padding_bottom(0_px),
 
         // ── Tags ──
         vars({{"tag-bg", transparent}, {"tag-text", dim_txt}, {"tag-radius", raw("0")},
               {"tag-hover-bg", transparent}, {"tag-hover-text", phosphor}}),
-        ".tag"_s | font_size(11_px) | padding(0_px, 2_px),
+        ".tag"_s | font_size(12_px) | padding(0_px, 2_px),
         ".tag::before"_s | prop("content", raw("'--'")),
         ".tag:hover"_s | color(phosphor),
 
         // ── Cards ──
         ".post-card"_s | bg(transparent) | border(1_px, dashed, gray) | padding(14_px),
-        ".post-card a"_s | color(phosphor) | font_weight(400) | font_size(13_px),
+        ".post-card a"_s | color(phosphor) | font_weight(400) | font_size(14_px),
         ".post-card a:hover"_s | color(raw("#50ff80")),
         ".post-card:hover"_s | border_color(dim_p) | bg(dark_g),
-        ".post-card .date"_s | color(dim_txt) | font_size(11_px),
+        ".post-card .date"_s | color(dim_txt) | font_size(12_px),
         ".post-card .reading-time"_s | display(none),
         ".post-card .excerpt"_s | color(dim_txt) | font_size(12_px),
 
         // ── Post page ──
-        ".post-full h1"_s | font_size(16_px) | font_weight(400) | color(phosphor)
+        ".post-full h1"_s | font_size(15_px) | font_weight(400) | color(phosphor)
                           | margin_bottom(6_px) | line_height(num(1.4))
                           | text_transform(none)
                           | prop("text-shadow", glow),
@@ -143,19 +143,20 @@ inline const ThemeDef hacker = {
         ".post-meta"_s | color(dim_txt) | font_size(12_px),
         ".heading-anchor"_s | opacity(0.2),
 
-        // ── Content area ──
+        // ── Content area — body text slightly smaller than UI ──
+        ".post-content,.page-content"_s | font_size(raw("12.5px")),
         content_area().nest(
             "a"_s | color(phosphor) | text_decoration(underline)
                   | text_decoration_style(dotted) | text_underline_offset(3_px),
             "a:hover"_s | text_decoration_style(solid),
-            "pre"_s | border_left(2_px, solid, dim_p),
+            "pre"_s | border_left(2_px, solid, dim_p) | font_size(12_px),
             ":not(pre)>code"_s | color(phosphor) | bg(transparent) | padding(0_px),
             "h1,h2,h3,h4"_s | color(phosphor) | font_weight(400),
-            "h2"_s | font_size(14_px) | margin_top(28_px) | border_bottom(none),
-            "h3"_s | font_size(13_px),
+            "h2"_s | font_size(13_px) | margin_top(28_px) | border_bottom(none),
+            "h3"_s | font_size(12_px),
             "hr"_s | border_top(1_px, dashed, gray),
             "blockquote"_s | border_left(2_px, solid, dim_p)
-                           | color(dim_p) | bg(transparent) | padding(4_px, 14_px),
+                           | color(dim_txt) | bg(transparent) | padding(4_px, 14_px),
             "table th"_s | bg(transparent) | color(phosphor),
             "table th,table td"_s | border_color(gray)
         ),
@@ -163,44 +164,48 @@ inline const ThemeDef hacker = {
         // ── Post nav ──
         ".post-nav"_s | border_top(1_px, dashed, gray) | margin_top(28_px)
                       | padding_top(12_px),
-        ".post-nav a"_s | color(dim_p) | font_size(12_px),
+        ".post-nav a"_s | color(dim_p) | font_size(13_px),
         ".post-nav a:hover"_s | color(phosphor),
         ".related-posts"_s | border_top(1_px, dashed, gray),
         ".related-posts h2"_s | color(dim_txt),
-        ".related-posts li a"_s | color(phosphor) | font_size(12_px),
+        ".related-posts li a"_s | color(phosphor) | font_size(13_px),
         ".related-posts li a:hover"_s | color(raw("#50ff80")),
 
         // ── Series nav — tree style ──
         ".series-nav"_s | border_color(gray) | border_left_color(dim_p) | bg(transparent),
-        ".series-label"_s | color(dim_txt) | font_size(12_px),
+        ".series-label"_s | color(dim_txt) | font_size(13_px),
         ".series-list"_s | list_style(none) | padding_left(0_px),
         ".series-list li"_s | padding_left(16_px),
         ".series-list li::before"_s | prop("content", raw("'\\251C\\2500 '"))
                                     | color(gray),
         ".series-list li:last-child::before"_s | prop("content", raw("'\\2514\\2500 '"))
                                                | color(gray),
-        ".series-list a"_s | color(phosphor) | font_size(12_px),
+        ".series-list a"_s | color(phosphor) | font_size(13_px),
         ".series-current"_s | color(phosphor) | font_weight(400),
         ".series-current::after"_s | prop("content", raw("' *'"))
                                    | color(dim_p),
 
+        // ── Series/archive page — dates on their own line so they don't wrap ──
+        ".series-list .date"_s | display(block) | font_size(12_px) | color(dim_txt)
+                               | margin_left(0_px),
+
         // ── Sidebar ──
-        ".sidebar"_s | font_size(12_px),
-        ".widget h3"_s | font_size(11_px) | color(dim_txt) | font_weight(400)
+        ".sidebar"_s | font_size(13_px),
+        ".widget h3"_s | font_size(13_px) | color(dim_txt) | font_weight(400)
                        | letter_spacing(1_px) | text_transform(uppercase)
                        | border_bottom(1_px, dashed, gray) | padding_bottom(4_px),
-        ".widget li a"_s | color(phosphor) | font_size(12_px),
-        ".widget li a:hover"_s | color(phosphor),
-        ".widget .date"_s | color(dim_txt) | font_size(11_px),
-        ".widget p"_s | color(dim_txt) | font_size(12_px),
+        ".widget li a"_s | color(phosphor) | font_size(13_px),
+        ".widget li a:hover"_s | color(raw("#50ff80")),
+        ".widget .date"_s | color(dim_txt) | font_size(12_px) | display(block),
+        ".widget p"_s | color(dim_txt) | font_size(13_px),
 
         // ── Footer ──
-        "footer"_s | border_top(1_px, dashed, gray) | color(dim_txt) | font_size(11_px),
+        "footer"_s | border_top(1_px, dashed, gray) | color(dim_txt) | font_size(12_px),
         ".footer-links a"_s | color(dim_p),
         ".footer-links a:hover"_s | color(phosphor),
 
         // ── Breadcrumbs ──
-        "nav.breadcrumb"_s | color(dim_txt) | font_size(12_px),
+        "nav.breadcrumb"_s | color(dim_txt) | font_size(13_px),
         "nav.breadcrumb a"_s | color(dim_txt),
         "nav.breadcrumb a:hover"_s | color(phosphor),
 
