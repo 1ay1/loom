@@ -46,6 +46,8 @@
 #include "../domain/post_summary.hpp"
 #include "../domain/page.hpp"
 
+namespace loom::theme { struct ThemeDef; }
+
 namespace loom::component
 {
 
@@ -235,6 +237,7 @@ struct Ctx
 {
     const Site& site;
     const ComponentOverrides* overrides = nullptr;
+    const theme::ThemeDef* theme_def = nullptr;
 
     // ctx(Component{.props}, child1, child2, ...)
     template<typename C, typename... Args>

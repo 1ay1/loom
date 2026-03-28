@@ -472,6 +472,83 @@ KeyframeBlock keyframes(const char* name, Fs&&... frames)
 }
 
 // ─────────────────────────────────────────────────────────────────────
+//  RulePack — multiple rules from a single expression
+//
+//    link_colors("nav a", dim, green)
+//    → nav a { color: <dim>; }
+//    → nav a:hover { color: <green>; }
+//
+// ─────────────────────────────────────────────────────────────────────
+
+struct RulePack
+{
+    std::vector<Rule> rules;
+};
+
+// ─────────────────────────────────────────────────────────────────────
+//  Content area selector — .post-content,.page-content shorthand
+//
+//    content_area().nest(
+//        "a"_s         | color(green),
+//        "a"_s.hover() | text_decoration(underline),
+//        "pre"_s       | bg(panel)
+//    )
+//    → .post-content a,.page-content a { color: green; }
+//    → .post-content a:hover,.page-content a:hover { ... }
+//    → .post-content pre,.page-content pre { ... }
+//
+// ─────────────────────────────────────────────────────────────────────
+
+inline Sel content_area() { return {".post-content,.page-content"}; }
+
+// ─────────────────────────────────────────────────────────────────────
+//  Hover helpers — common color + hover patterns
+//
+//    link_colors("nav a", dim, green)
+//    → nav a { color: <dim>; }  nav a:hover { color: <green>; }
+//
+//    recolor_links(base, hover, {"nav a", ".post-card a", ...})
+//    → generates both base + hover rules for each selector
+//
+// ─────────────────────────────────────────────────────────────────────
+
+inline RulePack link_colors(const char* selector, const Val& base, const Val& hover_val)
+{
+    return {{
+        {selector, {color(base)}},
+        {std::string(selector) + ":hover", {color(hover_val)}}
+    }};
+}
+
+inline RulePack recolor_links(const Val& base, const Val& hover_val,
+                               std::initializer_list<const char*> selectors)
+{
+    RulePack pack;
+    for (auto sel : selectors)
+    {
+        pack.rules.push_back({sel, {color(base)}});
+        pack.rules.push_back({std::string(sel) + ":hover", {color(hover_val)}});
+    }
+    return pack;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  CSS variable shorthand
+//
+//    vars({{"tag-bg", transparent}, {"tag-radius", raw("0")}})
+//    → :root { --tag-bg: transparent; --tag-radius: 0; }
+//
+// ─────────────────────────────────────────────────────────────────────
+
+inline Rule vars(std::initializer_list<std::pair<const char*, Val>> assignments)
+{
+    Rule r{":root", {}};
+    for (const auto& [name, val] : assignments)
+        r.decls.push_back({std::string("--") + name, val.v});
+    return r;
+}
+
+// ─────────────────────────────────────────────────────────────────────
 //  Sheet — collects rules, nests, media, keyframes → compiles to CSS
 // ─────────────────────────────────────────────────────────────────────
 
@@ -518,6 +595,11 @@ namespace detail
 inline void flatten(Sheet& s, Rule&& r)
 {
     s.rules.push_back(std::move(r));
+}
+
+inline void flatten(Sheet& s, RulePack&& p)
+{
+    for (auto& r : p.rules) s.rules.push_back(std::move(r));
 }
 
 inline void flatten(Sheet& s, Nest&& n)

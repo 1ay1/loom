@@ -167,9 +167,10 @@ inline css::Sheet base_listings()
             | color(raw("var(--text)")) | text_decoration(none) | font_weight(600)
             | font_size(raw("1.05em")) | display(block) | line_height(raw("1.35")),
         ".post-listing > a:hover"_s | color(raw("var(--accent-hover)")),
-        ".post-listing-meta"_s | margin_top(px(4)) | font_size(px(13)) | color(raw("var(--muted)")),
-        ".post-listing .date"_s | display(raw("inline")),
-        ".post-listing .reading-time"_s | display(raw("inline")),
+        ".post-listing-meta"_s | display(raw("flex")) | gap(px(4))
+            | margin_top(px(4)) | font_size(px(13)) | color(raw("var(--muted)")),
+        ".post-listing .reading-time::before"_s
+            | prop("content", raw("'\\00B7'")) | margin_right(px(4)),
         ".post-listing .post-tags"_s | margin_top(px(6)),
         ".post-listing .tag"_s | color(raw("var(--tag-text)")) | text_decoration(none),
         ".post-listing .tag:hover"_s | color(raw("var(--tag-hover-text)")),
@@ -203,7 +204,10 @@ inline css::Sheet base_cards()
             | color(raw("var(--text)")) | text_decoration(none)
             | font_weight(600) | font_size(raw("1.05em")),
         ".post-card a:hover"_s | color(raw("var(--accent-hover)")),
-        ".post-card .date"_s | display(block) | margin_top(px(8)),
+        ".post-card .date"_s | display(block) | margin_top(px(8))
+            | font_size(px(13)) | color(raw("var(--muted)")),
+        ".post-card .reading-time"_s | display(block)
+            | font_size(px(13)) | color(raw("var(--muted)")),
         ".post-card .post-tags"_s | margin_top(px(10)),
         ".post-card .tag"_s | color(raw("var(--tag-text)")) | text_decoration(none),
         ".post-card .tag:hover"_s | color(raw("var(--tag-hover-text)"))
@@ -221,6 +225,7 @@ inline css::Sheet base_post()
             | prop("font-family", raw("var(--heading-font)"))
             | font_weight(raw("var(--heading-weight)")),
         ".post-meta"_s | margin_bottom(px(12)) | font_size(px(14)) | color(raw("var(--muted)")),
+        ".post-meta .reading-time::before"_s | prop("content", raw("'\\00B7 '")),
         ".post-full .post-tags"_s | margin_bottom(px(20))
     );
 }

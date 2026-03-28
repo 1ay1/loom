@@ -60,6 +60,13 @@ struct ThemeDef
     Scrollbar       scrollbar    = Scrollbar::Default;
     FocusStyle      focus_style  = FocusStyle::Outline;
 
+    // ── Content overrides ──
+    //
+    // Override default component text without writing component lambdas.
+    // Empty = use site config / built-in defaults.
+    std::string date_format   = {};   // strftime format, e.g. "%b %d"
+    std::string index_heading = {};   // e.g. "posts" (default: "Recent Posts")
+
     // ── Custom styles (typed CSS DSL) ──
     css::Sheet styles = {};
 

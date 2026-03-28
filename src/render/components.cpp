@@ -1,5 +1,6 @@
 #include "../../include/loom/render/component.hpp"
 #include "../../include/loom/render/themes.hpp"
+#include "../../include/loom/render/theme/theme_def.hpp"
 #include "../../include/loom/render/base_styles.hpp"
 
 #include <ctime>
@@ -39,6 +40,14 @@ static std::string escape_json(const std::string& s)
         }
     }
     return out;
+}
+
+// Resolve date format: ThemeDef override > layout config
+static const std::string& resolve_date_format(const Ctx& ctx)
+{
+    if (ctx.theme_def && !ctx.theme_def->date_format.empty())
+        return ctx.theme_def->date_format;
+    return ctx.site.layout.date_format;
 }
 
 static std::string apply_external_new_tab(const std::string& html)
@@ -399,7 +408,7 @@ Node RecentPostsWidget::render(const RecentPostsWidget& props, const Ctx& ctx, C
             return li(
                 a(href("/post/" + post.slug.get()), post.title.get()),
                 span(class_("date"),
-                    raw(" " + format_date(post.published, ctx.site.layout.date_format))));
+                    raw(" " + format_date(post.published, resolve_date_format(ctx)))));
         }))
     );
 }
@@ -476,13 +485,14 @@ Node PostMeta::render(const PostMeta& props, const Ctx& ctx, Children)
     if (!props.post) return Node{Node::Fragment, {}, {}, {}, {}};
     const auto& layout = ctx.site.layout;
     const auto& post   = *props.post;
+    const auto& dfmt   = resolve_date_format(ctx);
 
     return when(layout.show_post_dates || layout.show_reading_time,
         div(class_("post-meta"),
             when(layout.show_post_dates,
-                time_(format_date(post.published, layout.date_format))),
+                time_(format_date(post.published, dfmt))),
             when(layout.show_reading_time && post.reading_time_minutes > 0,
-                raw((layout.show_post_dates ? " &middot; " : "") +
+                span(class_("reading-time"),
                     std::to_string(post.reading_time_minutes) + " min read"))));
 }
 
@@ -520,7 +530,7 @@ Node RelatedPosts::render(const RelatedPosts& props, const Ctx& ctx, Children)
                 a(href("/post/" + rp.slug.get()), rp.title.get()),
                 when(layout.show_post_dates,
                     span(class_("date"),
-                        raw(" " + format_date(rp.published, layout.date_format)))));
+                        raw(" " + format_date(rp.published, resolve_date_format(ctx))))));
         }))
     );
 }
@@ -572,17 +582,17 @@ Node PostListing::render(const PostListing& props, const Ctx& ctx, Children)
     if (!props.post) return Node{Node::Fragment, {}, {}, {}, {}};
     const auto& post   = *props.post;
     const auto& layout = ctx.site.layout;
+    const auto& dfmt   = resolve_date_format(ctx);
 
     return article(class_("post-listing"),
         a(href("/post/" + post.slug.get()), post.title.get()),
         when(layout.show_post_dates || (layout.show_reading_time && post.reading_time_minutes > 0),
             div(class_("post-listing-meta"),
                 when(layout.show_post_dates,
-                    span(class_("date"), format_date(post.published, layout.date_format))),
+                    span(class_("date"), format_date(post.published, dfmt))),
                 when(layout.show_reading_time && post.reading_time_minutes > 0,
                     span(class_("reading-time"),
-                        raw((layout.show_post_dates ? " &middot; " : "") +
-                            std::to_string(post.reading_time_minutes) + " min"))))),
+                        std::to_string(post.reading_time_minutes) + " min")))),
         when(layout.show_excerpts && !post.excerpt.empty(),
             p_(class_("excerpt"), post.excerpt)),
         when(layout.show_post_tags && !post.tags.empty(),
@@ -595,16 +605,15 @@ Node PostCard::render(const PostCard& props, const Ctx& ctx, Children)
     if (!props.post) return Node{Node::Fragment, {}, {}, {}, {}};
     const auto& post   = *props.post;
     const auto& layout = ctx.site.layout;
+    const auto& dfmt   = resolve_date_format(ctx);
 
     return div(class_("post-card"),
         a(href("/post/" + post.slug.get()), post.title.get()),
-        when(layout.show_post_dates || layout.show_reading_time,
-            span(class_("date"),
-                when(layout.show_post_dates,
-                    text(format_date(post.published, layout.date_format))),
-                when(layout.show_reading_time && post.reading_time_minutes > 0,
-                    raw((layout.show_post_dates ? " &middot; " : "") +
-                        std::to_string(post.reading_time_minutes) + " min")))),
+        when(layout.show_post_dates,
+            span(class_("date"), format_date(post.published, dfmt))),
+        when(layout.show_reading_time && post.reading_time_minutes > 0,
+            span(class_("reading-time"),
+                std::to_string(post.reading_time_minutes) + " min")),
         when(layout.show_excerpts && !post.excerpt.empty(),
             p_(class_("excerpt"), post.excerpt)),
         when(layout.show_post_tags && !post.tags.empty(),
@@ -620,11 +629,14 @@ Node Index::render(const Index& props, const Ctx& ctx, Children)
 {
     if (!props.posts) return Node{Node::Fragment, {}, {}, {}, {}};
     const auto& layout = ctx.site.layout;
+    const char* heading = (ctx.theme_def && !ctx.theme_def->index_heading.empty())
+                              ? ctx.theme_def->index_heading.c_str()
+                              : "Recent Posts";
 
     if (layout.post_list_style == "cards")
     {
         return section(
-            h2("Recent Posts"),
+            h2(heading),
             div(class_("post-cards"),
                 each(*props.posts, [&](const PostSummary& p) {
                     return ctx(PostCard{.post = &p});
@@ -633,7 +645,7 @@ Node Index::render(const Index& props, const Ctx& ctx, Children)
     }
 
     return section(
-        h2("Recent Posts"),
+        h2(heading),
         each(*props.posts, [&](const PostSummary& p) {
             return ctx(PostListing{.post = &p});
         })
@@ -673,7 +685,7 @@ Node Archives::render(const Archives& props, const Ctx& ctx, Children)
                 each(pair.second, [&](const PostSummary& p) {
                     return article(class_("post-listing"),
                         when(layout.show_post_dates,
-                            span(class_("date"), format_date(p.published, layout.date_format))),
+                            span(class_("date"), format_date(p.published, resolve_date_format(ctx)))),
                         raw(" "),
                         a(href("/post/" + p.slug.get()), p.title.get()));
                 }));
@@ -694,7 +706,7 @@ Node SeriesPage::render(const SeriesPage& props, const Ctx& ctx, Children)
                     a(href("/post/" + p.slug.get()), p.title.get()),
                     when(layout.show_post_dates,
                         span(class_("date"),
-                            raw(" " + format_date(p.published, layout.date_format)))));
+                            raw(" " + format_date(p.published, resolve_date_format(ctx))))));
             }))
     );
 }
@@ -788,13 +800,15 @@ Node Ctx::page(const PageMeta& meta, Node content,
 
 Ctx Ctx::from(const Site& site)
 {
-    // Resolve theme component overrides
+    // Resolve theme component overrides and ThemeDef pointer
     auto& themes = builtin_themes();
     auto it = themes.find(site.theme.name);
-    if (it != themes.end() && it->second.components)
-        return {site, it->second.components.get()};
+    if (it != themes.end())
+        return {site,
+                it->second.components ? it->second.components.get() : nullptr,
+                &it->second};
 
-    return {site, nullptr};
+    return {site, nullptr, nullptr};
 }
 
 } // namespace loom::component
