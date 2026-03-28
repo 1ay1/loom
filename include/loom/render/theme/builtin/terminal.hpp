@@ -90,7 +90,7 @@ inline const ThemeDef terminal = {
         ".post-content a,.page-content a"_s | color(hex("#5fba7d")),
         ".post-content a:hover,.page-content a:hover"_s | text_decoration(underline),
         ".post-content pre,.page-content pre"_s | bg(hex("#1e1e1e"))
-            | border_left(3_px, solid, hex("#5fba7d")) | border_top(none) | border_right(none) | border_bottom(none),
+            | border_left(3_px, solid, hex("#5fba7d")) | prop("border-top", raw("none")) | prop("border-right", raw("none")) | prop("border-bottom", raw("none")),
         ".post-content pre code,.page-content pre code"_s | color(hex("#c8d0d8")),
         ".post-content :not(pre)>code,.page-content :not(pre)>code"_s | bg(hex("#2a2a2a"))
             | color(hex("#5fba7d")) | padding(2_px, 6_px),
