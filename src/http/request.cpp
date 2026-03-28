@@ -1,111 +1,111 @@
 #include "../../include/loom/http/request.hpp"
 
-#include <algorithm>
+#include <cctype>
 
 namespace loom
 {
-    HttpMethod parse_method(const std::string& method)
+    static constexpr HttpMethod parse_method(std::string_view m) noexcept
     {
-        if (method == "GET")     return HttpMethod::GET;
-        if (method == "POST")    return HttpMethod::POST;
-        if (method == "PUT")     return HttpMethod::PUT;
-        if (method == "DELETE")  return HttpMethod::DELETE;
-        if (method == "PATCH")   return HttpMethod::PATCH;
-        if (method == "HEAD")    return HttpMethod::HEAD;
-        if (method == "OPTIONS") return HttpMethod::OPTIONS;
+        if (m == "GET")     return HttpMethod::GET;
+        if (m == "POST")    return HttpMethod::POST;
+        if (m == "PUT")     return HttpMethod::PUT;
+        if (m == "DELETE")  return HttpMethod::DELETE;
+        if (m == "PATCH")   return HttpMethod::PATCH;
+        if (m == "HEAD")    return HttpMethod::HEAD;
+        if (m == "OPTIONS") return HttpMethod::OPTIONS;
         return HttpMethod::UNKNOWN;
     }
 
-    std::string HttpRequest::header(const std::string& key) const
+    std::string_view HttpRequest::header(std::string_view key) const
     {
-        std::string lower;
-        lower.reserve(key.size());
-        for (char c : key)
-            lower += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-
-        auto it = headers.find(lower);
-        return it != headers.end() ? it->second : "";
+        for (const auto& h : headers_)
+            if (h.key == key) return h.value;
+        return {};
     }
 
     bool HttpRequest::keep_alive() const
     {
-        std::string conn = header("connection");
-        for (auto& c : conn)
-            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return conn != "close";
+        auto v = header("connection");
+        // Fast case-insensitive check for "close"
+        if (v.size() == 5)
+        {
+            return !((v[0] | 0x20) == 'c' && (v[1] | 0x20) == 'l' &&
+                     (v[2] | 0x20) == 'o' && (v[3] | 0x20) == 's' &&
+                     (v[4] | 0x20) == 'e');
+        }
+        return true;
     }
 
-    bool parse_request(const std::string& raw, HttpRequest& request)
+    bool parse_request(std::string& raw, HttpRequest& request)
     {
-        auto header_end = raw.find("\r\n\r\n");
-        if (header_end == std::string::npos)
-            return false;
+        std::string_view sv(raw);
 
-        // Request line
-        auto first_line_end = raw.find("\r\n");
-        if (first_line_end == std::string::npos)
-            return false;
+        auto header_end = sv.find("\r\n\r\n");
+        if (header_end == std::string_view::npos) return false;
 
-        auto method_end = raw.find(' ');
-        if (method_end == std::string::npos || method_end >= first_line_end)
-            return false;
+        auto first_line_end = sv.find("\r\n");
+        if (first_line_end == std::string_view::npos) return false;
 
-        request.method = parse_method(raw.substr(0, method_end));
+        auto method_end = sv.find(' ');
+        if (method_end == std::string_view::npos || method_end >= first_line_end) return false;
+
+        request.method = parse_method(sv.substr(0, method_end));
 
         auto path_start = method_end + 1;
-        auto path_end = raw.find(' ', path_start);
-        if (path_end == std::string::npos || path_end >= first_line_end)
-            return false;
+        auto path_end = sv.find(' ', path_start);
+        if (path_end == std::string_view::npos || path_end >= first_line_end) return false;
 
-        std::string uri = raw.substr(path_start, path_end - path_start);
-
-        auto query_pos = uri.find('?');
-        if (query_pos != std::string::npos)
+        auto uri = sv.substr(path_start, path_end - path_start);
+        auto qpos = uri.find('?');
+        if (qpos != std::string_view::npos)
         {
-            request.path = uri.substr(0, query_pos);
-            request.query = uri.substr(query_pos + 1);
+            request.path = uri.substr(0, qpos);
+            request.query = uri.substr(qpos + 1);
         }
         else
         {
             request.path = uri;
         }
 
-        // Headers
+        // Headers — lowercase keys in-place in the raw buffer
         size_t pos = first_line_end + 2;
         while (pos < header_end)
         {
-            auto line_end = raw.find("\r\n", pos);
-            if (line_end == std::string::npos || line_end > header_end)
-                break;
+            auto line_end = sv.find("\r\n", pos);
+            if (line_end == std::string_view::npos || line_end > header_end) break;
 
-            auto colon = raw.find(':', pos);
-            if (colon != std::string::npos && colon < line_end)
+            auto colon = sv.find(':', pos);
+            if (colon != std::string_view::npos && colon < line_end)
             {
-                std::string key = raw.substr(pos, colon - pos);
-                for (auto& c : key)
-                    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                for (size_t i = pos; i < colon; ++i)
+                    raw[i] = static_cast<char>(
+                        std::tolower(static_cast<unsigned char>(raw[i])));
 
                 auto val_start = colon + 1;
                 while (val_start < line_end && raw[val_start] == ' ')
                     ++val_start;
 
-                request.headers[key] = raw.substr(val_start, line_end - val_start);
+                request.headers_.push_back({
+                    sv.substr(pos, colon - pos),
+                    sv.substr(val_start, line_end - val_start)
+                });
             }
-
             pos = line_end + 2;
         }
 
         // Body
-        auto cl_it = request.headers.find("content-length");
-        if (cl_it != request.headers.end())
+        for (const auto& h : request.headers_)
         {
-            size_t content_length = std::stoul(cl_it->second);
-            size_t body_start = header_end + 4;
-
-            if (raw.size() - body_start < content_length)
-                return false;
-
-            request.body = raw.substr(body_start, content_length);
+            if (h.key == "content-length")
+            {
+                size_t cl = 0;
+                for (char c : h.value)
+                    if (c >= '0' && c <= '9') cl = cl * 10 + (c - '0');
+                size_t body_start = header_end + 4;
+                if (sv.size() - body_start < cl) return false;
+                request.body = sv.substr(body_start, cl);
+                break;
+            }
         }
 
         return true;

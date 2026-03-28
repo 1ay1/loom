@@ -3,12 +3,12 @@ title: The Atomic Cache Pattern — Lock-Free Reads with shared_ptr
 date: 2025-11-24
 slug: atomic-cache-pattern
 tags: cpp, internals, architecture
-excerpt: Loom serves HTML from a shared_ptr<const SiteCache>. Reads are lock-free. Writes swap the pointer under a tiny mutex. Here's why this works and when to use it.
+excerpt: Loom serves HTML from a shared_ptr<const SiteCache>. Reads and writes are lock-free using C++20's std::atomic<shared_ptr>. Here's why this works and when to use it.
 ---
 
 Loom has two concurrent activities: the HTTP server reading the cache to serve requests, and the hot-reloader writing a new cache when content changes. Getting this concurrency right requires neither too much locking (which stalls requests) nor too little (which causes data races).
 
-The solution is the atomic cache pattern: a `shared_ptr` protected by a mutex that's only held long enough to copy or swap the pointer.
+The solution is the atomic cache pattern: a `shared_ptr` inside `std::atomic` — lock-free reads, lock-free writes, automatic lifetime management.
 
 ## The Problem
 
@@ -37,48 +37,42 @@ Two races: the pointer write in `rebuild` is not atomic, and requests using the 
 ```cpp
 template<typename T>
 class AtomicCache {
-    std::shared_ptr<const T> ptr_;
-    mutable std::mutex       mutex_;
+    std::atomic<std::shared_ptr<const T>> data_;
 
 public:
-    std::shared_ptr<const T> load() const {
-        std::lock_guard<std::mutex> lock(mutex_);
-        return ptr_; // copy the shared_ptr under the lock
+    std::shared_ptr<const T> load() const noexcept {
+        return data_.load(std::memory_order_acquire);
     }
 
-    void store(std::shared_ptr<const T> new_ptr) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        ptr_ = std::move(new_ptr);
+    void store(std::shared_ptr<const T> next) noexcept {
+        data_.store(std::move(next), std::memory_order_release);
     }
 };
 ```
 
-**`load()`:** Locks the mutex, copies the `shared_ptr` (this atomically increments the reference count), releases the lock. The caller now holds a `shared_ptr` to the current cache. Even if `store()` runs immediately after, the old cache stays alive as long as someone holds a `shared_ptr` to it.
+**`load()`:** Atomically loads the `shared_ptr` and increments the reference count. The caller now holds a snapshot. Even if `store()` runs immediately after, the old cache stays alive as long as someone holds a `shared_ptr` to it.
 
-**`store()`:** Locks the mutex, swaps the stored pointer. The old `shared_ptr` goes out of scope when the local variable `ptr_` is overwritten — if no readers hold a copy, the `SiteCache` destructor runs immediately. If readers do hold copies, destruction waits until they're all done.
+**`store()`:** Atomically swaps the stored pointer. The old `shared_ptr`'s reference count drops — if no readers hold a copy, the `SiteCache` destructor runs immediately. If readers do hold copies, destruction waits until they're all done.
 
-## How The Mutex Protects Only a Pointer Copy
+C++20's `std::atomic<std::shared_ptr<T>>` handles the coordination internally. On x86_64 with GCC, this compiles to a spinlock-protected pointer swap — not a true lock-free CAS on the 128-bit `shared_ptr`, but no OS mutex involvement. The critical section is a few pointer operations: nanoseconds.
 
-The mutex is held for roughly two operations:
-1. `load()`: increment refcount + copy pointer (nanoseconds)
-2. `store()`: swap two pointers (nanoseconds)
+## Why No Mutex Is Needed
 
-It is **not** held while:
-- Serving a request (milliseconds)
-- Building a new cache (hundreds of milliseconds)
+The previous version used an explicit `std::mutex` around the `shared_ptr`. This worked but had two costs: a syscall if the mutex was contended, and a memory barrier even when it wasn't. `std::atomic<shared_ptr>` expresses the same intent with less overhead — the compiler and runtime choose the minimal synchronisation needed.
 
-This is the key insight. After `load()` returns, the caller uses `ptr_->pages.find(...)` with no lock held. This is safe because:
-1. The cache is `const` — nobody modifies it after construction
-2. The caller's `shared_ptr` keeps it alive
-3. The pointer won't change under the caller's feet because they don't read `ptr_` again — they use their own copy
+The key insight remains the same. After `load()` returns, the caller uses the cache with no synchronisation at all:
 
 ```cpp
-// In the request handler
-auto cache = atomic_cache.load();  // lock held ~nanoseconds
-auto it = cache->pages.find(req.path); // no lock — safe because const + alive
-return serve_cached(req, it->second);  // no lock
-// cache goes out of scope here — refcount drops, may free if rebuilding
+auto snap = cache.load();                 // atomic — nanoseconds
+auto it = snap->pages.find(req.path);     // no lock — safe because const + alive
+return serve_cached(it->second, req, snap); // no lock — pointer into pre-built wire data
+// snap goes out of scope here — refcount drops, may free if cache was rebuilt
 ```
+
+This is safe because:
+1. The cache is `const` — nobody modifies it after construction
+2. The caller's `shared_ptr` keeps it alive
+3. The pointer won't change under the caller's feet because they use their own copy
 
 ## Why const Matters
 
@@ -94,23 +88,14 @@ When `load()` copies the `shared_ptr`, the strong count increments. When the req
 
 This is automatic reference counting with deterministic destruction — no garbage collector, no indeterminate lifetime.
 
-## The Trade-off: Copies vs Atomics
+## The Trade-off: atomic<shared_ptr> vs Mutex
 
-An alternative: use `std::atomic<std::shared_ptr<T>>` (C++20), which makes the `shared_ptr` itself atomic without a separate mutex:
+The previous version of Loom used an explicit `std::mutex` to protect the `shared_ptr`. This is portable and explicit about what's being protected. The current version uses `std::atomic<std::shared_ptr<T>>` (C++20) for two reasons:
 
-```cpp
-std::atomic<std::shared_ptr<const SiteCache>> cache_;
+1. **No syscall path.** A `std::mutex` can invoke `futex()` under contention. The atomic version uses a userspace spinlock — it never enters the kernel.
+2. **Semantic clarity.** `std::atomic<shared_ptr>` says "this pointer is accessed concurrently" at the type level. A raw `shared_ptr` + `mutex` requires the reader to understand the locking protocol.
 
-std::shared_ptr<const SiteCache> load() {
-    return cache_.load(); // atomic
-}
-
-void store(std::shared_ptr<const SiteCache> p) {
-    cache_.store(std::move(p)); // atomic
-}
-```
-
-This is equivalent but relies on hardware support for atomic 128-bit operations (or a lock inside the `atomic`). The mutex version is portable and explicit about what's being protected. For Loom's use case — rebuilds happen at most once per 500ms, not in a tight loop — the difference is immeasurable.
+For Loom's use case — rebuilds happen at most once per 500ms, reads happen thousands of times per second — the performance difference is small. The design difference is what matters: the type system enforces the concurrency contract.
 
 ## When To Use This Pattern
 

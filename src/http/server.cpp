@@ -31,9 +31,9 @@ namespace loom
     HttpServer::HttpServer(int port)
         : port_(port) {}
 
-    Router& HttpServer::router()
+    void HttpServer::set_dispatch(Dispatch fn)
     {
-        return router_;
+        dispatch_ = std::move(fn);
     }
 
     void HttpServer::stop()
@@ -79,7 +79,9 @@ namespace loom
             ev.data.fd = client_fd;
             epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, client_fd, &ev);
 
-            connections_[client_fd] = Connection{{}, {}, 0, true, now_ms()};
+            auto& conn = connections_[client_fd];
+            conn = Connection{};
+            conn.last_activity_ms = now_ms();
         }
     }
 
@@ -102,8 +104,7 @@ namespace loom
 
                 if (conn.read_buf.size() > MAX_REQUEST_SIZE)
                 {
-                    auto resp = HttpResponse::bad_request().serialize(false);
-                    start_write(fd, resp);
+                    start_write_owned(fd, HttpResponse::bad_request().serialize(false));
                     conn.keep_alive = false;
                     return;
                 }
@@ -116,7 +117,6 @@ namespace loom
                 return;
             }
 
-            // n < 0
             if (errno == EAGAIN || errno == EWOULDBLOCK)
                 break;
             if (errno == EINTR)
@@ -125,7 +125,6 @@ namespace loom
             return;
         }
 
-        // Try to process complete requests from the buffer
         process_request(fd);
     }
 
@@ -137,33 +136,35 @@ namespace loom
 
         auto& conn = it->second;
 
-        // Check if we have a complete request (headers end with \r\n\r\n)
         auto header_end = conn.read_buf.find("\r\n\r\n");
         if (header_end == std::string::npos)
             return;
 
-        // Check Content-Length for body completion
-        auto cl_pos = conn.read_buf.find("Content-Length:");
-        if (cl_pos == std::string::npos)
-            cl_pos = conn.read_buf.find("content-length:");
+        // Check Content-Length for body completion (string_view, no alloc)
+        std::string_view buf_view(conn.read_buf);
+        auto cl_pos = buf_view.find("Content-Length:");
+        if (cl_pos == std::string_view::npos)
+            cl_pos = buf_view.find("content-length:");
 
-        if (cl_pos != std::string::npos && cl_pos < header_end)
+        if (cl_pos != std::string_view::npos && cl_pos < header_end)
         {
             auto val_start = cl_pos + 15;
-            auto val_end = conn.read_buf.find("\r\n", val_start);
-            size_t content_length = std::stoul(
-                conn.read_buf.substr(val_start, val_end - val_start));
-            size_t body_start = header_end + 4;
-
-            if (conn.read_buf.size() - body_start < content_length)
-                return; // Body not yet complete
+            auto val_end = buf_view.find("\r\n", val_start);
+            size_t content_length = 0;
+            for (size_t i = val_start; i < val_end && i < buf_view.size(); ++i)
+            {
+                char c = buf_view[i];
+                if (c >= '0' && c <= '9')
+                    content_length = content_length * 10 + (c - '0');
+            }
+            if (conn.read_buf.size() - (header_end + 4) < content_length)
+                return;
         }
 
         HttpRequest request;
         if (!parse_request(conn.read_buf, request))
         {
-            auto resp = HttpResponse::bad_request().serialize(false);
-            start_write(fd, resp);
+            start_write_owned(fd, HttpResponse::bad_request().serialize(false));
             conn.keep_alive = false;
             conn.read_buf.clear();
             return;
@@ -171,26 +172,51 @@ namespace loom
 
         conn.keep_alive = request.keep_alive();
 
-        auto response = router_.route(request);
-        auto raw = response.serialize(conn.keep_alive);
+        auto response = dispatch_(request);
 
-        // Clear the consumed request from the buffer
         conn.read_buf.clear();
 
-        start_write(fd, raw);
+        if (response.is_prebuilt())
+        {
+            start_write_view(fd, std::move(response.wire_owner_),
+                             response.wire_data_, response.wire_len_);
+        }
+        else
+        {
+            start_write_owned(fd, response.serialize(conn.keep_alive));
+        }
     }
 
-    void HttpServer::start_write(int fd, const std::string& data)
+    void HttpServer::start_write_owned(int fd, std::string data)
     {
         auto it = connections_.find(fd);
         if (it == connections_.end())
             return;
 
         auto& conn = it->second;
-        conn.write_buf = data;
+        conn.write_owned = std::move(data);
+        conn.write_ref.reset();
+        conn.write_ptr = conn.write_owned.data();
+        conn.write_len = conn.write_owned.size();
         conn.write_offset = 0;
 
-        // Try to write immediately
+        handle_writable(fd);
+    }
+
+    void HttpServer::start_write_view(int fd, std::shared_ptr<const void> owner,
+                                       const char* data, size_t len)
+    {
+        auto it = connections_.find(fd);
+        if (it == connections_.end())
+            return;
+
+        auto& conn = it->second;
+        conn.write_ref = std::move(owner);
+        conn.write_owned.clear();
+        conn.write_ptr = data;
+        conn.write_len = len;
+        conn.write_offset = 0;
+
         handle_writable(fd);
     }
 
@@ -202,11 +228,11 @@ namespace loom
 
         auto& conn = it->second;
 
-        while (conn.write_offset < conn.write_buf.size())
+        while (conn.write_offset < conn.write_len)
         {
             ssize_t n = write(fd,
-                conn.write_buf.c_str() + conn.write_offset,
-                conn.write_buf.size() - conn.write_offset);
+                conn.write_ptr + conn.write_offset,
+                conn.write_len - conn.write_offset);
 
             if (n > 0)
             {
@@ -218,7 +244,6 @@ namespace loom
             {
                 if (errno == EAGAIN || errno == EWOULDBLOCK)
                 {
-                    // Switch to waiting for writable
                     epoll_event ev{};
                     ev.events = EPOLLOUT | EPOLLET;
                     ev.data.fd = fd;
@@ -229,13 +254,14 @@ namespace loom
                     continue;
             }
 
-            // Write error or n == 0
             close_connection(fd);
             return;
         }
 
-        // Write complete
-        conn.write_buf.clear();
+        conn.write_owned.clear();
+        conn.write_ref.reset();
+        conn.write_ptr = nullptr;
+        conn.write_len = 0;
         conn.write_offset = 0;
         conn.last_activity_ms = now_ms();
 
@@ -245,15 +271,11 @@ namespace loom
             return;
         }
 
-        // Switch back to reading for next request
         epoll_event ev{};
         ev.events = EPOLLIN | EPOLLET;
         ev.data.fd = fd;
         epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, fd, &ev);
 
-        // With edge-triggered epoll, data may have arrived while we were
-        // writing. Re-arming EPOLLIN won't fire an event for data already
-        // in the kernel buffer, so we must drain it now.
         handle_readable(fd);
     }
 
@@ -368,7 +390,6 @@ namespace loom
                     handle_writable(fd);
             }
 
-            // Reap idle keep-alive connections every second
             auto now = now_ms();
             if (now - last_reap > 1000)
             {
@@ -379,7 +400,6 @@ namespace loom
 
         std::cout << "Shutting down...\n";
 
-        // Close all active connections
         for (auto& [fd, _] : connections_)
             close(fd);
         connections_.clear();

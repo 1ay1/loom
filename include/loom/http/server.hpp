@@ -1,11 +1,13 @@
 #pragma once
 
-#include "router.hpp"
+#include "request.hpp"
+#include "response.hpp"
 
 #include <atomic>
+#include <functional>
 #include <string>
 #include <unordered_map>
-#include <vector>
+#include <memory>
 #include <cstddef>
 
 namespace loom
@@ -13,9 +15,13 @@ namespace loom
     class HttpServer
     {
     public:
+        using Dispatch = std::function<HttpResponse(HttpRequest&)>;
+
         explicit HttpServer(int port);
 
-        Router& router();
+        // Set the dispatch function (typically a compiled route table)
+        void set_dispatch(Dispatch fn);
+
         void run();
         void stop();
 
@@ -27,8 +33,14 @@ namespace loom
         struct Connection
         {
             std::string read_buf;
-            std::string write_buf;
+
+            // Write state: either owned data or a view into shared cache data
+            std::string write_owned;
+            std::shared_ptr<const void> write_ref;
+            const char* write_ptr = nullptr;
+            size_t write_len = 0;
             size_t write_offset = 0;
+
             bool keep_alive = true;
             int64_t last_activity_ms = 0;
         };
@@ -36,7 +48,7 @@ namespace loom
         int port_;
         int server_fd_ = -1;
         int epoll_fd_ = -1;
-        Router router_;
+        Dispatch dispatch_;
         std::atomic<bool> running_{false};
         std::unordered_map<int, Connection> connections_;
 
@@ -44,7 +56,9 @@ namespace loom
         void handle_readable(int fd);
         void handle_writable(int fd);
         void process_request(int fd);
-        void start_write(int fd, const std::string& data);
+        void start_write_owned(int fd, std::string data);
+        void start_write_view(int fd, std::shared_ptr<const void> owner,
+                              const char* data, size_t len);
         void close_connection(int fd);
         void reap_idle_connections();
         int64_t now_ms() const;

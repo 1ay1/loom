@@ -9,42 +9,35 @@
 #include <functional>
 #include <iostream>
 #include <memory>
-#include <mutex>
 #include <thread>
 
 namespace loom
 {
 
-// Thread-safe, atomically-swappable cache.
-// Readers grab a shared_ptr snapshot — zero contention on the read path.
-// Writers build a new cache and swap in the pointer.
+// Lock-free, atomically-swappable cache.
+// Readers grab a shared_ptr snapshot — no mutex, no contention.
+// Writers build a new cache and swap in the pointer atomically.
 template<typename T>
 class AtomicCache
 {
 public:
     explicit AtomicCache(std::shared_ptr<const T> initial)
+        : data_(std::move(initial)) {}
+
+    // Lock-free read: atomic shared_ptr copy
+    std::shared_ptr<const T> load() const noexcept
     {
-        std::lock_guard lock(mu_);
-        data_ = std::move(initial);
+        return data_.load(std::memory_order_acquire);
     }
 
-    // Fast read: grab a snapshot (shared_ptr copy is thread-safe)
-    std::shared_ptr<const T> load() const
+    // Atomic swap of the cache pointer
+    void store(std::shared_ptr<const T> next) noexcept
     {
-        std::lock_guard lock(mu_);
-        return data_;
-    }
-
-    // Swap in a new cache
-    void store(std::shared_ptr<const T> next)
-    {
-        std::lock_guard lock(mu_);
-        data_ = std::move(next);
+        data_.store(std::move(next), std::memory_order_release);
     }
 
 private:
-    mutable std::mutex mu_;
-    std::shared_ptr<const T> data_;
+    std::atomic<std::shared_ptr<const T>> data_;
 };
 
 // HotReloader: polls a WatchPolicy on a background thread and invokes a

@@ -1,171 +1,208 @@
 ---
-title: The Trie Router — O(segments) Path Matching
-date: 2025-10-06
+title: Compile-Time Routing — Zero-Overhead Dispatch with C++20 NTTPs
+date: 2026-03-28
 slug: router
 tags: internals, architecture, cpp
-excerpt: Loom uses a trie to match URL paths. Each segment is one node traversal. Parameters like :slug are first-class citizens, not regex afterthoughts.
+excerpt: Loom's route table is a compile-time expression. Patterns are non-type template parameters, dispatch is a fold expression, and the compiler generates an optimal branch chain. No trie, no hash map, no heap.
 ---
 
-URL routing sounds simple until it isn't. You need literal matches (`/tags`), parameter captures (`/post/:slug`), and a sane fallback for everything else. Regex works but is hard to extend. Linear scan works but is O(routes). Loom uses a trie — a tree of path segments where matching is O(number of segments in the URL).
+URL routing sounds simple until it isn't. You need literal matches (`/tags`), parameter captures (`/post/:slug`), and a sane fallback for everything else. Most frameworks solve this with a runtime trie, a hash map, or — worst case — a linear regex scan. Loom solves it at compile time.
 
-## The Trie Structure
+Every route pattern is a non-type template parameter. The compiler sees the entire route table as a single expression and generates an optimal if-else chain. No trie nodes, no hash maps, no heap allocations, no virtual dispatch. The dispatch logic lives in `.text`, not in a data structure.
+
+## The DSL
 
 ```cpp
-struct TrieNode {
-    std::unordered_map<std::string, std::unique_ptr<TrieNode>> children; // literal segments
-    std::unique_ptr<TrieNode> param_child;  // :param wildcard
-    std::string param_name;                 // name of the captured parameter
-    std::unordered_map<HttpMethod, RouteHandler> handlers; // GET, POST, etc.
+using namespace loom::route;
+
+auto dispatch = compile(
+    fallback(fallback_handler),
+    // Static routes — exact match
+    get<"/">(cached),
+    get<"/tags">(cached),
+    get<"/archives">(cached),
+    get<"/series">(cached),
+    get<"/sitemap.xml">(sitemap_handler),
+    get<"/robots.txt">(robots_handler),
+    get<"/feed.xml">(rss_handler),
+    // Parameterized routes — prefix match
+    get<"/post/:slug">(cached),
+    get<"/tag/:slug">(cached),
+    get<"/series/:slug">(cached)
+);
+```
+
+`dispatch` is a callable. The server calls `dispatch(request)` and gets back an `HttpResponse`. The type of `dispatch` is a template instantiation that encodes every route — the compiler can see through it completely.
+
+## Compile-Time String Literals
+
+C++20 allows class types as non-type template parameters, as long as they're structural types (public members, no mutable state). `Lit` is a fixed-size char array that captures a string literal at compile time:
+
+```cpp
+template<size_t N>
+struct Lit {
+    char buf[N]{};
+
+    constexpr Lit(const char (&s)[N]) noexcept
+    { for (size_t i = 0; i < N; ++i) buf[i] = s[i]; }
+
+    constexpr std::string_view sv() const noexcept { return {buf, N - 1}; }
+    constexpr size_t size() const noexcept { return N - 1; }
 };
 ```
 
-The root node represents `/`. Each level represents one path segment. A node can have both literal children (exact matches) and a single parameter child (wildcard).
+When you write `get<"/post/:slug">`, the compiler deduces `Lit<13>` and embeds the string `"/post/:slug"` into the type. Every operation on this string — finding the `:`, measuring the prefix, comparing segments — can happen at compile time.
 
-For Loom's routes, the trie looks like this:
+## Compile-Time Pattern Analysis
 
-```
-root /
-├── "post" → node
-│   └── :slug (param_child, param_name="slug")
-│       └── [GET handler]
-├── "tag" → node
-│   └── :slug (param_child, param_name="slug")
-│       └── [GET handler]
-├── "tags" → node [GET handler]
-├── "series" → node [GET handler]
-│   └── :name (param_child)
-│       └── [GET handler]
-├── "archives" → node [GET handler]
-├── "feed.xml" → node [GET handler]
-├── "sitemap.xml" → node [GET handler]
-└── "robots.txt" → node [GET handler]
-```
-
-The root node itself has a GET handler for `/`.
-
-## Registering Routes
+`Traits<P>` analyses a pattern at compile time using `consteval` functions:
 
 ```cpp
-void add_route(HttpMethod method, const std::string& pattern, RouteHandler handler) {
-    auto segments = split_path(pattern); // "/post/:slug" → ["post", ":slug"]
-    TrieNode* node = &root_;
+template<Lit P>
+struct Traits {
+    static consteval bool is_static() noexcept {
+        for (size_t i = 0; i < P.size(); ++i)
+            if (P[i] == ':') return false;
+        return true;
+    }
 
-    for (const auto& seg : segments) {
-        if (seg.starts_with(':')) {           // C++20 starts_with
-            if (!node->param_child)
-                node->param_child = std::make_unique<TrieNode>();
-            node->param_child->param_name = seg.substr(1); // strip ':'
-            node = node->param_child.get();
+    static consteval size_t prefix_len() noexcept {
+        for (size_t i = 0; i < P.size(); ++i)
+            if (P[i] == ':') return i;
+        return P.size();
+    }
+
+    static bool match(std::string_view path) noexcept {
+        if constexpr (is_static()) {
+            return path == P.sv();
         } else {
-            if (!node->children.count(seg))
-                node->children[seg] = std::make_unique<TrieNode>();
-            node = node->children.at(seg).get();
+            constexpr std::string_view prefix{P.buf, prefix_len()};
+            return path.size() > prefix.size() && path.starts_with(prefix);
         }
     }
-
-    node->handlers[method] = std::move(handler);
-}
+};
 ```
 
-`split_path` splits on `/` and strips empty segments from leading/trailing slashes. `"/post/:slug"` → `["post", ":slug"]`. The `:` prefix indicates a parameter.
+`consteval` means these functions *must* run at compile time — not "can", *must*. The compiler evaluates `is_static()` and `prefix_len()` during template instantiation. The `match()` function uses `if constexpr` to select the right code path based on the compile-time analysis, and the dead branch is discarded entirely.
 
-`std::make_unique<TrieNode>()` allocates the node on the heap. The parent owns it via `unique_ptr` — no manual memory management, no leaks.
+For `"/tags"`: `is_static()` is true, `match()` compiles to `path == "/tags"`.
 
-## Matching a Request
+For `"/post/:slug"`: `is_static()` is false, `prefix_len()` is 6, `match()` compiles to `path.size() > 6 && path.starts_with("/post/")`. The prefix string `"/post/"` is a compile-time constant in `.rodata`.
+
+## Route Types
+
+A `Route` is a `(Method × Pattern × Handler)` triple encoded at the type level:
 
 ```cpp
-Response route(Request& req) {
-    auto segments = split_path(req.path);
-    TrieNode* node = &root_;
-    std::vector<std::string> params; // captured parameter values
+template<HttpMethod M, Lit P, typename H>
+struct Route {
+    H handler;
 
-    for (const auto& seg : segments) {
-        if (node->children.count(seg)) {
-            node = node->children.at(seg).get(); // literal match: prefer this
-        } else if (node->param_child) {
-            params.push_back(seg);               // parameter match: capture value
-            node = node->param_child.get();
-        } else {
-            return fallback_(req);               // no match at this level
-        }
+    bool try_dispatch(HttpRequest& req, HttpResponse& out) const {
+        if (req.method != M) return false;
+        if (!Traits<P>::match(req.path)) return false;
+
+        if constexpr (!Traits<P>::is_static())
+            req.params.emplace_back(Traits<P>::param(req.path));
+
+        out = handler(req);
+        return true;
     }
+};
+```
 
-    // Found a node — check for the HTTP method
-    if (node->handlers.count(req.method)) {
-        req.params = std::move(params);
-        try {
-            return node->handlers.at(req.method)(req);
-        } catch (...) {
-            return Response::internal_error();
-        }
+Parameter extraction is also conditional on `if constexpr`. For static routes, `req.params` is never touched — the compiler doesn't even emit the code. For parameterized routes, `param()` returns `path.substr(prefix_len())` — a `string_view` slice, no allocation.
+
+## Fold Expression Dispatch
+
+`compile()` returns a `Compiled` struct that holds all routes in a `std::tuple` and dispatches with a fold expression:
+
+```cpp
+template<typename FB, typename... Rs>
+struct Compiled {
+    std::tuple<Rs...> routes;
+    FB fb;
+
+    HttpResponse operator()(HttpRequest& req) const {
+        HttpResponse result;
+        bool found = false;
+
+        auto try_one = [&](const auto& route) {
+            if (!found && route.try_dispatch(req, result))
+                found = true;
+        };
+
+        std::apply([&](const auto&... route) {
+            (try_one(route), ...);
+        }, routes);
+
+        return found ? result : fb.handler(req);
     }
-
-    // Node exists but not this method
-    if (!node->handlers.empty())
-        return Response::method_not_allowed();
-
-    return fallback_(req);
-}
+};
 ```
 
-**Literal before parameter:** When both a literal child and a parameter child exist, the literal wins. A request for `/tags` matches the literal `tags` node, not the `:slug` parameter of some other route.
-
-**Parameter capture:** When only the parameter child matches, the segment value goes into `params`. Multiple parameters across multiple levels all accumulate into the same vector, in order.
-
-**Fallback:** Any path that falls off the trie goes to the fallback handler. For Loom, this is the static file server — images, fonts, PDFs, anything that isn't a named route.
-
-## Parameter Access
-
-In a route handler:
+The fold expression `(try_one(route), ...)` expands at compile time into:
 
 ```cpp
-router.add_route(GET, "/post/:slug", [&](const Request& req) {
-    const std::string& slug = req.params[0]; // first captured param
-    auto page = cache->pages.find("/post/" + slug);
-    if (page == cache->pages.end())
-        return Response::not_found(cache->not_found);
-    return serve_cached(req, page->second);
-});
+try_one(route_0);  // get<"/">
+try_one(route_1);  // get<"/tags">
+try_one(route_2);  // get<"/archives">
+// ...
+try_one(route_9);  // get<"/series/:slug">
 ```
 
-Parameters are positional. For `/series/:name`, `req.params[0]` is the series name. For a hypothetical `/post/:year/:slug`, `params[0]` is the year and `params[1]` is the slug.
+Each `try_one` call is a separate function body with its own compile-time-specialized `match()`. The compiler inlines everything and generates an optimal branch chain — no function pointers, no vtable, no indirection.
 
-## Why a Trie Instead of a Map
+Because `found` short-circuits, routes are tried in definition order. Static routes (exact match) come first, then parameterized routes (prefix match). This means `/series` (exact) is checked before `/series/:slug` (prefix), so they don't conflict.
 
-A simple map `{"/post/:slug" → handler}` works at first. But matching against parameterised patterns means iterating all routes and testing each regex/pattern. With N routes and M segments, that's O(N×M).
+## The Builder Syntax
 
-The trie is O(M) — one hash lookup per segment in the URL, regardless of how many routes exist. For Loom's ~15 routes, the difference is negligible. But the trie also handles conflicting patterns naturally: `/tags` (literal) and `/tag/:slug` (parameter) don't interfere because they branch at the second segment.
-
-## Method Not Allowed vs Not Found
-
-There's a semantic difference between "no route matches this path" (404) and "a route matches but not with this method" (405). The trie handles both:
-
-- Path doesn't reach a node with handlers → `fallback_` (potentially 404)
-- Path reaches a node, node has handlers, but not for this method → 405
-
-This matters for APIs. If a client sends `POST /tags`, they should get 405, not 404. They found the right endpoint; they used the wrong verb.
-
-## The Fallback Handler
+The `get<"/path">` syntax works through a two-step mechanism:
 
 ```cpp
-router.set_fallback([&](const Request& req) -> Response {
-    if (!is_safe_path(req.path))
-        return Response::bad_request();
+template<Lit P>
+struct get_t {
+    template<typename H>
+    constexpr auto operator()(H h) const {
+        return Route<HttpMethod::GET, P, H>{std::move(h)};
+    }
+};
 
-    // Try the pre-rendered cache first
-    auto it = cache->pages.find(req.path);
-    if (it != cache->pages.end())
-        return serve_cached(req, it->second);
-
-    // Serve static file (disk, git blob, or GitHub redirect)
-    return serve_static_asset(req, source, config);
-});
+template<Lit P>
+inline constexpr get_t<P> get{};
 ```
 
-The fallback always checks the HTML cache first. This handles pages that don't have explicit routes but are stored by exact path (though in practice Loom registers all routes explicitly). Static assets fall through to the file-serving logic.
+`get<"/post/:slug">` is a `constexpr` variable template — a zero-size object with `operator()`. Calling `get<"/post/:slug">(handler)` constructs a `Route<GET, "/post/:slug", Handler>`. The pattern is baked into the type; the handler is stored by value.
 
-## Trie and Memory
+## What the Compiler Sees
 
-The trie is built once at startup and never modified. All nodes are owned by their parents via `unique_ptr`. The root node's destructor recursively frees the tree. There's no need for a custom allocator or any explicit cleanup.
+For a request to `/post/hello-world`, the generated code (at -O2) is roughly:
 
-`std::unordered_map` for children means O(1) average lookup per segment. For Loom's small trie, the constant factors dominate, but for a larger routing table, the O(1) per-level guarantee matters.
+```
+if path == "/"            → call handler_0
+if path == "/tags"        → call handler_1
+if path == "/archives"    → call handler_2
+if path == "/series"      → call handler_3
+if path == "/sitemap.xml" → call handler_4
+if path == "/robots.txt"  → call handler_5
+if path == "/feed.xml"    → call handler_6
+if path.starts_with("/post/")   && len > 6  → call handler_7
+if path.starts_with("/tag/")    && len > 5  → call handler_8
+if path.starts_with("/series/") && len > 8  → call handler_9
+→ call fallback
+```
+
+No heap. No hash. No indirection. Just comparisons against constants in `.rodata` and direct function calls. The branch predictor handles the rest.
+
+## Why Not a Runtime Trie
+
+The previous version of Loom used a hand-built trie: `std::unordered_map<std::string, std::unique_ptr<TrieNode>>` at each level, with parameter children as special nodes. It worked, but:
+
+1. **Heap allocations at startup** — `make_unique<TrieNode>` for every segment of every route.
+2. **Hash map lookup per segment** — runtime hash computation, cache-line misses chasing pointers.
+3. **`std::istringstream` for path splitting** — heap-allocated stream just to tokenize on `/`.
+4. **`std::function` for handlers** — type-erased callable with a potential heap allocation per route.
+
+The compile-time router eliminates all of these. The "trie" exists only in the compiler's template instantiation — it's flattened into straight-line code in the binary.
+
+For 10 routes, the performance difference is small. But the design difference is fundamental: the route table is verified at compile time, dispatch is inlined, and there's zero runtime overhead for the routing layer itself.

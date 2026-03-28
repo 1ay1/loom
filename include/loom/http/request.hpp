@@ -1,27 +1,31 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
+#include <string_view>
 #include <vector>
+#include <cstdint>
 
 namespace loom
 {
-    enum class HttpMethod { GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS, UNKNOWN };
-
-    HttpMethod parse_method(const std::string& method);
+    enum class HttpMethod : uint8_t { GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS, UNKNOWN };
 
     struct HttpRequest
     {
         HttpMethod method = HttpMethod::GET;
-        std::string path;
-        std::string query;
-        std::vector<std::string> params;
-        std::unordered_map<std::string, std::string> headers;
-        std::string body;
+        std::string_view path;
+        std::string_view query;
+        std::vector<std::string_view> params;
+        std::string_view body;
 
-        std::string header(const std::string& key) const;
+        struct Header { std::string_view key; std::string_view value; };
+        std::vector<Header> headers_;
+
+        // Key must be lowercase — stored keys are lowercased during parsing.
+        std::string_view header(std::string_view key) const;
         bool keep_alive() const;
     };
 
-    bool parse_request(const std::string& raw, HttpRequest& request);
+    // Parses an HTTP request. Modifies raw in-place (lowercases header keys).
+    // The HttpRequest contains string_views into raw — raw must outlive the request.
+    bool parse_request(std::string& raw, HttpRequest& request);
 }

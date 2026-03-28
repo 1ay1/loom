@@ -108,12 +108,13 @@ Read the [Getting Started](/getting-started) guide to build your own site, or ex
 
 | Layer | Technology |
 |---|---|
-| HTTP server | Linux epoll, edge-triggered, single-threaded |
-| Router | Hand-written trie, O(path segments) matching |
-| Cache | `std::unordered_map` + `shared_ptr` atomic swap |
+| HTTP server | Linux epoll, edge-triggered, single-threaded, zero-copy writes |
+| Router | Compile-time DSL — C++20 NTTPs, consteval pattern analysis, fold-expression dispatch |
+| Cache | Pre-serialized wire responses + `std::atomic<shared_ptr>` lock-free swap |
+| Parsing | `string_view` throughout — zero allocations on the hot path |
 | Markdown | Hand-written two-pass parser, ~1200 lines |
-| Compression | zlib deflate, level 9, pre-computed |
+| Compression | zlib deflate, level 9, pre-computed at cache build |
 | Hot reload | Linux inotify or git poll |
-| Language | C++20 — concepts, structured bindings, ranges |
+| Language | C++20 — concepts, NTTPs, consteval, if constexpr, fold expressions |
 | Dependencies | zlib only |
 | Binary size | ~846KB stripped |

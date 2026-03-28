@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <map>
 #include <ctime>
@@ -17,74 +18,182 @@
 #include "loom/render/component.hpp"
 #include "loom/http/server.hpp"
 #include "loom/http/response.hpp"
+#include "loom/http/route.hpp"
 
 #include "loom/reload/hot_reloader.hpp"
 #include "loom/reload/inotify_watcher.hpp"
 #include "loom/reload/git_watcher.hpp"
 
+// ── Compile-time MIME type table ─────────────────────────────────
+// constexpr lookup — the compiler folds this into an optimal branch
+// chain at -O2. No hash map, no heap, no runtime table construction.
+
+static constexpr std::string_view mime_type(std::string_view path) noexcept
+{
+    auto dot = path.rfind('.');
+    if (dot == std::string_view::npos) return "application/octet-stream";
+    auto ext = path.substr(dot);
+
+    // Ordered by frequency for early-out
+    if (ext == ".png")  return "image/png";
+    if (ext == ".jpg")  return "image/jpeg";
+    if (ext == ".jpeg") return "image/jpeg";
+    if (ext == ".webp") return "image/webp";
+    if (ext == ".gif")  return "image/gif";
+    if (ext == ".svg")  return "image/svg+xml";
+    if (ext == ".ico")  return "image/x-icon";
+    if (ext == ".css")  return "text/css";
+    if (ext == ".js")   return "application/javascript";
+    if (ext == ".json") return "application/json";
+    if (ext == ".woff2") return "font/woff2";
+    if (ext == ".woff") return "font/woff";
+    if (ext == ".ttf")  return "font/ttf";
+    if (ext == ".pdf")  return "application/pdf";
+    if (ext == ".mp4")  return "video/mp4";
+    if (ext == ".webm") return "video/webm";
+    return "application/octet-stream";
+}
+
+// ── Pre-serialized HTTP response builder ─────────────────────────
+
+static std::string build_http_response(
+    std::string_view status_line,
+    std::initializer_list<std::pair<std::string_view, std::string_view>> headers,
+    std::string_view body,
+    bool keep_alive)
+{
+    std::string out;
+    out.reserve(256 + body.size());
+    out.append(status_line.data(), status_line.size());
+
+    for (const auto& [k, v] : headers)
+    {
+        out.append(k.data(), k.size());
+        out += ": ";
+        out.append(v.data(), v.size());
+        out += "\r\n";
+    }
+
+    out += "Content-Length: ";
+    out += std::to_string(body.size());
+    out += "\r\nConnection: ";
+    out += keep_alive ? "keep-alive" : "close";
+    out += "\r\n\r\n";
+    out.append(body.data(), body.size());
+    return out;
+}
+
+// ── CachedPage ───────────────────────────────────────────────────
+// 6 pre-serialized wire variants per page. On the hot path the server
+// writes directly from these buffers — zero copies, zero allocations.
+
 struct CachedPage
 {
-    std::string raw;
-    std::string gzipped;
     std::string etag;
+    std::string gzip_ka;
+    std::string gzip_close;
+    std::string plain_ka;
+    std::string plain_close;
+    std::string not_modified_ka;
+    std::string not_modified_close;
 };
 
-// The entire pre-rendered site lives in this struct.
-// Immutable once built — swapped atomically by the hot reloader.
+// Transparent hash for string_view lookups in string-keyed maps
+struct PageHash
+{
+    using is_transparent = void;
+    size_t operator()(std::string_view sv) const noexcept
+    { return std::hash<std::string_view>{}(sv); }
+};
+
 struct SiteCache
 {
-    std::unordered_map<std::string, CachedPage> pages;
+    std::unordered_map<std::string, CachedPage, PageHash, std::equal_to<>> pages;
     CachedPage not_found;
     CachedPage sitemap;
     CachedPage robots;
     CachedPage rss;
 };
 
-static CachedPage make_cached(std::string html, bool minify = true)
+static constexpr std::string_view status_line_for(int status) noexcept
 {
-    if (minify)
+    switch (status)
+    {
+        case 200: return "HTTP/1.1 200 OK\r\n";
+        case 404: return "HTTP/1.1 404 Not Found\r\n";
+        default:  return "HTTP/1.1 200 OK\r\n";
+    }
+}
+
+static CachedPage make_cached(std::string html,
+    std::string_view content_type = "text/html; charset=utf-8",
+    bool do_minify = true,
+    int status = 200)
+{
+    if (do_minify)
         html = loom::minify_html(html);
+
     auto hash = std::hash<std::string>{}(html);
     std::string etag = "\"" + std::to_string(hash) + "\"";
     auto gz = loom::gzip_compress(html);
-    return {std::move(html), std::move(gz), std::move(etag)};
+
+    auto sl = status_line_for(status);
+    CachedPage page;
+    page.etag = etag;
+
+    page.gzip_ka = build_http_response(sl,
+        {{"Content-Type", content_type}, {"ETag", etag},
+         {"Cache-Control", "public, max-age=60, must-revalidate"},
+         {"Content-Encoding", "gzip"}},
+        gz, true);
+    page.gzip_close = build_http_response(sl,
+        {{"Content-Type", content_type}, {"ETag", etag},
+         {"Cache-Control", "public, max-age=60, must-revalidate"},
+         {"Content-Encoding", "gzip"}},
+        gz, false);
+    page.plain_ka = build_http_response(sl,
+        {{"Content-Type", content_type}, {"ETag", etag},
+         {"Cache-Control", "public, max-age=60, must-revalidate"}},
+        html, true);
+    page.plain_close = build_http_response(sl,
+        {{"Content-Type", content_type}, {"ETag", etag},
+         {"Cache-Control", "public, max-age=60, must-revalidate"}},
+        html, false);
+    page.not_modified_ka = build_http_response("HTTP/1.1 304 Not Modified\r\n",
+        {{"ETag", etag}, {"Cache-Control", "public, max-age=60, must-revalidate"}},
+        "", true);
+    page.not_modified_close = build_http_response("HTTP/1.1 304 Not Modified\r\n",
+        {{"ETag", etag}, {"Cache-Control", "public, max-age=60, must-revalidate"}},
+        "", false);
+
+    return page;
 }
 
 static bool accepts_gzip(const loom::HttpRequest& req)
 {
-    auto ae = req.header("Accept-Encoding");
-    return ae.find("gzip") != std::string::npos;
+    return req.header("accept-encoding").find("gzip") != std::string_view::npos;
 }
 
-static loom::HttpResponse serve_cached(const CachedPage& page, const loom::HttpRequest& req,
-    const std::string& content_type = "text/html; charset=utf-8", int status = 200)
+// Zero-copy serve: returns a prebuilt HttpResponse pointing directly
+// into the SiteCache wire buffers.
+static loom::HttpResponse serve_cached(
+    const CachedPage& page,
+    const loom::HttpRequest& req,
+    const std::shared_ptr<const SiteCache>& snap)
 {
-    auto inm = req.header("If-None-Match");
+    bool ka = req.keep_alive();
+
+    auto inm = req.header("if-none-match");
     if (!inm.empty() && inm == page.etag)
-    {
-        loom::HttpResponse resp;
-        resp.status = 304;
-        resp.headers["ETag"] = page.etag;
-        resp.headers["Cache-Control"] = "public, max-age=60, must-revalidate";
-        return resp;
-    }
+        return loom::HttpResponse::prebuilt(snap,
+            ka ? page.not_modified_ka : page.not_modified_close);
 
-    loom::HttpResponse resp;
-    resp.status = status;
-    resp.headers["Content-Type"] = content_type;
-    resp.headers["ETag"] = page.etag;
-    resp.headers["Cache-Control"] = "public, max-age=60, must-revalidate";
+    if (accepts_gzip(req))
+        return loom::HttpResponse::prebuilt(snap,
+            ka ? page.gzip_ka : page.gzip_close);
 
-    if (accepts_gzip(req) && !page.gzipped.empty())
-    {
-        resp.body = page.gzipped;
-        resp.headers["Content-Encoding"] = "gzip";
-    }
-    else
-    {
-        resp.body = page.raw;
-    }
-    return resp;
+    return loom::HttpResponse::prebuilt(snap,
+        ka ? page.plain_ka : page.plain_close);
 }
 
 static std::string format_iso_date(std::chrono::system_clock::time_point tp)
@@ -126,9 +235,8 @@ static std::string xml_escape(const std::string& s)
     return out;
 }
 
-// Build the entire SiteCache from a source. Pure function — no side effects.
-// Uses the component system (Ctx) for all rendering — theme component
-// overrides are automatically resolved and applied.
+// ── build_cache ──────────────────────────────────────────────────
+
 template<loom::ContentSource Source>
 static std::shared_ptr<const SiteCache> build_cache(Source& source)
 {
@@ -138,14 +246,12 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
     auto site = loom::build_site(source, std::move(config));
     loom::BlogEngine engine(site);
 
-    // Create the render context — resolves theme component overrides
     auto ctx = c::Ctx::from(site);
 
     auto all_tags = engine.all_tags();
     auto all_series = engine.all_series();
     c::SidebarData sidebar_data{engine.list_posts(), all_tags, all_series};
 
-    // Helper: render a full page through the component system
     auto render_page = [&](loom::PageMeta meta, loom::dom::Node content) -> std::string {
         return ctx.page(meta, std::move(content), &sidebar_data).render();
     };
@@ -281,7 +387,9 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         loom::PageMeta meta;
         meta.title = "404 \xe2\x80\x94 Not Found";
         meta.noindex = true;
-        cache->not_found = make_cached(render_page(meta, ctx(c::NotFound{})));
+        cache->not_found = make_cached(
+            render_page(meta, ctx(c::NotFound{})),
+            "text/html; charset=utf-8", true, 404);
     }
 
     // Sitemap
@@ -310,7 +418,7 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
             sitemap += "  <url><loc>" + site.base_url + "/series</loc><priority>0.4</priority></url>\n";
         sitemap += "</urlset>\n";
 
-        cache->sitemap = make_cached(sitemap, false);
+        cache->sitemap = make_cached(sitemap, "application/xml; charset=utf-8", false);
     }
 
     // Robots
@@ -321,7 +429,7 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         robots += "Disallow:\n\n";
         if (!site.base_url.empty())
             robots += "Sitemap: " + site.base_url + "/sitemap.xml\n";
-        cache->robots = make_cached(robots, false);
+        cache->robots = make_cached(robots, "text/plain; charset=utf-8", false);
     }
 
     // RSS
@@ -354,47 +462,24 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
 
         rss += "</channel>\n";
         rss += "</rss>\n";
-        cache->rss = make_cached(rss, false);
+        cache->rss = make_cached(rss, "application/rss+xml; charset=utf-8", false);
     }
 
     return cache;
 }
 
-static std::string mime_type(const std::string& path)
-{
-    auto dot = path.rfind('.');
-    if (dot == std::string::npos) return "application/octet-stream";
-    auto ext = path.substr(dot);
-    if (ext == ".png") return "image/png";
-    if (ext == ".jpg" || ext == ".jpeg") return "image/jpeg";
-    if (ext == ".gif") return "image/gif";
-    if (ext == ".svg") return "image/svg+xml";
-    if (ext == ".webp") return "image/webp";
-    if (ext == ".ico") return "image/x-icon";
-    if (ext == ".css") return "text/css";
-    if (ext == ".js") return "application/javascript";
-    if (ext == ".json") return "application/json";
-    if (ext == ".woff") return "font/woff";
-    if (ext == ".woff2") return "font/woff2";
-    if (ext == ".ttf") return "font/ttf";
-    if (ext == ".pdf") return "application/pdf";
-    if (ext == ".mp4") return "video/mp4";
-    if (ext == ".webm") return "video/webm";
-    return "application/octet-stream";
-}
+// ── Helpers ──────────────────────────────────────────────────────
 
-static bool safe_path(const std::string& path)
+static constexpr bool safe_path(std::string_view path) noexcept
 {
-    if (path.find("..") != std::string::npos) return false;
-    if (path.find('\0') != std::string::npos) return false;
+    if (path.find("..") != std::string_view::npos) return false;
+    if (path.find('\0') != std::string_view::npos) return false;
     if (path.empty() || path[0] != '/') return false;
     return true;
 }
 
 static std::string raw_content_base(const std::string& remote_url, const std::string& branch)
 {
-    // GitHub HTTPS: https://github.com/user/repo[.git]
-    // GitHub SSH:   git@github.com:user/repo[.git]
     std::string owner_repo;
     auto gh = remote_url.find("github.com/");
     if (gh != std::string::npos)
@@ -416,81 +501,11 @@ static std::string raw_content_base(const std::string& remote_url, const std::st
     return "";
 }
 
-static void setup_routes(loom::HttpServer& server, loom::AtomicCache<SiteCache>& cache)
-{
-    server.router().get("/", [&](const loom::HttpRequest& req)
-    {
-        auto snap = cache.load();
-        return serve_cached(snap->pages.at("/"), req);
-    });
-
-    server.router().get("/sitemap.xml", [&](const loom::HttpRequest& req)
-    {
-        auto snap = cache.load();
-        return serve_cached(snap->sitemap, req, "application/xml; charset=utf-8");
-    });
-
-    server.router().get("/robots.txt", [&](const loom::HttpRequest& req)
-    {
-        auto snap = cache.load();
-        return serve_cached(snap->robots, req, "text/plain; charset=utf-8");
-    });
-
-    server.router().get("/feed.xml", [&](const loom::HttpRequest& req)
-    {
-        auto snap = cache.load();
-        return serve_cached(snap->rss, req, "application/rss+xml; charset=utf-8");
-    });
-
-    server.router().get("/post/:slug", [&](const loom::HttpRequest& req)
-    {
-        auto snap = cache.load();
-        auto it = snap->pages.find("/post/" + req.params[0]);
-        if (it == snap->pages.end())
-            return serve_cached(snap->not_found, req, "text/html; charset=utf-8", 404);
-        return serve_cached(it->second, req);
-    });
-
-    server.router().get("/tags", [&](const loom::HttpRequest& req)
-    {
-        auto snap = cache.load();
-        return serve_cached(snap->pages.at("/tags"), req);
-    });
-
-    server.router().get("/tag/:slug", [&](const loom::HttpRequest& req)
-    {
-        auto snap = cache.load();
-        auto it = snap->pages.find("/tag/" + req.params[0]);
-        if (it == snap->pages.end())
-            return serve_cached(snap->not_found, req, "text/html; charset=utf-8", 404);
-        return serve_cached(it->second, req);
-    });
-
-    server.router().get("/archives", [&](const loom::HttpRequest& req)
-    {
-        auto snap = cache.load();
-        return serve_cached(snap->pages.at("/archives"), req);
-    });
-
-    server.router().get("/series", [&](const loom::HttpRequest& req)
-    {
-        auto snap = cache.load();
-        auto it = snap->pages.find("/series");
-        if (it == snap->pages.end())
-            return serve_cached(snap->not_found, req, "text/html; charset=utf-8", 404);
-        return serve_cached(it->second, req);
-    });
-
-    server.router().get("/series/:slug", [&](const loom::HttpRequest& req)
-    {
-        auto snap = cache.load();
-        auto it = snap->pages.find("/series/" + req.params[0]);
-        if (it == snap->pages.end())
-            return serve_cached(snap->not_found, req, "text/html; charset=utf-8", 404);
-        return serve_cached(it->second, req);
-    });
-
-}
+// ── Compile-time route table ─────────────────────────────────────
+//
+// Every route pattern is a non-type template parameter. The compiler
+// sees the full table as a single constexpr expression and generates
+// an optimal dispatch chain — no trie, no hash map, no vtable.
 
 static void run_with_filesystem(const std::string& content_dir)
 {
@@ -504,7 +519,6 @@ static void run_with_filesystem(const std::string& content_dir)
     loom::AtomicCache<SiteCache> cache(std::move(initial));
 
     loom::InotifyWatcher watcher(content_dir);
-
     loom::HotReloader<loom::FileSystemSource, loom::InotifyWatcher, SiteCache> reloader(
         source, watcher, cache,
         [](loom::FileSystemSource& src, const loom::ChangeSet&) {
@@ -514,37 +528,77 @@ static void run_with_filesystem(const std::string& content_dir)
     reloader.start();
     std::cout << "[hot-reload] Watching " << content_dir << " for changes" << std::endl;
 
-    loom::HttpServer server(8080);
-    setup_routes(server, cache);
+    // ── Handlers ──
 
-    server.router().set_fallback([&cache, content_dir](const loom::HttpRequest& req)
-    {
+    // Cached HTML pages — all use the same logic: look up req.path in the map
+    auto cached = [&cache](const loom::HttpRequest& req) {
+        auto snap = cache.load();
+        auto it = snap->pages.find(req.path);
+        if (it != snap->pages.end())
+            return serve_cached(it->second, req, snap);
+        return serve_cached(snap->not_found, req, snap);
+    };
+
+    // Fixed cache fields
+    auto sitemap = [&cache](const loom::HttpRequest& req) {
+        auto s = cache.load(); return serve_cached(s->sitemap, req, s);
+    };
+    auto robots = [&cache](const loom::HttpRequest& req) {
+        auto s = cache.load(); return serve_cached(s->robots, req, s);
+    };
+    auto rss = [&cache](const loom::HttpRequest& req) {
+        auto s = cache.load(); return serve_cached(s->rss, req, s);
+    };
+
+    // Static file fallback
+    auto fb = [&cache, &content_dir](loom::HttpRequest& req) {
         if (!safe_path(req.path))
             return loom::HttpResponse::not_found();
 
         auto snap = cache.load();
 
-        // Check if it's a known page first (shouldn't happen, but be safe)
         auto it = snap->pages.find(req.path);
         if (it != snap->pages.end())
-            return serve_cached(it->second, req);
+            return serve_cached(it->second, req, snap);
 
-        // Try serving a static file from the content directory
-        std::string file_path = content_dir + req.path;
+        std::string file_path = content_dir;
+        file_path += req.path;
         std::ifstream file(file_path, std::ios::binary);
         if (!file.is_open())
-            return serve_cached(snap->not_found, req, "text/html; charset=utf-8", 404);
+            return serve_cached(snap->not_found, req, snap);
 
         std::string body((std::istreambuf_iterator<char>(file)),
                           std::istreambuf_iterator<char>());
 
         loom::HttpResponse resp;
         resp.status = 200;
-        resp.headers["Content-Type"] = mime_type(req.path);
-        resp.headers["Cache-Control"] = "public, max-age=3600";
+        resp.headers = {{"Content-Type", std::string(mime_type(req.path))},
+                        {"Cache-Control", "public, max-age=3600"}};
         resp.body = std::move(body);
         return resp;
-    });
+    };
+
+    // ── Compile the route table ──
+    using namespace loom::route;
+
+    auto dispatch = compile(
+        fallback(fb),
+        // Static routes (exact match, checked first)
+        get<"/">(cached),
+        get<"/tags">(cached),
+        get<"/archives">(cached),
+        get<"/series">(cached),
+        get<"/sitemap.xml">(sitemap),
+        get<"/robots.txt">(robots),
+        get<"/feed.xml">(rss),
+        // Parameterized routes (prefix match)
+        get<"/post/:slug">(cached),
+        get<"/tag/:slug">(cached),
+        get<"/series/:slug">(cached)
+    );
+
+    loom::HttpServer server(8080);
+    server.set_dispatch(dispatch);
 
     std::cout << "Serving at http://localhost:8080" << std::endl;
     server.run();
@@ -567,7 +621,6 @@ static void run_with_git(const std::string& repo_path, const std::string& branch
     loom::AtomicCache<SiteCache> cache(std::move(initial));
 
     loom::GitWatcher watcher(repo_path, branch, fetch_remote);
-
     loom::HotReloader<loom::GitSource, loom::GitWatcher, SiteCache> reloader(
         source, watcher, cache,
         [](loom::GitSource& src, const loom::ChangeSet&) {
@@ -581,15 +634,31 @@ static void run_with_git(const std::string& repo_path, const std::string& branch
     else
         std::cout << "[hot-reload] Polling " << branch << " for new commits" << std::endl;
 
-    loom::HttpServer server(8080);
-    setup_routes(server, cache);
-
     std::string raw_base = raw_content_base(remote_url, branch);
     if (!raw_base.empty())
         std::cout << "[static] Redirecting assets to " << raw_base << std::endl;
 
-    server.router().set_fallback([&cache, repo_path, branch, content_prefix, raw_base](const loom::HttpRequest& req)
-    {
+    // ── Handlers ──
+
+    auto cached = [&cache](const loom::HttpRequest& req) {
+        auto snap = cache.load();
+        auto it = snap->pages.find(req.path);
+        if (it != snap->pages.end())
+            return serve_cached(it->second, req, snap);
+        return serve_cached(snap->not_found, req, snap);
+    };
+
+    auto sitemap_h = [&cache](const loom::HttpRequest& req) {
+        auto s = cache.load(); return serve_cached(s->sitemap, req, s);
+    };
+    auto robots_h = [&cache](const loom::HttpRequest& req) {
+        auto s = cache.load(); return serve_cached(s->robots, req, s);
+    };
+    auto rss_h = [&cache](const loom::HttpRequest& req) {
+        auto s = cache.load(); return serve_cached(s->rss, req, s);
+    };
+
+    auto fb = [&cache, repo_path, branch, content_prefix, raw_base](loom::HttpRequest& req) {
         if (!safe_path(req.path))
             return loom::HttpResponse::not_found();
 
@@ -597,40 +666,61 @@ static void run_with_git(const std::string& repo_path, const std::string& branch
 
         auto it = snap->pages.find(req.path);
         if (it != snap->pages.end())
-            return serve_cached(it->second, req);
+            return serve_cached(it->second, req, snap);
 
-        // Static asset path within the repo
-        std::string asset_path = content_prefix.empty()
-            ? req.path.substr(1)
-            : content_prefix + req.path;
+        std::string asset_path;
+        if (content_prefix.empty())
+            asset_path = std::string(req.path.substr(1));
+        else
+        {
+            asset_path = content_prefix;
+            asset_path += req.path;
+        }
 
-        // If we have a public remote, redirect instead of serving bytes
         if (!raw_base.empty())
         {
             loom::HttpResponse resp;
             resp.status = 302;
-            resp.headers["Location"] = raw_base + "/" + asset_path;
-            resp.headers["Cache-Control"] = "public, max-age=3600";
+            resp.headers = {{"Location", raw_base + "/" + asset_path},
+                            {"Cache-Control", "public, max-age=3600"}};
             return resp;
         }
 
-        // Local repo — serve from git objects
         try
         {
             auto body = loom::git_read_blob(repo_path, branch, asset_path);
 
             loom::HttpResponse resp;
             resp.status = 200;
-            resp.headers["Content-Type"] = mime_type(req.path);
-            resp.headers["Cache-Control"] = "public, max-age=3600";
+            resp.headers = {{"Content-Type", std::string(mime_type(req.path))},
+                            {"Cache-Control", "public, max-age=3600"}};
             resp.body = std::move(body);
             return resp;
         }
         catch (const loom::GitError&)
         {
-            return serve_cached(snap->not_found, req, "text/html; charset=utf-8", 404);
+            return serve_cached(snap->not_found, req, snap);
         }
-    });
+    };
+
+    using namespace loom::route;
+
+    auto dispatch = compile(
+        fallback(fb),
+        get<"/">(cached),
+        get<"/tags">(cached),
+        get<"/archives">(cached),
+        get<"/series">(cached),
+        get<"/sitemap.xml">(sitemap_h),
+        get<"/robots.txt">(robots_h),
+        get<"/feed.xml">(rss_h),
+        get<"/post/:slug">(cached),
+        get<"/tag/:slug">(cached),
+        get<"/series/:slug">(cached)
+    );
+
+    loom::HttpServer server(8080);
+    server.set_dispatch(dispatch);
 
     std::cout << "Serving at http://localhost:8080" << std::endl;
     server.run();
@@ -638,9 +728,6 @@ static void run_with_git(const std::string& repo_path, const std::string& branch
 
 int main(int argc, char* argv[])
 {
-    // Usage:
-    //   ./loom [content_dir]                                 — filesystem source (default)
-    //   ./loom --git <repo_or_url> [branch] [content_prefix] — git source (local path or remote URL)
     if (argc > 1 && std::string(argv[1]) == "--git")
     {
         if (argc < 3)
