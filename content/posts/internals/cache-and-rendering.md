@@ -1,27 +1,24 @@
 ---
-title: Pre-Rendering and the Atomic Cache — How Loom Serves Sub-Millisecond HTML
-date: 2025-10-20
+title: "Pre-Rendering and the Atomic Cache — Sub-Millisecond Responses"
+date: 2025-12-12
 slug: cache-and-rendering
-tags: internals, architecture, cpp
-excerpt: Every page is rendered once at startup and pre-serialized into complete HTTP wire responses. Requests are hash table lookups that return a pointer to pre-built bytes — no serialization, no body copy, no allocation.
+tags: [loom-internals, c++20, performance, caching, http]
+excerpt: "How Loom pre-renders every page into 6 HTTP wire variants, serves them with zero copies and zero allocations, and keeps responses under a millisecond."
 ---
 
-Loom's core performance trick is simple: do all the work upfront. At startup, every post, page, tag listing, series page, RSS feed, sitemap, and 404 is rendered to HTML, minified, and gzip-compressed. Requests are hash table lookups. No template engine runs per request, no disk is touched, no markdown is parsed.
+Most web frameworks generate HTML on every request. Loom generates HTML zero times per request. Every page is pre-rendered at startup into complete HTTP responses — headers, body, gzip compression, ETag, everything. When a request arrives, the server writes pre-built bytes directly to the socket. No template rendering, no string concatenation, no memory allocation.
 
-## The SiteCache
+This is what makes Loom fast: it does all the work upfront and caches the results in a format that is ready to write to the wire.
+
+This post builds on [post #2 on containers](/post/containers-and-iteration), [post #5 on shared_ptr](/post/ownership-and-move-semantics), and [post #6 on string_view](/post/string-view-and-zero-copy).
+
+## SiteCache: The Central Data Structure
+
+The entire pre-rendered site lives in a single struct:
 
 ```cpp
-struct CachedPage {
-    std::string etag;
-    std::string gzip_ka;          // complete HTTP response: gzip + keep-alive
-    std::string gzip_close;       // complete HTTP response: gzip + close
-    std::string plain_ka;         // complete HTTP response: plain + keep-alive
-    std::string plain_close;      // complete HTTP response: plain + close
-    std::string not_modified_ka;  // 304 response: keep-alive
-    std::string not_modified_close; // 304 response: close
-};
-
-struct SiteCache {
+struct SiteCache
+{
     std::unordered_map<std::string, CachedPage, PageHash, std::equal_to<>> pages;
     CachedPage not_found;
     CachedPage sitemap;
@@ -30,199 +27,302 @@ struct SiteCache {
 };
 ```
 
-Each `CachedPage` stores six pre-serialized HTTP wire responses — every combination of `{gzip, plain, 304} × {keep-alive, close}`. The server doesn't build responses per-request; it picks a pre-built string and writes it directly to the socket.
+The `pages` map holds every HTML page keyed by URL path (`/`, `/post/some-slug`, `/tag/c++`, etc.). Fixed resources like the 404 page, sitemap, robots.txt, and RSS feed have their own fields.
 
-`pages` uses a transparent hash (`PageHash` with `is_transparent`) so lookups accept `string_view` without constructing a `std::string`. The request path is a `string_view` into the connection's read buffer — the lookup is `cache.pages.find(req.path)` with zero allocation.
-
-## Building a CachedPage
-
-Every page goes through `make_cached`, which produces six wire variants:
+The map uses a transparent hash and comparator — `PageHash` with `is_transparent` and `std::equal_to<>`:
 
 ```cpp
-CachedPage make_cached(std::string html, std::string_view content_type, int status) {
-    html = minify_html(html);
-    std::string etag = "\"" + std::to_string(std::hash<std::string>{}(html)) + "\"";
-    std::string gz = gzip_compress(html);
+struct PageHash
+{
+    using is_transparent = void;
+    size_t operator()(std::string_view sv) const noexcept
+    { return std::hash<std::string_view>{}(sv); }
+};
+```
 
+This is the technique from [post #6](/post/string-view-and-zero-copy). With a transparent hash, you can look up a `std::string_view` key in a `std::string`-keyed map without allocating a temporary `std::string`. The HTTP request gives us a `string_view` path (pointing into the read buffer), and we can use it directly for the map lookup. Zero copies on the hot path.
+
+## CachedPage: Six Wire Variants
+
+Each page is stored as six pre-serialized HTTP responses:
+
+```cpp
+struct CachedPage
+{
+    std::string etag;
+    std::string gzip_ka;          // gzipped, Connection: keep-alive
+    std::string gzip_close;       // gzipped, Connection: close
+    std::string plain_ka;         // uncompressed, keep-alive
+    std::string plain_close;      // uncompressed, close
+    std::string not_modified_ka;  // 304, keep-alive
+    std::string not_modified_close; // 304, close
+};
+```
+
+Why six variants? Because the HTTP response differs based on three binary choices:
+
+1. **Gzip or plain?** Depends on the client's `Accept-Encoding` header.
+2. **Keep-alive or close?** Depends on the client's `Connection` header.
+3. **Full response or 304?** Depends on whether the client sent a matching `If-None-Match` ETag.
+
+That is 2 x 2 x 2 = 8 combinations, but the 304 response does not need gzip/plain variants (it has no body), so we get 4 + 2 = 6.
+
+Each variant is a complete HTTP response: status line, headers, content-length, connection header, blank line, body. Ready to be written to a socket with a single `write()` call.
+
+## The Build Pipeline
+
+The `make_cached()` function converts raw HTML into a `CachedPage`:
+
+```cpp
+static CachedPage make_cached(std::string html,
+    std::string_view content_type = "text/html; charset=utf-8",
+    bool do_minify = true, int status = 200)
+{
+    if (do_minify)
+        html = loom::minify_html(html);
+
+    auto hash = std::hash<std::string>{}(html);
+    std::string etag = "\"" + std::to_string(hash) + "\"";
+    auto gz = loom::gzip_compress(html);
+
+    auto sl = status_line_for(status);
     CachedPage page;
     page.etag = etag;
 
-    // Each variant is a complete HTTP response: status line + headers + body
-    page.gzip_ka = build_http_response(status_line, {
-        {"Content-Type", content_type}, {"ETag", etag},
-        {"Cache-Control", "public, max-age=60, must-revalidate"},
-        {"Content-Encoding", "gzip"}
-    }, gz, /*keep_alive=*/true);
+    page.gzip_ka = build_http_response(sl,
+        {{"Content-Type", content_type}, {"ETag", etag},
+         {"Cache-Control", "public, max-age=60, must-revalidate"},
+         {"Content-Encoding", "gzip"}},
+        gz, true);
+    page.gzip_close = build_http_response(sl,
+        {{"Content-Type", content_type}, {"ETag", etag},
+         {"Cache-Control", "public, max-age=60, must-revalidate"},
+         {"Content-Encoding", "gzip"}},
+        gz, false);
+    page.plain_ka = build_http_response(sl, /* ... */, html, true);
+    page.plain_close = build_http_response(sl, /* ... */, html, false);
+    page.not_modified_ka = build_http_response("HTTP/1.1 304 Not Modified\r\n",
+        {{"ETag", etag}, {"Cache-Control", "public, max-age=60, must-revalidate"}},
+        "", true);
+    page.not_modified_close = build_http_response("HTTP/1.1 304 Not Modified\r\n",
+        {{"ETag", etag}, {"Cache-Control", "..."}}, "", false);
 
-    page.gzip_close = /* same with Connection: close */;
-    page.plain_ka   = /* same without Content-Encoding, body is html */;
-    // ... all six variants
     return page;
 }
 ```
 
-Four steps:
+The pipeline for each page:
 
-**1. Minify.** Strip redundant whitespace between HTML tags. A typical page goes from 50KB to 35KB. The minifier preserves `<pre>`, `<script>`, and `<style>` content verbatim.
+1. **Minify**: Strip whitespace from HTML (unless `do_minify` is false, as for XML feeds).
+2. **Hash**: Compute a `std::hash<std::string>` of the HTML for the ETag.
+3. **Compress**: Gzip the HTML.
+4. **Serialize**: Build six complete HTTP response strings.
 
-**2. Hash.** `std::hash<std::string>` wrapped in quotes becomes the ETag: `"14923847261"`. Not cryptographic — just needs to change when content changes.
+The ETag is a quoted hash string like `"12345678901234"`. It is not a cryptographic hash — just `std::hash`, which is fast and collision-resistant enough for cache validation. The same ETag appears in all six variants.
 
-**3. Compress.** `gzip_compress` uses zlib level 9 in gzip format. Compression happens once.
-
-**4. Pre-serialize.** Each variant is a complete HTTP response: `HTTP/1.1 200 OK\r\nContent-Type: ...\r\nETag: ...\r\nContent-Length: ...\r\nConnection: keep-alive\r\n\r\n<body>`. Status line, headers, and body concatenated into a single `std::string`. At serve time, the server picks one and writes it to the socket — no `serialize()` call, no body copy, no header formatting.
-
-## The Build Process
-
-`build_cache` takes a content source, renders everything, and returns a `shared_ptr<SiteCache>`. Here's the structure:
+`build_http_response()` constructs a complete HTTP response as a single string:
 
 ```cpp
-std::shared_ptr<SiteCache> build_cache(ContentSource& source) {
-    auto cache = std::make_shared<SiteCache>();
-    auto site  = build_site(source);    // load posts, pages, config
-    BlogEngine engine(site);            // query layer (related posts, etc.)
+static std::string build_http_response(
+    std::string_view status_line,
+    std::initializer_list<std::pair<std::string_view, std::string_view>> headers,
+    std::string_view body, bool keep_alive)
+{
+    std::string out;
+    out.reserve(256 + body.size());
+    out.append(status_line.data(), status_line.size());
 
-    // Pre-render navigation HTML once — reused on every page
-    auto nav = render_navigation(site.navigation);
-
-    // Pre-render sidebar HTML once
-    auto sidebar = render_sidebar(site, engine);
-
-    // Index page
-    cache->pages["/"] = make_cached(
-        render_layout(site, nav, render_index(engine.list_posts(), site.layout), sidebar));
-
-    // Every published, non-future post
-    for (const auto& post : site.posts) {
-        if (post.draft || post.published > now()) continue;
-
-        PageMeta meta;
-        meta.title          = post.title.get();
-        meta.canonical_path = "/post/" + post.slug.get();
-        meta.og_type        = "article";
-        meta.published_date = format_iso_date(post.published);
-        meta.tags           = /* tag strings */;
-        meta.og_image       = post.image;
-
-        auto content = render_post(post, engine.related(post), engine.prev_next(post), site.layout);
-        cache->pages["/post/" + post.slug.get()] = make_cached(render_layout(site, nav, content, sidebar, meta));
+    for (const auto& [k, v] : headers)
+    {
+        out.append(k.data(), k.size());
+        out += ": ";
+        out.append(v.data(), v.size());
+        out += "\r\n";
     }
 
-    // Tag pages, series pages, archive, 404, RSS, sitemap, robots...
+    out += "Content-Length: ";
+    out += std::to_string(body.size());
+    out += "\r\nConnection: ";
+    out += keep_alive ? "keep-alive" : "close";
+    out += "\r\n\r\n";
+    out.append(body.data(), body.size());
+    return out;
+}
+```
+
+One allocation (the `reserve`), one linear write. The result is a string that can be written directly to a TCP socket.
+
+## The Full Build
+
+The `build_cache()` function orchestrates the entire process:
+
+```cpp
+template<loom::ContentSource Source>
+static std::shared_ptr<const SiteCache> build_cache(Source& source)
+{
+    auto config = source.site_config();
+    auto site = loom::build_site(source, std::move(config));
+    loom::BlogEngine engine(site);
+    auto ctx = component::Ctx::from(site);
+
+    auto all_tags = engine.all_tags();
+    auto all_series = engine.all_series();
+    component::SidebarData sidebar_data{engine.list_posts(), all_tags, all_series};
+
+    auto cache = std::make_shared<SiteCache>();
+
+    // Index page
+    auto posts = engine.list_posts();
+    cache->pages["/"] = make_cached(
+        render_page(meta, ctx(component::Index{.posts = &posts})));
+
+    // Each post
+    for (const auto& post : site.posts)
+    {
+        // ... build PostContext (prev/next, related, series)
+        cache->pages["/post/" + post.slug.get()] = make_cached(
+            render_page(meta, ctx(component::PostFull{.post = &post, .context = &pctx})));
+    }
+
+    // Tag pages, archives, series pages, static pages, 404, sitemap, robots, RSS
+    // ... same pattern for each
+
     return cache;
 }
 ```
 
-Navigation and sidebar HTML are rendered once and reused for every page. They're identical across the whole site so this is safe, and it avoids re-rendering the same strings thousands of times.
+The pattern is the same for every page:
 
-## The Render Pipeline
+1. Build the component props (which post, which tag, etc.)
+2. Render to HTML via the component system: `ctx(Component{.props = ...})`
+3. Wrap in the page layout: `ctx.page(meta, content, &sidebar_data).render()`
+4. Convert to a cached page: `make_cached(html)`
+5. Store in the map under the URL path
 
-For a post, the call chain is:
+The result is a `shared_ptr<const SiteCache>` — immutable and reference-counted. This is critical for the hot reload system.
 
-```
-render_layout(site, nav, render_post(post, ...), sidebar, meta)
-    └── render_post builds the article HTML:
-            <h1>title</h1>
-            <div class="post-meta">date · reading time</div>
-            <div class="post-tags">...</div>
-            <nav class="series-nav">...</nav>      (if in series)
-            <div class="post-content">{{html}}</div>
-            <nav class="post-nav">prev | next</nav>
-            <section class="related-posts">...</section>
-    └── render_layout wraps it in the full HTML document:
-            <!DOCTYPE html>
-            <head> meta, OG, JSON-LD, preload, CSS </head>
-            <body>
-              <header> nav </header>
-              <div class="container">
-                <main>
-                  <nav class="breadcrumb">...</nav>
-                  {{content}}
-                </main>
-                <aside class="sidebar">...</aside>
-              </div>
-              <footer>...</footer>
-            </body>
-```
+## Related Posts: Tag Overlap Scoring
 
-The final HTML string goes into `make_cached`. Nothing in this pipeline touches the network or filesystem — it's pure string manipulation.
-
-## Atomic Cache Swap
-
-The cache lives behind an `AtomicCache<SiteCache>`:
+One interesting part of the build is related post scoring:
 
 ```cpp
-template<typename T>
-class AtomicCache {
-    std::atomic<std::shared_ptr<const T>> data_;
-public:
-    std::shared_ptr<const T> load() const noexcept {
-        return data_.load(std::memory_order_acquire);
-    }
-
-    void store(std::shared_ptr<const T> next) noexcept {
-        data_.store(std::move(next), std::memory_order_release);
-    }
-};
-```
-
-C++20's `std::atomic<std::shared_ptr<T>>` makes both `load()` and `store()` lock-free. No mutex, no contention. Readers never block writers, writers never block readers.
-
-**Why this works without per-request locking:** Each request calls `load()` once, gets a `shared_ptr`, and holds it for the duration of request handling. Even if a rebuild happens mid-request, the request's `shared_ptr` keeps the old cache alive. The new cache is only accessible to requests that call `load()` after the `store()`.
-
-The read path is:
-
-```cpp
-auto snap = cache.load();                    // lock-free atomic load
-auto it = snap->pages.find(req.path);        // hash lookup (string_view, no alloc)
-return HttpResponse::prebuilt(snap, it->gzip_ka); // pointer into pre-serialized data
-```
-
-Zero locks. Zero copies. The `shared_ptr` in the response keeps the cache snapshot alive until the write completes — even if a hot-reload swaps in a new cache mid-write.
-
-## Related Posts Scoring
-
-`engine.related(post)` returns the 3 most related posts by tag overlap:
-
-```cpp
-std::vector<PostSummary> related(const Post& post) {
+std::vector<PostSummary> related_posts(const Post& post, int count = 3) const
+{
     std::vector<std::pair<int, PostSummary>> scored;
-    for (const auto& other : posts_) {
-        if (other.slug == post.slug) continue;
-        int score = 0;
-        for (const auto& tag : post.tags)
-            if (std::find(other.tags.begin(), other.tags.end(), tag) != other.tags.end())
-                score++;
-        if (score > 0)
-            scored.push_back({score, summarize(other)});
+
+    for (const auto& p : site_.posts)
+    {
+        if (p.slug.get() == post.slug.get()) continue;
+
+        int overlap = 0;
+        for (const auto& t1 : post.tags)
+            for (const auto& t2 : p.tags)
+                if (t1.get() == t2.get()) ++overlap;
+
+        if (overlap > 0)
+            scored.push_back({overlap, make_summary(p)});
     }
-    std::sort(scored.begin(), scored.end(),
-        [](const auto& a, const auto& b) { return a.first > b.first; });
-    return top_n(scored, 3);
+
+    std::sort(scored.begin(), scored.end(), [](const auto& a, const auto& b) {
+        if (a.first != b.first) return a.first > b.first;
+        return a.second.published > b.second.published;
+    });
+
+    // Return top `count` results
 }
 ```
 
-This runs at cache build time, not per request. The O(posts²) scoring is fast enough for any reasonable blog — 100 posts means 10,000 comparisons, done once.
+For each post, count how many tags it shares with every other post. Sort by overlap (descending), then by date. Take the top 3. This is O(n * m^2) where n is the number of posts and m is the average tag count — fine for a blog with hundreds of posts and single-digit tags per post.
 
-## Sitemap Priority
+The scoring runs at build time, not request time. The results are baked into the HTML.
 
-The sitemap assigns priority scores based on page type:
+## Serving: Zero Copies
 
-| Page | Priority |
-|---|---|
-| Homepage | 1.0 |
-| Posts | 0.8 |
-| Static pages | 0.6 |
-| Series pages | 0.5 |
-| Archives, series index | 0.5 |
-| Tag pages | 0.4 |
-| Tags index | 0.3 |
+When a request arrives, the server selects the right variant:
 
-These are hints for crawlers, not guarantees. The homepage is most important, deep tag pages least.
+```cpp
+static loom::HttpResponse serve_cached(
+    const CachedPage& page,
+    const loom::HttpRequest& req,
+    const std::shared_ptr<const SiteCache>& snap)
+{
+    bool ka = req.keep_alive();
 
-## Memory Usage
+    auto inm = req.header("if-none-match");
+    if (!inm.empty() && inm == page.etag)
+        return loom::HttpResponse::prebuilt(snap,
+            ka ? page.not_modified_ka : page.not_modified_close);
 
-Each page stores six pre-serialized variants. A typical page: ~22KB minified HTML, ~6KB gzipped. The wire response adds ~200 bytes of headers per variant. The 304 responses are ~150 bytes each.
+    if (accepts_gzip(req))
+        return loom::HttpResponse::prebuilt(snap,
+            ka ? page.gzip_ka : page.gzip_close);
 
-Per page: `(22 + 6) × 2` (ka + close for both plain and gzip) + negligible 304 overhead ≈ 56KB. For 100 posts plus listing pages: roughly 100 × 56KB ≈ 5.6MB. Well within reason for any modern machine, and the payoff is zero per-request work.
+    return loom::HttpResponse::prebuilt(snap,
+        ka ? page.plain_ka : page.plain_close);
+}
+```
 
-The raw HTML is not stored separately — it's embedded in the wire responses. This means the cache is slightly larger than the old approach (which stored raw + gzip + etag), but eliminates the per-request `serialize()` call and body copy that were the main latency bottleneck.
+Three checks: ETag match, gzip support, keep-alive. Each one selects a pre-built string.
+
+The `HttpResponse::prebuilt()` static method creates a response that points directly into the cache:
+
+```cpp
+static HttpResponse prebuilt(std::shared_ptr<const void> owner,
+                              const std::string& wire)
+{
+    HttpResponse r;
+    r.wire_owner_ = std::move(owner);
+    r.wire_data_ = wire.data();
+    r.wire_len_ = wire.size();
+    return r;
+}
+```
+
+`wire_data_` is a raw pointer into the `SiteCache`'s string. `wire_owner_` is a `shared_ptr<const void>` that keeps the cache alive. The server writes from `wire_data_` directly — no copy, no allocation.
+
+The `shared_ptr<const void>` trick is worth noting. The `SiteCache` is a `shared_ptr<const SiteCache>`, but the response stores a `shared_ptr<const void>`. This works because `shared_ptr` preserves the deleter regardless of the pointer type. You can convert `shared_ptr<const SiteCache>` to `shared_ptr<const void>` and the original deleter still runs when the reference count hits zero. This is discussed in [post #5 on ownership](/post/ownership-and-move-semantics).
+
+## Memory Budget
+
+Each `CachedPage` stores six strings. For a typical blog post:
+
+- **Plain HTML**: ~15KB after minification
+- **Gzipped HTML**: ~5KB
+- **HTTP headers**: ~200 bytes per variant
+- **304 responses**: ~100 bytes each
+
+That is roughly 15 + 15 + 5 + 5 + 0.1 + 0.1 + overhead = ~42KB per page. The two plain variants share the same body content but differ in the Connection header, so they are about the same size. The two gzip variants similarly.
+
+For a blog with 100 posts plus tag pages, archives, and series pages — maybe 150 pages total — that is about 6MB of pre-built HTTP responses. Plus the map overhead, the sidebar data, and the feed/sitemap strings. Call it 8-10MB total.
+
+This is tiny. A single image is often larger than the entire pre-rendered site. And unlike an image, these bytes are the complete, ready-to-write response. The server does not touch them — it just writes pointers.
+
+## The Sidebar Optimization
+
+There is one more optimization worth mentioning. The sidebar (recent posts, tag cloud, series list) is the same on every page. Rather than rendering it separately for each page, it is computed once:
+
+```cpp
+component::SidebarData sidebar_data{engine.list_posts(), all_tags, all_series};
+
+auto render_page = [&](loom::PageMeta meta, loom::dom::Node content) -> std::string {
+    return ctx.page(meta, std::move(content), &sidebar_data).render();
+};
+```
+
+The `sidebar_data` is shared across all `render_page` calls. The component system renders the sidebar once per page (because it needs to be in the HTML), but the data collection happens just once for the entire site.
+
+## Summary
+
+The rendering pipeline works like a compiler:
+
+1. **Source** (markdown, frontmatter, config) is loaded from the content source
+2. **Domain model** (Site, Posts, Tags, Series) is built by `build_site()`
+3. **Components** render the domain model into a DOM tree
+4. **Serialization** converts the DOM tree to an HTML string
+5. **Minification** strips unnecessary whitespace
+6. **Hashing** produces an ETag
+7. **Compression** produces a gzip variant
+8. **Wire serialization** produces complete HTTP response strings
+9. **Caching** stores everything in an immutable `SiteCache`
+
+Steps 1-9 happen once at startup (and once per hot reload). Steps 0 happen per request: look up the path, check ETag, select the variant, write the bytes. That is why responses are sub-millisecond — the "response" is just a pointer into pre-built data.
