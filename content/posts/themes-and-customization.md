@@ -35,9 +35,9 @@ Each theme defines a light palette, a dark palette, a font stack, font size, and
 - **Corners** — Soft (rounded), Sharp (square), or Round (pill-shaped). Affects every element site-wide.
 - **Tag style** — Pill badges, bordered rectangles, outlined with muted borders, or plain text.
 - **Link style** — Solid underline, dotted, dashed, or none.
-- **Code blocks** — Plain background, full border, or a left accent stripe.
-- **Blockquotes** — Accent-colored or muted left border.
 - **Headings** — Normal, UPPERCASE, or lowercase.
+
+All code styling is palette-driven — code blocks use `var(--text)` on a subtle `var(--bg)` tint, inline code uses `var(--accent)` on an accent-tinted background. Define your five palette colors and code rendering works in both light and dark mode automatically. No separate light/dark paths needed.
 
 This is why `terminal` and `rose` feel completely different — terminal uses sharp corners, bordered tags, and no link decoration, while rose uses round corners, pill-shaped tags, and pill-shaped nav links. Themes can also override content defaults like date format and index headings without writing component code.
 

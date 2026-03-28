@@ -55,6 +55,16 @@ Compare how `terminal` and `rose` use the same structural system to achieve comp
 
 Same theme system, radically different UI.
 
+### Palette-Driven Styling
+
+Code blocks, inline code, and blockquotes all derive their colors from the five palette tokens (`bg`, `text`, `muted`, `border`, `accent`). There are no separate light/dark color paths — define your palette once and everything works in both modes:
+
+- **Code blocks** use `color-mix(var(--text) 7%, var(--bg))` as background with `var(--text)` for text
+- **Inline code** uses `color-mix(var(--accent) 10%, var(--bg))` as background with `var(--accent)` for text — so inline code always matches your theme's accent color
+- **Blockquotes** use `var(--accent)` for the left border and `var(--muted)` for text
+
+Themes only need to add a border or adjust spacing — colors come from the palette automatically.
+
 Themes can also override content-level defaults like date formatting and index headings — the terminal theme uses `"%b %d"` dates and a lowercase "posts" heading without needing any component overrides.
 
 ---

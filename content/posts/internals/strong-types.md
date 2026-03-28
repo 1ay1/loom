@@ -373,6 +373,8 @@ inline const ThemeDef rose = {
 
 Same type system, radically different UI. Terminal uses `content_area().nest()` to scope CSS rules to `.post-content,.page-content` in one expression, `link_colors()` to generate color + hover pairs, and `vars()` for CSS variable shorthand. Rose uses `Corners::Round` and `NavStyle::Pills` to get pill-shaped UI elements with zero custom CSS. The type system makes the differences explicit and the compiler generates different CSS for each.
 
+Neither theme needs to define separate light/dark code block colors. The base stylesheet derives code block backgrounds from `var(--text)` and `var(--bg)` using `color-mix()`, and inline code text uses `var(--accent)`. Define a light palette and a dark palette — code rendering works automatically in both modes.
+
 C++20 designated initializers make the mapping explicit. Miss a required field and the compiler warns. Swap `.light` and `.dark` and the type system catches it — `Palette` expects `Color` values, not `FontStack`. Skip a structural field and it defaults to the base behavior.
 
 ### Theme Composition

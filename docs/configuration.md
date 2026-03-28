@@ -192,7 +192,9 @@ Loom ships with 5 built-in themes. Each sets colors, fonts, sizing, and structur
 | `gruvbox` | Retro groove, warm earthy contrast, orange accent, bordered tags |
 | `rose` | Soft pinks, magenta accent, pill-shaped elements, rounded corners |
 
-Themes define more than colors — they set structural choices like corner rounding (`Corners::Sharp` vs `Round`), tag styles, link decoration, card hover effects, and more. See the [Themes](/themes) page for details.
+Themes define more than colors — they set structural choices like corner rounding (`Corners::Sharp` vs `Round`), tag styles, link decoration, card hover effects, and more.
+
+All code styling is palette-driven. Code blocks derive their background from `var(--text)` and `var(--bg)`, inline code uses `var(--accent)` for text color. No separate light/dark color definitions needed — define your palette and both modes work automatically. See the [Themes](/themes) page for details.
 
 ### 2. Theme Variable Overrides
 
