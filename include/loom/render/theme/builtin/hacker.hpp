@@ -143,21 +143,37 @@ inline const ThemeDef hacker = {
         ".post-meta"_s | color(dim_txt) | font_size(12_px),
         ".heading-anchor"_s | opacity(0.2),
 
-        // ── Content area — body text slightly smaller than UI ──
-        ".post-content,.page-content"_s | font_size(raw("12.5px")),
+        // ── Content area ──
+        ".post-content,.page-content"_s
+            | font_size(raw("12.5px")) | color(raw("#b0e0b0")) | line_height(num(1.7)),
         content_area().nest(
             "a"_s | color(phosphor) | text_decoration(underline)
                   | text_decoration_style(dotted) | text_underline_offset(3_px),
             "a:hover"_s | text_decoration_style(solid),
-            "pre"_s | border_left(2_px, solid, dim_p) | font_size(12_px),
-            ":not(pre)>code"_s | color(phosphor) | bg(transparent) | padding(0_px),
-            "h1,h2,h3,h4"_s | color(phosphor) | font_weight(400),
-            "h2"_s | font_size(13_px) | margin_top(28_px) | border_bottom(none),
-            "h3"_s | font_size(12_px),
-            "hr"_s | border_top(1_px, dashed, gray),
-            "blockquote"_s | border_left(2_px, solid, dim_p)
-                           | color(dim_txt) | bg(transparent) | padding(4_px, 14_px),
-            "table th"_s | bg(transparent) | color(phosphor),
+            // Headings — bright, spaced, dashed top border as separator
+            "h2"_s | font_size(14_px) | font_weight(400) | color(phosphor)
+                   | margin_top(36_px) | margin_bottom(12_px) | padding_top(12_px)
+                   | border_top(1_px, dashed, gray) | border_bottom(none)
+                   | text_transform(none) | prop("text-shadow", glow),
+            "h3"_s | font_size(13_px) | font_weight(400) | color(phosphor)
+                   | margin_top(24_px) | margin_bottom(8_px),
+            "h4"_s | font_size(12_px) | color(dim_p),
+            // Code blocks — dark inset background
+            "pre"_s | border_left(2_px, solid, dim_p) | margin(raw("20px 0"))
+                    | bg(raw("#060d06")) | padding(12_px) | font_size(12_px),
+            ":not(pre)>code"_s | color(phosphor) | bg(raw("#0f1a0f")) | padding(1_px, 4_px),
+            // Blockquotes — visually distinct
+            "blockquote"_s | border_left(2_px, solid, dim_p) | color(dim_txt)
+                           | bg(raw("#060d06")) | padding(8_px, 16_px)
+                           | margin(raw("16px 0")) | font_style(italic),
+            // Bold stands out
+            "strong"_s | color(phosphor),
+            // HR — clear section break
+            "hr"_s | border_top(1_px, dashed, gray) | margin(raw("28px 0")),
+            // Paragraphs
+            "p"_s | margin_bottom(14_px),
+            // Tables
+            "table th"_s | bg(raw("#060d06")) | color(phosphor),
             "table th,table td"_s | border_color(gray)
         ),
 
