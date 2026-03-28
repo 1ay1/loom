@@ -24,16 +24,19 @@ inline const ThemeDef rose = {
         "::selection"_s | bg(hex("#c2185b")) | color(hex("#fffbfc")),
         "::selection"_s.dark() | bg(hex("#f06292")) | color(hex("#1a1118")),
 
-        // Soft code blocks
+        // Soft code blocks — light
         content_area().nest(
             "pre"_s | bg(hex("#fdf2f5")) | border(1_px, solid, hex("#f0dde4")) | color(hex("#3d2b35")),
             "pre code"_s | color(hex("#3d2b35")),
-            "pre"_s.dark() | bg(hex("#231a1f")) | border(1_px, solid, hex("#2d2028")) | color(hex("#e8d0da")),
-            "pre code"_s.dark() | color(hex("#e8d0da")),
             "blockquote"_s | border_left(3_px, solid, hex("#c2185b")) | color(hex("#8e7a86"))
-                           | bg(hex("#fdf2f5")) | padding(10_px, 16_px),
-            "blockquote"_s.dark() | border_left(3_px, solid, hex("#f06292")) | color(hex("#b09aa6"))
-                                  | bg(hex("#231a1f"))
+                           | bg(hex("#fdf2f5")) | padding(10_px, 16_px)
+        ),
+        // Soft code blocks — dark
+        content_area().dark().nest(
+            "pre"_s | bg(hex("#231a1f")) | border(1_px, solid, hex("#2d2028")) | color(hex("#e8d0da")),
+            "pre code"_s | color(hex("#e8d0da")),
+            "blockquote"_s | border_left(3_px, solid, hex("#f06292")) | color(hex("#b09aa6"))
+                           | bg(hex("#231a1f"))
         ),
 
         // Cards with blush tint

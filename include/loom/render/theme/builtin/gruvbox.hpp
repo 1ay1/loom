@@ -30,16 +30,19 @@ inline const ThemeDef gruvbox = {
         "::selection"_s | bg(gruvbox_orange) | color(gruvbox_cream),
         "::selection"_s.dark() | bg(gruvbox_borange) | color(gruvbox_dark),
 
-        // Earthy code blocks
+        // Earthy code blocks — light
         content_area().nest(
             "pre"_s | bg(hex("#f2e5bc")) | color(hex("#3c3836")) | border(1_px, solid, hex("#d5c4a1")),
             "pre code"_s | color(hex("#3c3836")),
-            "pre"_s.dark() | bg(hex("#1d2021")) | color(hex("#ebdbb2")) | border(1_px, solid, hex("#3c3836")),
-            "pre code"_s.dark() | color(hex("#ebdbb2")),
             "blockquote"_s | border_left(3_px, solid, gruvbox_orange) | color(hex("#7c6f64"))
-                           | bg(hex("#f2e5bc")) | padding(10_px, 16_px),
-            "blockquote"_s.dark() | border_left(3_px, solid, gruvbox_borange) | color(hex("#a89984"))
-                                  | bg(hex("#1d2021"))
+                           | bg(hex("#f2e5bc")) | padding(10_px, 16_px)
+        ),
+        // Earthy code blocks — dark
+        content_area().dark().nest(
+            "pre"_s | bg(hex("#1d2021")) | color(hex("#ebdbb2")) | border(1_px, solid, hex("#3c3836")),
+            "pre code"_s | color(hex("#ebdbb2")),
+            "blockquote"_s | border_left(3_px, solid, gruvbox_borange) | color(hex("#a89984"))
+                           | bg(hex("#1d2021"))
         ),
 
         // Warm cards
