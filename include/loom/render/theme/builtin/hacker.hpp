@@ -39,8 +39,8 @@ namespace {
 inline const ThemeDef hacker = {
     .light = {{black.v}, {phosphor.v}, {dim_txt.v}, {gray.v}, {phosphor.v}},
     .dark  = {{black.v}, {phosphor.v}, {dim_txt.v}, {gray.v}, {phosphor.v}},
-    .font  = {"'Courier New',Courier,ui-monospace,'SF Mono',monospace"},
-    .font_size = "13px",
+    .font  = {"ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,'Courier New',monospace"},
+    .font_size = "13.5px",
     .max_width = "740px",
     .line_height = "1.6",
     .heading_weight = "400",
