@@ -191,7 +191,7 @@ inline const ThemeDef hacker = {
         ".series-nav"_s | border(1_px, dashed, gray) | bg(raw("#060d06"))
                         | padding(12_px, 16_px),
         ".series-label"_s | color(dim_txt) | font_size(12_px) | margin_bottom(8_px),
-        ".series-list"_s | padding_left(0_px)
+        ".series-list"_s | list_style(none) | padding_left(0_px)
                          | prop("counter-reset", raw("line")),
         ".series-list li"_s | padding(3_px, 0_px) | padding_left(36_px)
                             | prop("counter-increment", raw("line"))
