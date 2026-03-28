@@ -205,7 +205,8 @@ inline const ThemeDef hacker = {
         ".series-current"_s | color(phosphor) | font_weight(400) | text_transform(none),
         ".series-current::after"_s | prop("content", raw("'  \\2190'"))
                                    | color(dim_txt) | font_size(11_px),
-        ".series-list .date"_s | display(none),
+        ".series-list .date"_s | display(block) | font_size(11_px) | color(dim_txt)
+                               | margin_top(1_px),
 
         // ── Sidebar ──
         ".sidebar"_s | font_size(13_px),
@@ -258,7 +259,7 @@ inline const ThemeDef hacker = {
             return dom::footer(
                 div(class_("container"),
                     p_(dom::raw(
-                        "<span style='color:#3a6a3a'>PID " + pid + "</span>"
+                        "<span style='color:#5a9a5a'>PID " + pid + "</span>"
                         " &middot; "
                         + (!ctx.site.footer.copyright.empty()
                             ? ctx.site.footer.copyright
