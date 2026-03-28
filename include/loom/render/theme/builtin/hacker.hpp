@@ -296,7 +296,7 @@ inline const ThemeDef hacker = {
         .index = [](const Index& props, const Ctx& ctx, Children) {
             if (!props.posts) return empty();
             return section(
-                h2(dom::raw("~/ &nbsp;<span style='color:#3a6a3a;font-weight:400;"
+                h2(dom::raw("~/ &nbsp;<span style='color:#5a9a5a;font-weight:400;"
                     "text-transform:none;letter-spacing:0'>" +
                     std::to_string(props.posts->size()) + " posts</span>")),
                 each(*props.posts, [&](const PostSummary& p) {
