@@ -36,7 +36,7 @@ base_url = https://yourdomain.com
 theme = nord
 ```
 
-Pick any theme: `default`, `terminal`, `nord`, `gruvbox`, `rose`. See them all on the [Themes](/themes) page.
+Pick any theme: `default`, `terminal`, `nord`, `gruvbox`, `rose`, `hacker`. See them all on the [Themes](/themes) page.
 
 Run your blog:
 

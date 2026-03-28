@@ -6,7 +6,7 @@ tags: feature, themes, tutorial
 excerpt: "A complete guide to Loom's theming system: pick a built-in theme, override individual variables, inject custom CSS, or replace the stylesheet entirely."
 ---
 
-Loom ships with 5 built-in themes. Every theme supports light and dark mode, switches instantly via hot reload, and ships inlined — zero external requests.
+Loom ships with 6 built-in themes. Every theme supports light and dark mode, switches instantly via hot reload, and ships inlined — zero external requests.
 
 This post walks through every layer of customization, from the simplest one-line change to building your own theme from scratch.
 
@@ -29,6 +29,7 @@ Here's every available theme:
 | `nord` | Arctic frost palette, muted blues |
 | `gruvbox` | Retro groove, warm earthy contrast, orange accent |
 | `rose` | Soft pinks, magenta accent, round corners |
+| `hacker` | CRT phosphor green-on-black, scanlines, custom components |
 
 Each theme defines a light palette, a dark palette, a font stack, font size, and content width. But themes go beyond colors — they also define **structural choices** that change the shape and behavior of UI components:
 

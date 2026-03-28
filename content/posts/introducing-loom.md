@@ -24,7 +24,7 @@ No Node.js. No Ruby. No Python. No Docker. No config files to debug. Just a C++ 
 Out of the box, with zero configuration:
 
 - **Hot reload** — edit a file, refresh the browser, see the change. No build step, no restart.
-- **5 built-in themes** — switch with one line in `site.conf`. Dark mode included.
+- **6 built-in themes** — switch with one line in `site.conf`. Dark mode included.
 - **Full SEO** — Open Graph, Twitter Cards, JSON-LD, sitemap, RSS feed. All automatic.
 - **Sub-millisecond responses** — every page is pre-rendered, compressed, and cached in memory.
 - **Series, tags, archives** — organize content however you want.

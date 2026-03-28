@@ -5,7 +5,7 @@ slug: themes
 
 ## Built-in Themes
 
-Set `theme = name` in `site.conf`. All 5 themes support dark and light mode. Changes take effect instantly via hot reload.
+Set `theme = name` in `site.conf`. All 6 themes support dark and light mode. Changes take effect instantly via hot reload.
 
 | Theme | Font | Style |
 |-------|------|-------|
@@ -14,6 +14,7 @@ Set `theme = name` in `site.conf`. All 5 themes support dark and light mode. Cha
 | `nord` | Inter / sans-serif | Arctic frost palette, muted blues, soft glow on card hover |
 | `gruvbox` | System sans-serif | Retro groove, warm earthy contrast, orange accent, bordered tags |
 | `rose` | System sans-serif | Soft pinks, magenta accent, pill-shaped nav and tags, round corners |
+| `hacker` | Courier New | CRT phosphor green-on-black, scanline overlay, blinking cursor, prompt-style headings, `ls`-style listings, custom components |
 
 ---
 
@@ -24,6 +25,8 @@ Set `theme = name` in `site.conf`. All 5 themes support dark and light mode. Cha
 **Want a familiar editor palette?** Try `nord` or `gruvbox` — your readers will feel at home.
 
 **Want something soft and elegant?** Try `rose` — round corners, pill-shaped navigation, and a warm magenta accent.
+
+**Want to go full nerd?** Try `hacker` — CRT scanlines, phosphor green, blinking cursor, terminal prompts as headings, `ls -lt` style post listings, and custom component overrides. It demonstrates the full power of the theming system.
 
 **Playing it safe?** `default` works for everyone.
 

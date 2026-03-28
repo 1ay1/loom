@@ -109,7 +109,7 @@ Series appear in the sidebar widget and at `/series` and `/series/:name`.
 | `description` | Site description |
 | `author` | Author name (used in meta tags, RSS, JSON-LD) |
 | `base_url` | Full base URL for canonical links, sitemap, RSS |
-| `theme` | Theme name — 5 built-in: `default`, `terminal`, `nord`, `gruvbox`, `rose` |
+| `theme` | Theme name — 6 built-in: `default`, `terminal`, `nord`, `gruvbox`, `rose`, `hacker` |
 
 ### Navigation
 

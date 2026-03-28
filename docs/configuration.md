@@ -182,7 +182,7 @@ Loom uses CSS custom properties for all visual styling. There are three ways to 
 theme = default
 ```
 
-Loom ships with 5 built-in themes. Each sets colors, fonts, sizing, and structural choices for both light and dark modes.
+Loom ships with 6 built-in themes. Each sets colors, fonts, sizing, and structural choices for both light and dark modes.
 
 | Theme | Description |
 |---|---|
@@ -191,6 +191,7 @@ Loom ships with 5 built-in themes. Each sets colors, fonts, sizing, and structur
 | `nord` | Arctic color palette, Inter font, frost blues, soft glow on hover |
 | `gruvbox` | Retro groove, warm earthy contrast, orange accent, bordered tags |
 | `rose` | Soft pinks, magenta accent, pill-shaped elements, rounded corners |
+| `hacker` | CRT phosphor green-on-black, scanlines, blinking cursor, custom components |
 
 Themes define more than colors — they set structural choices like corner rounding (`Corners::Sharp` vs `Round`), tag styles, link decoration, card hover effects, and more.
 

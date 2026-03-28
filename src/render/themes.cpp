@@ -5,6 +5,7 @@
 #include "../../include/loom/render/theme/builtin/nord.hpp"
 #include "../../include/loom/render/theme/builtin/gruvbox.hpp"
 #include "../../include/loom/render/theme/builtin/rose.hpp"
+#include "../../include/loom/render/theme/builtin/hacker.hpp"
 
 namespace loom
 {
@@ -17,6 +18,7 @@ static const std::map<std::string, theme::ThemeDef> THEMES = {
     {"nord",     bt::nord},
     {"gruvbox",  bt::gruvbox},
     {"rose",     bt::rose},
+    {"hacker",   bt::hacker},
 };
 
 const std::map<std::string, theme::ThemeDef>& builtin_themes()

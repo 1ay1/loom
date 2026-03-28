@@ -28,7 +28,7 @@ Every static site generator needs a build step, a deploy pipeline, and a runtime
 - **Gzip + ETag** — compressed responses with HTTP 304 support out of the box
 - **HTML minification** — automatic, zero config
 - **Hot reload** — inotify-based filesystem watching with 500ms debounce, or git polling for commit-driven updates
-- **5 built-in themes** — default, terminal, nord, gruvbox, rose — all with light/dark mode
+- **6 built-in themes** — default, terminal, nord, gruvbox, rose — all with light/dark mode
 - **RSS, sitemap, robots.txt** — generated automatically
 - **Tags, series, archives** — first-class content organization with dedicated pages
 - **Sidebar widgets** — recent posts, tag cloud, about text
@@ -193,7 +193,7 @@ custom_head_html = <link rel="icon" href="/favicon.ico">
 
 ## Themes
 
-All 5 themes ship with light and dark variants. The toggle is automatic (respects `prefers-color-scheme`, with manual override persisted to localStorage).
+All 6 themes ship with light and dark variants. The toggle is automatic (respects `prefers-color-scheme`, with manual override persisted to localStorage).
 
 | Theme | Font | Vibe |
 |-------|------|------|
@@ -202,6 +202,7 @@ All 5 themes ship with light and dark variants. The toggle is automatic (respect
 | `nord` | Inter / sans-serif | Arctic color palette, muted frost blues |
 | `gruvbox` | System sans-serif | Retro groove, warm earthy contrast, orange accent |
 | `rose` | System sans-serif | Soft pinks, elegant, magenta accent, pill-shaped elements |
+| `hacker` | Courier New | CRT phosphor green-on-black, scanlines, blinking cursor, prompt-style UI |
 
 Themes go beyond colors — they define structural choices like corner rounding, tag styles, link decoration, and more. The theme DSL makes it easy to create new themes purely in C++ with type-safe CSS helpers.
 
