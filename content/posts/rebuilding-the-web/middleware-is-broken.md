@@ -1,9 +1,9 @@
 ---
-title: Middleware: The Hidden Enemy of Your Web Server
+title: "app.use(chaos): Why Middleware Architectures Fall Apart"
 date: 2026-03-12
 slug: middleware-is-broken
 tags: architecture, systems, series, performance
-excerpt: Every call to app.use() is a promise that something, somewhere, will call next(). Whether that happens correctly is between your middleware and God.
+excerpt: "Your /health endpoint runs through 12 middleware functions to return {ok: true}. Your architecture is doing a pull-up, a squat, and a mile run before it's allowed to say I'm fine."
 ---
 
 At some point in your career, you will ship a bug caused by a middleware calling `next()` twice.
@@ -102,9 +102,12 @@ Three years later: 34 middleware functions. Nobody knows the exact order they ru
 
 The fifteen-minute setup bought you fifteen minutes. The maintenance costs are still compounding. They will compound forever.
 
-The question isn't "does middleware work?" It works, for a while. Everything works for a while. The question is what you're trading for that initial convenience — and whether you'd make the same trade if the invoice arrived on Day 1 instead of Year 3.
+The question isn't "does middleware work?" Everything works for a while.
+
+The question is whether you'd make the same trade if the invoice arrived on Day 1 instead of Year 3. If every `app.use()` call came with a popup that said *"This will add 2ms of latency to every request, make your control flow untraceable, and create a dependency on a package maintained by a DJ"* — would you still click OK?
+
+You already know the answer. You just haven't said it out loud yet.
 
 ---
 
-*Part 2 of the "Rebuilding the Web" series.*
-**Next:** [The Template Language Fallacy: Why Your View Layer is a Performance Sinkhole](/post/no-more-templates)
+**Next:** [The Template Language Fallacy](/post/no-more-templates)

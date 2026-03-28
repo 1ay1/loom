@@ -1,9 +1,9 @@
 ---
-title: The ORM Delusion: Why Your Database Abstraction Is Making You Slow
+title: "247 Database Queries to Render One Page: The ORM Delusion"
 date: 2026-03-17
 slug: database-lies
 tags: architecture, databases, performance, series
-excerpt: Your ORM is quietly sending 300 database queries to render one page. It just never mentioned that.
+excerpt: "Your ORM is quietly sending 247 database queries to render one page. It smiled warmly while loading your entire database into memory one row at a time, like a golden retriever fetching every stick in the park."
 ---
 
 Your web app has a dashboard.
@@ -137,9 +137,10 @@ Learning to write SQL — understanding joins, indexes, execution plans, and the
 
 Kill the ORM. Write the queries. Run `EXPLAIN ANALYZE`. Know what your system is actually doing.
 
-The database has been trying to tell you. The ORM was just covering its ears.
+The database has been trying to tell you for years. It's been sending performance warnings, slow query logs, and timeout errors — desperately waving its arms. The ORM just kept translating them as "everything is fine."
+
+Fire the translator. Talk to your database directly. It has a lot to say.
 
 ---
 
-*Part 4 of the "Rebuilding the Web" series.*
-**Next:** [The Distributed Systems Lie: You Don't Need Microservices](/post/microservice-lies)
+**Next:** [You Don't Need Microservices](/post/microservice-lies)

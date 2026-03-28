@@ -1,9 +1,9 @@
 ---
-title: The Template Language Fallacy: Why Your View Layer is a Performance Sinkhole
+title: "I Deleted Our Template Engine. Response Time Went From 35ms to 1ms."
 date: 2026-03-14
 slug: no-more-templates
 tags: architecture, performance, compilers, web
-excerpt: Template engines exist so that designers can edit HTML. Designers haven't touched your Jinja files in two years.
+excerpt: "Template engines exist so designers can edit HTML. Designers haven't touched your Jinja files in two years. You're running an interpreter inside your server for an audience that left."
 ---
 
 Template engines were invented for a beautiful reason.
@@ -107,9 +107,10 @@ The comfort you feel in a template language comes from years of working around i
 
 The alternative isn't ugly. It isn't worse. The initial 20 minutes of "this feels weird" is a small price for a view layer you can type-check, test, debug, and actually trust at 3am when the site is down and the template error message says `'NoneType' object is not iterable` with no line number.
 
-A template engine once made sense. In 2006. When PHP was king, designers hand-edited HTML, and "separation of concerns" meant literally different people editing different files. That world is gone. The designers are in Figma. The files are yours. You might as well write them in a real language.
+A template engine once made sense. In 2006. When PHP was king, designers hand-edited HTML, and "separation of concerns" meant literally different people editing different files.
+
+That world is gone. The designers are in Figma. The files are yours. You might as well write them in a real language — and pick up a free 35x speedup while you're at it.
 
 ---
 
-*Part 3 of the "Rebuilding the Web" series.*
-**Next:** [The ORM Delusion: Why Your Database Abstraction Is Making You Slow](/post/database-lies)
+**Next:** [The ORM Delusion](/post/database-lies)

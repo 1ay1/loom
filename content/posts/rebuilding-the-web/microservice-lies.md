@@ -1,9 +1,9 @@
 ---
-title: The Distributed Systems Lie: You Don't Need Microservices
+title: "You Don't Need Microservices. You Need To Write Better Code."
 date: 2026-03-19
 slug: microservice-lies
 tags: architecture, microservices, systems, devops
-excerpt: Stack Overflow serves 1.3 billion page views a month with 9 web servers. You have 500 users and three Kubernetes clusters.
+excerpt: "Stack Overflow serves 1.3 billion page views a month with 9 web servers. WhatsApp hit 450M users with 32 engineers. You have 500 users and three Kubernetes clusters."
 ---
 
 Let me tell you about a system that handles 1.3 billion page views every month.
@@ -114,9 +114,12 @@ Before you decompose a service, answer these questions honestly:
 
 If the answer is "we might need to scale it independently someday" — you don't have a problem. You have anxiety.
 
-Build the monolith. Make the code fast. Profile before you split. And when someone suggests microservices at the architecture meeting, ask them: "How many users do we have?" Then ask them how many Stack Overflow has. Then sit in the silence.
+Build the monolith. Make the code fast. Profile before you split.
+
+And next time someone proposes microservices at the architecture meeting, ask two questions: "How many users do we have?" and "How many does Stack Overflow have?"
+
+Then sit in the silence. The silence is the architecture review.
 
 ---
 
-*Part 5 of the "Rebuilding the Web" series.*
-**Next:** [Complexity Is a Choice: Why Your Stack Is 100x Heavier Than It Needs To Be](/post/complexity-is-a-choice)
+**Next:** [Complexity Is a Choice](/post/complexity-is-a-choice)

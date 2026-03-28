@@ -113,11 +113,10 @@ Routing is a data structure. Control flow is logic. State transitions can be typ
 
 None of that requires magic. None of it requires a framework that hides what's happening behind seven layers of middleware and a prayer. The code *can be* the system — not a facade painted on top of one.
 
-That's what the rest of this series is about. We're going to look at every piece of the modern web stack and ask: what are you actually doing, and could I do it better if I understood it?
+That's what the rest of this series is about. We're going to look at every piece of the modern web stack — middleware, templates, ORMs, microservices — and ask a question the framework vendors don't want you to ask:
 
-The answer, inconveniently, is almost always yes.
+*What if the reason this is hard is because someone made it hard on purpose?*
 
 ---
 
-*Part 1 of the "Rebuilding the Web" series.*
-**Next:** [Middleware: The Hidden Enemy of Your Web Server](/post/middleware-is-broken)
+**Next:** [app.use(chaos): Why Middleware Architectures Fall Apart](/post/middleware-is-broken)

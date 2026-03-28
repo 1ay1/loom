@@ -1,9 +1,9 @@
 ---
-title: Complexity Is a Choice: Why Your Stack Is 100x Heavier Than It Needs To Be
+title: "500MB to Print Hello World: How We Mass-Hallucinated an Entire Industry"
 date: 2026-03-21
 slug: complexity-is-a-choice
 tags: architecture, philosophy, systems, web
-excerpt: It now takes 500MB of software to display the words "Hello, World." We did this to ourselves. We can undo it.
+excerpt: "In 1991, the entire web fit in 8MB. A Hello World app now requires 500MB. We made software 62,500 times larger to do the same thing. If this were any other discipline, there'd be a congressional hearing."
 ---
 
 Do you know how much software it takes to display "Hello, World" in a browser in 2026?
@@ -111,9 +111,10 @@ Loom is 800KB. No dependencies. 10-second build. Sub-millisecond response times 
 
 That's the other end of the spectrum. It's not a theoretical position. It's running, right now, serving this page, on a server that costs less than your lunch.
 
-It's available to anyone willing to make different choices.
+It's available to anyone willing to make different choices. The hard part was never the code. The hard part is looking at the industry consensus and saying: *no, I don't think I will.*
+
+The [source code is here](https://github.com/1ay1/loom). It's 800KB. It serves this page. It has no opinions about your career — only about whether software should work.
 
 ---
 
-*Part 6 of the "Rebuilding the Web" series.*
-**The End.** -- Or the beginning. The [source code is here](https://github.com/1ay1/loom) if you want to see what it looks like.
+*End of the "Rebuilding the Web" series.*
