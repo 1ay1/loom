@@ -32,10 +32,10 @@ inline const ThemeDef gruvbox = {
 
         // Earthy code blocks
         content_area().nest(
-            "pre"_s | bg(hex("#f2e5bc")) | border(1_px, solid, hex("#d5c4a1")),
-            "pre"_s.dark() | bg(hex("#1d2021")) | border(1_px, solid, hex("#3c3836")),
-            ":not(pre)>code"_s | bg(hex("#f2e5bc")) | color(hex("#9d0006")) | padding(2_px, 5_px),
-            ":not(pre)>code"_s.dark() | bg(hex("#1d2021")) | color(hex("#fe8019")) | padding(2_px, 5_px),
+            "pre"_s | bg(hex("#f2e5bc")) | color(hex("#3c3836")) | border(1_px, solid, hex("#d5c4a1")),
+            "pre code"_s | color(hex("#3c3836")),
+            "pre"_s.dark() | bg(hex("#1d2021")) | color(hex("#ebdbb2")) | border(1_px, solid, hex("#3c3836")),
+            "pre code"_s.dark() | color(hex("#ebdbb2")),
             "blockquote"_s | border_left(3_px, solid, gruvbox_orange) | color(hex("#7c6f64"))
                            | bg(hex("#f2e5bc")) | padding(10_px, 16_px),
             "blockquote"_s.dark() | border_left(3_px, solid, gruvbox_borange) | color(hex("#a89984"))

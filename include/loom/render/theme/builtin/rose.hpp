@@ -30,8 +30,6 @@ inline const ThemeDef rose = {
             "pre code"_s | color(hex("#3d2b35")),
             "pre"_s.dark() | bg(hex("#231a1f")) | border(1_px, solid, hex("#2d2028")) | color(hex("#e8d0da")),
             "pre code"_s.dark() | color(hex("#e8d0da")),
-            ":not(pre)>code"_s | bg(hex("#fdf2f5")) | color(hex("#c2185b")) | padding(2_px, 6_px),
-            ":not(pre)>code"_s.dark() | bg(hex("#231a1f")) | color(hex("#f06292")) | padding(2_px, 6_px),
             "blockquote"_s | border_left(3_px, solid, hex("#c2185b")) | color(hex("#8e7a86"))
                            | bg(hex("#fdf2f5")) | padding(10_px, 16_px),
             "blockquote"_s.dark() | border_left(3_px, solid, hex("#f06292")) | color(hex("#b09aa6"))

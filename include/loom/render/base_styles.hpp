@@ -276,13 +276,17 @@ inline css::Sheet base_content()
         // Code
         ".post-content pre,.page-content pre"_s
             | bg(raw("color-mix(in srgb, var(--text) 7%, var(--bg))"))
+            | color(raw("var(--text)"))
             | padding(px(14)) | border_radius(raw("var(--border-radius)"))
             | prop("overflow-x", raw("auto")) | margin_bottom(px(14))
             | font_size(px(13)) | line_height(raw("1.5")),
         ".post-content code,.page-content code"_s
             | prop("font-family", raw("var(--code-font)")),
+        ".post-content pre code,.page-content pre code"_s
+            | color(raw("inherit")),
         ".post-content :not(pre)>code,.page-content :not(pre)>code"_s
-            | bg(raw("color-mix(in srgb, var(--text) 7%, var(--bg))"))
+            | bg(raw("color-mix(in srgb, var(--accent) 10%, var(--bg))"))
+            | color(raw("var(--accent)"))
             | padding(raw("2px 6px"))
             | border_radius(raw("calc(var(--border-radius) * 0.67)"))
             | font_size(raw("0.9em")),

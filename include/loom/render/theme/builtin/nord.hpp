@@ -24,10 +24,10 @@ inline const ThemeDef nord = {
 
         // Soften code blocks with nord palette
         content_area().nest(
-            "pre"_s | bg(hex("#e5e9f0")) | border(1_px, solid, hex("#d8dee9")),
-            "pre"_s.dark() | bg(hex("#3b4252")) | border(1_px, solid, hex("#434c5e")),
-            ":not(pre)>code"_s | bg(hex("#e5e9f0")) | padding(2_px, 5_px),
-            ":not(pre)>code"_s.dark() | bg(hex("#3b4252")) | padding(2_px, 5_px),
+            "pre"_s | bg(hex("#e5e9f0")) | color(hex("#2e3440")) | border(1_px, solid, hex("#d8dee9")),
+            "pre code"_s | color(hex("#2e3440")),
+            "pre"_s.dark() | bg(hex("#3b4252")) | color(hex("#d8dee9")) | border(1_px, solid, hex("#434c5e")),
+            "pre code"_s.dark() | color(hex("#d8dee9")),
             "blockquote"_s | border_left(3_px, solid, hex("#5e81ac"))
                            | color(hex("#4c566a")) | bg(hex("#e5e9f0")) | padding(10_px, 16_px),
             "blockquote"_s.dark() | border_left(3_px, solid, hex("#88c0d0"))
