@@ -154,6 +154,7 @@ struct NotFound        { static Node render(const NotFound&, const Ctx&, Childre
 struct SearchPage      { static Node render(const SearchPage&, const Ctx&, Children); };
 struct TableOfContents { const std::vector<TocEntry>* entries = nullptr; static Node render(const TableOfContents&, const Ctx&, Children); };
 struct ReadingProgress { static Node render(const ReadingProgress&, const Ctx&, Children); };
+struct PostGraph       { const std::vector<PostSummary>* posts = nullptr; static Node render(const PostGraph&, const Ctx&, Children); };
 
 // ─────────────────────────────────────────────────────────────────────
 //  ComponentOverrides — one std::function slot per component
@@ -194,6 +195,7 @@ struct ComponentOverrides
     RenderFn<SearchPage> search_page{};
     RenderFn<TableOfContents> table_of_contents{};
     RenderFn<ReadingProgress> reading_progress{};
+    RenderFn<PostGraph>       post_graph{};
 
     // Type-safe lookup — resolves component type to the correct slot
     template<typename C>
@@ -237,6 +239,7 @@ struct ComponentOverrides
         else if constexpr (std::is_same_v<C, SearchPage>)        return search_page;
         else if constexpr (std::is_same_v<C, TableOfContents>)  return table_of_contents;
         else if constexpr (std::is_same_v<C, ReadingProgress>)  return reading_progress;
+        else if constexpr (std::is_same_v<C, PostGraph>)       return post_graph;
     }
 };
 
@@ -280,6 +283,7 @@ struct Ctx
     const Site& site;
     const ComponentOverrides* overrides = nullptr;
     const theme::ThemeDef* theme_def = nullptr;
+    const AssetManifest* assets = nullptr;
 
     // ctx(Component{.props}, child1, child2, ...)
     template<typename C, typename... Args>
@@ -313,8 +317,16 @@ struct Ctx
     }
 
     // Build from site — resolves theme overrides automatically
-    static Ctx from(const Site& site);
+    static Ctx from(const Site& site, const AssetManifest* assets = nullptr);
 };
+
+// ── Build the full combined CSS for the site ──
+// Used by the cache builder to create the external CSS asset.
+std::string build_combined_css(const Site& site);
+
+// ── Build the full combined UX JS bundle ──
+// Used by the cache builder to create the external JS asset.
+std::string build_ux_js_bundle();
 
 // ── Helper: fragment from children vector ──
 
@@ -395,6 +407,7 @@ using component::NotFound;
 using component::SearchPage;
 using component::TableOfContents;
 using component::ReadingProgress;
+using component::PostGraph;
 using component::TocEntry;
 
 // DOM elements (the ones theme authors actually use)

@@ -770,6 +770,241 @@ inline css::Sheet base_responsive()
     );
 }
 
+// ── Sidenotes (Tufte-style) ──
+
+inline css::Sheet base_sidenotes()
+{
+    return sheet(
+        ".sidenote-toggle"_s
+            | prop("cursor", pointer) | color(raw("var(--accent)")),
+        ".sidenote-checkbox"_s
+            | display(none),
+        ".sidenote"_s
+            | display(none) | font_size(px(13)) | line_height(raw("1.5"))
+            | color(raw("var(--muted)")) | prop("vertical-align", raw("baseline")),
+
+        // Wide screens: show in margin
+        media("(min-width: 1100px)",
+            ".post-content,.page-content"_s
+                | prop("position", relative),
+            ".sidenote"_s
+                | display(block) | position(raw("absolute")) | right_(raw("-240px"))
+                | width(raw("200px")) | margin_top(raw("-1.4em"))
+                | padding_left(px(16)) | border_left(px(2), solid, raw("var(--border)"))
+                | font_size(px(12)),
+            ".sidenote-toggle"_s
+                | prop("cursor", raw("default"))
+        ),
+
+        // Narrow screens: toggle inline
+        media(max_w(px(1099)),
+            ".sidenote-checkbox:checked+.sidenote"_s
+                | display(block) | padding(raw("8px 12px")) | margin(raw("8px 0"))
+                | bg(raw("color-mix(in srgb, var(--accent) 5%, var(--bg))"))
+                | border_radius(raw("var(--border-radius)"))
+                | border_left(px(3), solid, raw("var(--accent)"))
+        )
+    );
+}
+
+// ── Code blocks (titles + copy button) ──
+
+inline css::Sheet base_code_blocks()
+{
+    return sheet(
+        ".code-block"_s
+            | position(relative) | margin_bottom(px(14)),
+        ".code-title"_s
+            | font_size(px(12)) | font_weight(600)
+            | prop("font-family", raw("var(--code-font)"))
+            | color(raw("var(--muted)")) | padding(raw("6px 14px"))
+            | bg(raw("color-mix(in srgb, var(--text) 10%, var(--bg))"))
+            | border_radius(raw("var(--border-radius) var(--border-radius) 0 0"))
+            | border_bottom(px(1), solid, raw("var(--border)")),
+        ".code-block pre"_s
+            | margin_bottom(px(0)),
+        ".code-block .code-title+pre"_s
+            | border_radius(raw("0 0 var(--border-radius) var(--border-radius)")),
+        ".code-copy"_s
+            | position(raw("absolute")) | top(px(6)) | right_(px(6))
+            | padding(raw("2px 10px")) | font_size(px(11))
+            | bg(raw("color-mix(in srgb, var(--text) 10%, var(--bg))"))
+            | color(raw("var(--muted)")) | border(px(1), solid, raw("var(--border)"))
+            | border_radius(px(4)) | prop("cursor", pointer)
+            | opacity(0) | transition(raw("opacity 0.15s"))
+            | prop("font-family", raw("var(--font)")),
+        ".code-block:hover .code-copy"_s
+            | opacity(1.0),
+        ".code-copy:hover"_s
+            | bg(raw("var(--accent)")) | color(raw("var(--bg)"))
+            | border_color(raw("var(--accent)")),
+        // Adjust copy button position when title is present
+        ".code-block:has(.code-title) .code-copy"_s
+            | top(raw("calc(6px + 1em + 12px)"))
+    );
+}
+
+// ── Command palette ──
+
+inline css::Sheet base_cmd_palette()
+{
+    return sheet(
+        ".cmd-palette-overlay"_s
+            | position(fixed) | inset(px(0))
+            | bg(raw("rgba(0,0,0,0.4)")) | z_index(10000)
+            | display(raw("flex")) | prop("justify-content", center)
+            | padding_top(raw("min(20vh, 150px)"))
+            | prop("align-items", raw("flex-start"))
+            | opacity(0) | prop("pointer-events", none)
+            | transition(raw("opacity 0.15s")),
+        ".cmd-palette-overlay.visible"_s
+            | opacity(1.0) | prop("pointer-events", raw("auto")),
+        ".cmd-palette"_s
+            | width(raw("min(540px, 90vw)")) | max_height(raw("400px"))
+            | bg(raw("var(--bg)")) | border(px(1), solid, raw("var(--border)"))
+            | border_radius(px(12))
+            | box_shadow(raw("0 16px 70px rgba(0,0,0,0.35)"))
+            | prop("overflow", hidden)
+            | prop("transform", raw("translateY(-8px) scale(0.98)"))
+            | transition(raw("transform 0.15s")),
+        ".cmd-palette-overlay.visible .cmd-palette"_s
+            | prop("transform", raw("translateY(0) scale(1)")),
+        ".cmd-input"_s
+            | width(raw("100%")) | padding(raw("14px 18px"))
+            | border(none) | prop("border-bottom", raw("1px solid var(--border)"))
+            | bg(transparent) | color(raw("var(--text)"))
+            | font_size(px(16)) | prop("outline", none)
+            | prop("font-family", raw("var(--font)")),
+        ".cmd-results"_s
+            | max_height(raw("320px")) | overflow_y(raw("auto"))
+            | padding(raw("4px 0")),
+        ".cmd-item"_s
+            | display(block) | padding(raw("10px 18px"))
+            | text_decoration(none) | color(raw("var(--text)"))
+            | transition(raw("background 0.1s")),
+        ".cmd-item.active,.cmd-item:hover"_s
+            | bg(raw("color-mix(in srgb, var(--accent) 10%, var(--bg))")),
+        ".cmd-title"_s
+            | display(block) | font_weight(500),
+        ".cmd-tags"_s
+            | display(block) | font_size(px(12)) | color(raw("var(--muted)"))
+            | margin_top(px(2)),
+        ".cmd-empty"_s
+            | padding(raw("20px 18px")) | color(raw("var(--muted)"))
+            | font_size(px(14))
+    );
+}
+
+// ── Image zoom ──
+
+inline css::Sheet base_image_zoom()
+{
+    return sheet(
+        ".img-zoom-overlay"_s
+            | position(fixed) | inset(px(0))
+            | bg(raw("rgba(0,0,0,0.85)")) | z_index(10001)
+            | display(raw("flex")) | prop("justify-content", center)
+            | prop("align-items", center)
+            | opacity(0) | transition(raw("opacity 0.2s"))
+            | prop("cursor", raw("zoom-out")),
+        ".img-zoom-overlay.visible"_s
+            | opacity(1.0),
+        ".img-zoom-full"_s
+            | max_width(raw("92vw")) | max_height(raw("92vh"))
+            | prop("object-fit", raw("contain"))
+            | border_radius(px(4))
+    );
+}
+
+// ── Staleness notice ──
+
+inline css::Sheet base_staleness()
+{
+    return sheet(
+        ".staleness-notice"_s
+            | padding(raw("10px 16px")) | margin_bottom(px(20))
+            | font_size(px(13)) | color(raw("var(--muted)"))
+            | bg(raw("color-mix(in srgb, var(--accent) 6%, var(--bg))"))
+            | border_left(px(3), solid, raw("var(--accent)"))
+            | border_radius(raw("0 var(--border-radius) var(--border-radius) 0"))
+            | line_height(raw("1.5"))
+    );
+}
+
+// ── Active TOC highlighting ──
+
+inline css::Sheet base_active_toc()
+{
+    return sheet(
+        ".toc-list a.toc-active"_s
+            | color(raw("var(--accent)")) | font_weight(600)
+    );
+}
+
+// ── Keyboard focus for listings ──
+
+inline css::Sheet base_kb_focus()
+{
+    return sheet(
+        ".post-listing.kb-focus,.post-card.kb-focus"_s
+            | prop("outline", raw("2px solid var(--accent)"))
+            | prop("outline-offset", raw("2px"))
+            | border_radius(raw("var(--border-radius)"))
+    );
+}
+
+// ── Reading position toast ──
+
+inline css::Sheet base_reading_toast()
+{
+    return sheet(
+        ".reading-toast"_s
+            | position(fixed) | bottom(px(24)) | left_(raw("50%"))
+            | prop("transform", raw("translateX(-50%) translateY(20px)"))
+            | bg(raw("var(--bg)")) | color(raw("var(--text)"))
+            | border(px(1), solid, raw("var(--border)"))
+            | border_radius(px(8))
+            | box_shadow(raw("0 4px 20px rgba(0,0,0,0.15)"))
+            | padding(raw("10px 20px")) | font_size(px(14))
+            | z_index(9999) | opacity(0)
+            | transition(raw("opacity 0.3s, transform 0.3s"))
+            | prop("pointer-events", none),
+        ".reading-toast.visible"_s
+            | opacity(1.0) | prop("pointer-events", raw("auto"))
+            | prop("transform", raw("translateX(-50%) translateY(0)")),
+        ".reading-toast a"_s
+            | color(raw("var(--accent)")) | text_decoration(none)
+            | font_weight(600) | margin_left(px(8)),
+        ".reading-toast a:hover"_s
+            | text_decoration(underline)
+    );
+}
+
+// ── Post connections graph ──
+
+inline css::Sheet base_post_graph()
+{
+    return sheet(
+        ".post-graph-section"_s
+            | margin_bottom(px(32)),
+        ".post-graph-section h3"_s
+            | font_size(px(14)) | font_weight(600) | color(raw("var(--muted)"))
+            | text_transform(uppercase) | letter_spacing(raw("0.5px"))
+            | margin_bottom(px(12)),
+        ".post-graph"_s
+            | width(raw("100%")) | height(raw("auto"))
+            | max_height(px(300))
+            | margin_bottom(px(20)),
+        ".post-graph-node"_s
+            | transition(raw("r 0.2s, fill 0.2s")),
+        ".post-graph a:hover circle"_s
+            | prop("r", raw("7")) | prop("fill-opacity", raw("0.8")),
+        ".post-graph-label"_s
+            | font_size(px(10)) | prop("fill", raw("var(--muted)"))
+            | prop("font-family", raw("var(--font)"))
+    );
+}
+
 } // namespace base_css_impl
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -800,6 +1035,15 @@ inline std::string compile_base_styles()
              + base_reading_progress()
              + base_back_to_top()
              + base_nav_search()
+             + base_sidenotes()
+             + base_code_blocks()
+             + base_cmd_palette()
+             + base_image_zoom()
+             + base_staleness()
+             + base_active_toc()
+             + base_kb_focus()
+             + base_reading_toast()
+             + base_post_graph()
              + base_responsive();
 
     return all.compile();

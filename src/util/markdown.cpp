@@ -356,15 +356,19 @@ static std::string process_inline(const std::string& text, const RefMap& refs)
             continue;
         }
 
-        // --- Footnote reference: [^id] ---
+        // --- Footnote reference: [^id] → sidenote ---
         if (c == '[' && i + 1 < len && text[i + 1] == '^')
         {
             auto close = text.find(']', i + 2);
             if (close != std::string::npos)
             {
                 auto id = text.substr(i + 2, close - i - 2);
-                out += "<sup class=\"footnote-ref\"><a href=\"#fn-" + escape_html(id) +
-                       "\" id=\"fnref-" + escape_html(id) + "\">" + escape_html(id) + "</a></sup>";
+                out += "<label class=\"sidenote-toggle\" for=\"sn-" + escape_html(id) + "\">"
+                       "<sup>" + escape_html(id) + "</sup></label>"
+                       "<input type=\"checkbox\" class=\"sidenote-checkbox\" id=\"sn-" + escape_html(id) + "\">"
+                       "<span class=\"sidenote\" id=\"fn-" + escape_html(id) + "\">";
+                // Inline the footnote content if available — will be filled by post-processing
+                out += "</span>";
                 i = close + 1;
                 continue;
             }
@@ -554,10 +558,53 @@ static std::string process_inline(const std::string& text, const RefMap& refs)
             continue;
         }
 
+        // --- Smart typography ---
+        // Em dash: ---
+        if (c == '-' && i + 2 < len && text[i + 1] == '-' && text[i + 2] == '-')
+        {
+            out += "&mdash;";
+            i += 3;
+            continue;
+        }
+        // En dash: --
+        if (c == '-' && i + 1 < len && text[i + 1] == '-')
+        {
+            out += "&ndash;";
+            i += 2;
+            continue;
+        }
+        // Ellipsis: ...
+        if (c == '.' && i + 2 < len && text[i + 1] == '.' && text[i + 2] == '.')
+        {
+            out += "&hellip;";
+            i += 3;
+            continue;
+        }
+        // Smart double quotes
+        if (c == '"')
+        {
+            // Opening quote: at start, after space/newline, or after (
+            bool is_open = (i == 0) ||
+                           (i > 0 && (text[i - 1] == ' ' || text[i - 1] == '\n' ||
+                                      text[i - 1] == '\t' || text[i - 1] == '('));
+            out += is_open ? "&ldquo;" : "&rdquo;";
+            i++;
+            continue;
+        }
+        // Smart single quotes / apostrophes
+        if (c == '\'')
+        {
+            bool is_open = (i == 0) ||
+                           (i > 0 && (text[i - 1] == ' ' || text[i - 1] == '\n' ||
+                                      text[i - 1] == '\t' || text[i - 1] == '('));
+            out += is_open ? "&lsquo;" : "&rsquo;";
+            i++;
+            continue;
+        }
+
         // --- Regular character ---
         if (c == '&') out += "&amp;";
         else if (c == '>') out += "&gt;";
-        else if (c == '"') out += "&quot;";
         else out += c;
         i++;
     }
@@ -1095,11 +1142,39 @@ static std::string process_blocks(const std::vector<std::string>& lines,
                 }
                 if (i < n) i++; // skip closing fence
 
-                if (!lang.empty())
-                    html += "<pre><code class=\"language-" + escape_html(lang) + "\">";
+                // Parse optional title="filename" from info string
+                std::string title;
+                std::string lang_only = lang;
+                {
+                    auto tpos = lang.find("title=");
+                    if (tpos != std::string::npos)
+                    {
+                        lang_only = trim(lang.substr(0, tpos));
+                        auto val_start = tpos + 6;
+                        if (val_start < lang.size() && (lang[val_start] == '"' || lang[val_start] == '\''))
+                        {
+                            char q = lang[val_start];
+                            auto val_end = lang.find(q, val_start + 1);
+                            if (val_end != std::string::npos)
+                                title = lang.substr(val_start + 1, val_end - val_start - 1);
+                        }
+                        else
+                        {
+                            title = trim(lang.substr(val_start));
+                        }
+                    }
+                }
+
+                if (!title.empty())
+                    html += "<div class=\"code-block\"><div class=\"code-title\">" + escape_html(title) + "</div>";
+                else
+                    html += "<div class=\"code-block\">";
+
+                if (!lang_only.empty())
+                    html += "<pre><code class=\"language-" + escape_html(lang_only) + "\">";
                 else
                     html += "<pre><code>";
-                html += escape_html(raw) + "</code></pre>\n";
+                html += escape_html(raw) + "</code></pre></div>\n";
                 continue;
             }
         }
@@ -1425,18 +1500,20 @@ std::string markdown_to_html(const std::string& markdown)
     std::unordered_map<std::string, int> heading_slugs;
     std::string html = process_blocks(lines, refs, footnotes, heading_slugs);
 
-    // Append footnotes section if any
+    // Fill in sidenote content — replace empty sidenote spans with footnote content
     if (!footnotes.empty())
     {
-        html += "<hr>\n<section class=\"footnotes\">\n<ol>\n";
         for (auto& [id, fndef] : footnotes)
         {
-            html += "<li id=\"fn-" + escape_html(id) + "\">"
-                  + process_inline(fndef.content, refs)
-                  + " <a href=\"#fnref-" + escape_html(id) + "\">&#8617;</a>"
-                  + "</li>\n";
+            auto marker = "id=\"fn-" + escape_html(id) + "\"></span>";
+            auto pos = html.find(marker);
+            if (pos != std::string::npos)
+            {
+                auto insert_pos = pos + marker.size() - 7; // before </span>
+                auto content = process_inline(fndef.content, refs);
+                html.insert(insert_pos, content);
+            }
         }
-        html += "</ol>\n</section>\n";
     }
 
     return html;

@@ -4,6 +4,7 @@
 #include "../../include/loom/render/base_styles.hpp"
 
 #include <ctime>
+#include <cmath>
 
 namespace loom::component
 {
@@ -310,12 +311,22 @@ Node Head::render(const Head& props, const Ctx& ctx, Children)
             link(rel("alternate"), type("application/rss+xml"),
                  attr("title", site.title + " RSS"), href(site.base_url + "/feed.xml"))),
         build_structured_data(site, pm, canonical, og_image_url),
+        dom::meta(name("view-transition"), attr("content", "same-origin")),
         when(layout.show_theme_toggle, script(dom::raw(THEME_JS))),
         when(!layout.custom_head_html.empty(), dom::raw(layout.custom_head_html)),
-        style(dom::raw(site.theme.css.empty() ? DEFAULT_CSS : site.theme.css)),
-        when(!theme_css.empty(), style(dom::raw(theme_css))),
-        when(!var_css.empty(), style(dom::raw(var_css))),
-        when(!layout.custom_css.empty(), style(dom::raw(layout.custom_css)))
+        // External CSS: content-hashed, immutably cached
+        when(ctx.assets != nullptr, [&]() -> Node {
+            if (ctx.assets->css_url.empty()) return Node{Node::Fragment, {}, {}, {}, {}};
+            return link(rel("stylesheet"), href(ctx.assets->css_url));
+        }),
+        // Fallback: inline CSS when no asset manifest (e.g. theme previews)
+        when(ctx.assets == nullptr, [&]() -> Node {
+            return dom::fragment(
+                style(dom::raw(site.theme.css.empty() ? DEFAULT_CSS : site.theme.css)),
+                when(!theme_css.empty(), style(dom::raw(theme_css))),
+                when(!var_css.empty(), style(dom::raw(var_css))),
+                when(!layout.custom_css.empty(), style(dom::raw(layout.custom_css))));
+        })
     );
 }
 
@@ -626,8 +637,21 @@ Node PostFull::render(const PostFull& props, const Ctx& ctx, Children ch)
     const auto& layout = ctx.site.layout;
     const auto  pctx   = props.context ? *props.context : PostContext{};
 
+    // Staleness notice — show if post is older than 18 months
+    auto age = std::chrono::system_clock::now() - post.published;
+    auto days = std::chrono::duration_cast<std::chrono::hours>(age).count() / 24;
+    int years = static_cast<int>(days / 365);
+    bool is_stale = days > 548; // ~18 months
+    std::string stale_text;
+    if (is_stale)
+        stale_text = years >= 2
+            ? "This post was written over " + std::to_string(years) + " years ago. Some information may be outdated."
+            : "This post was written over a year ago. Some information may be outdated.";
+
     return article(class_("post-full"),
         ctx(ReadingProgress{}),
+        when(is_stale,
+            div(class_("staleness-notice"), stale_text)),
         h1(post.title.get()),
         ctx(PostMeta{.post = props.post}),
         when(layout.show_post_tags && !post.tags.empty(),
@@ -805,8 +829,14 @@ Node Archives::render(const Archives& props, const Ctx& ctx, Children)
     if (!props.by_year) return Node{Node::Fragment, {}, {}, {}, {}};
     const auto& layout = ctx.site.layout;
 
+    // Collect all posts for the graph
+    std::vector<PostSummary> all_for_graph;
+    for (const auto& [year, posts] : *props.by_year)
+        for (const auto& p : posts) all_for_graph.push_back(p);
+
     return section(
         h2("Archives"),
+        ctx(PostGraph{.posts = &all_for_graph}),
         each(*props.by_year, [&](const auto& pair) {
             return dom::fragment(
                 h3(std::to_string(pair.first)),
@@ -982,6 +1012,270 @@ Node ReadingProgress::render(const ReadingProgress&, const Ctx&, Children)
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  UX Enhancement JavaScript
+// ═══════════════════════════════════════════════════════════════════════
+
+static const char* CMD_PALETTE_JS = R"JS(
+(function(){
+  var d=null,overlay=null,input=null,list=null,sel=0,matches=[];
+  function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+  function create(){
+    if(overlay)return;
+    overlay=document.createElement('div');
+    overlay.className='cmd-palette-overlay';
+    overlay.innerHTML='<div class="cmd-palette"><input type="text" class="cmd-input" placeholder="Navigate to..." autocomplete="off"><div class="cmd-results"></div></div>';
+    document.body.appendChild(overlay);
+    input=overlay.querySelector('.cmd-input');
+    list=overlay.querySelector('.cmd-results');
+    overlay.addEventListener('click',function(e){if(e.target===overlay)close()});
+    input.addEventListener('input',search);
+    input.addEventListener('keydown',function(e){
+      if(e.key==='ArrowDown'){e.preventDefault();sel=Math.min(sel+1,matches.length-1);highlight()}
+      else if(e.key==='ArrowUp'){e.preventDefault();sel=Math.max(sel-1,0);highlight()}
+      else if(e.key==='Enter'&&matches[sel]){close();window.location='/post/'+matches[sel].s}
+      else if(e.key==='Escape'){close()}
+    });
+  }
+  function open(){
+    create();
+    overlay.classList.add('visible');
+    input.value='';list.innerHTML='';sel=0;matches=[];
+    setTimeout(function(){input.focus()},10);
+    if(!d)fetch('/search.json').then(function(r){return r.json()}).then(function(j){d=j});
+  }
+  function close(){if(overlay)overlay.classList.remove('visible')}
+  function highlight(){
+    var items=list.querySelectorAll('.cmd-item');
+    items.forEach(function(el,i){el.classList.toggle('active',i===sel)});
+  }
+  function search(){
+    if(!d)return;
+    var q=input.value.toLowerCase().trim();
+    if(q.length<1){list.innerHTML='';matches=[];return}
+    var terms=q.split(/\s+/);
+    matches=d.filter(function(p){
+      var h=(p.t+' '+p.e+' '+p.g.join(' ')).toLowerCase();
+      return terms.every(function(t){return h.indexOf(t)!==-1})
+    }).slice(0,8);
+    sel=0;
+    if(!matches.length){list.innerHTML='<div class="cmd-empty">No results</div>';return}
+    var h='';
+    matches.forEach(function(p,i){
+      h+='<a href="/post/'+esc(p.s)+'" class="cmd-item'+(i===0?' active':'')+'">';
+      h+='<span class="cmd-title">'+esc(p.t)+'</span>';
+      if(p.g.length)h+='<span class="cmd-tags">'+p.g.map(esc).join(', ')+'</span>';
+      h+='</a>'
+    });
+    list.innerHTML=h;
+    list.querySelectorAll('.cmd-item').forEach(function(el,i){
+      el.addEventListener('mouseenter',function(){sel=i;highlight()})
+    });
+  }
+  document.addEventListener('keydown',function(e){
+    if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();open()}
+    if(e.key==='Escape')close();
+  });
+})();
+)JS";
+
+static const char* KEYBOARD_NAV_JS = R"JS(
+(function(){
+  document.addEventListener('keydown',function(e){
+    if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.isContentEditable)return;
+    var items=document.querySelectorAll('.post-listing,.post-card');
+    if(!items.length)return;
+    var cur=document.querySelector('.post-listing.kb-focus,.post-card.kb-focus');
+    var idx=cur?Array.prototype.indexOf.call(items,cur):-1;
+    if(e.key==='j'){e.preventDefault();idx=Math.min(idx+1,items.length-1);setFocus(items,idx)}
+    else if(e.key==='k'){e.preventDefault();idx=Math.max(idx-1,0);setFocus(items,idx)}
+    else if(e.key==='Enter'&&cur){var a=cur.querySelector('a');if(a)a.click()}
+    else if(e.key==='/'){
+      var si=document.getElementById('searchInput');
+      if(si){e.preventDefault();si.focus()}
+    }
+  });
+  function setFocus(items,idx){
+    items.forEach(function(el){el.classList.remove('kb-focus')});
+    if(items[idx]){items[idx].classList.add('kb-focus');items[idx].scrollIntoView({block:'nearest',behavior:'smooth'})}
+  }
+})();
+)JS";
+
+static const char* ACTIVE_TOC_JS = R"JS(
+(function(){
+  var toc=document.querySelector('.toc');
+  if(!toc)return;
+  var links=toc.querySelectorAll('.toc-list a');
+  if(!links.length)return;
+  var ids=[];
+  links.forEach(function(a){var h=a.getAttribute('href');if(h)ids.push(h.slice(1))});
+  var headings=ids.map(function(id){return document.getElementById(id)}).filter(Boolean);
+  if(!headings.length)return;
+  var observer=new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if(entry.isIntersecting){
+        links.forEach(function(a){a.classList.remove('toc-active')});
+        var match=toc.querySelector('a[href="#'+entry.target.id+'"]');
+        if(match)match.classList.add('toc-active');
+      }
+    });
+  },{rootMargin:'-80px 0px -70% 0px'});
+  headings.forEach(function(h){observer.observe(h)});
+})();
+)JS";
+
+static const char* IMAGE_ZOOM_JS = R"JS(
+(function(){
+  var content=document.querySelector('.post-content,.page-content');
+  if(!content)return;
+  content.querySelectorAll('img').forEach(function(img){
+    img.style.cursor='zoom-in';
+    img.addEventListener('click',function(){
+      var overlay=document.createElement('div');
+      overlay.className='img-zoom-overlay';
+      var clone=img.cloneNode();
+      clone.className='img-zoom-full';
+      clone.removeAttribute('loading');
+      overlay.appendChild(clone);
+      document.body.appendChild(overlay);
+      requestAnimationFrame(function(){overlay.classList.add('visible')});
+      function close(){overlay.classList.remove('visible');setTimeout(function(){overlay.remove()},200)}
+      overlay.addEventListener('click',close);
+      document.addEventListener('keydown',function handler(e){
+        if(e.key==='Escape'){close();document.removeEventListener('keydown',handler)}
+      });
+    });
+  });
+})();
+)JS";
+
+static const char* READING_POS_JS = R"JS(
+(function(){
+  var article=document.querySelector('.post-content');
+  if(!article)return;
+  var slug=window.location.pathname;
+  var key='loom-pos:'+slug;
+  var saved=localStorage.getItem(key);
+  if(saved&&parseInt(saved)>300){
+    var toast=document.createElement('div');
+    toast.className='reading-toast';
+    toast.innerHTML='Continue where you left off? <a href="#" id="resumePos">Resume</a>';
+    document.body.appendChild(toast);
+    requestAnimationFrame(function(){toast.classList.add('visible')});
+    document.getElementById('resumePos').addEventListener('click',function(e){
+      e.preventDefault();window.scrollTo({top:parseInt(saved),behavior:'smooth'});
+      toast.classList.remove('visible');setTimeout(function(){toast.remove()},300);
+    });
+    setTimeout(function(){toast.classList.remove('visible');setTimeout(function(){toast.remove()},300)},6000);
+  }
+  var ticking=false;
+  window.addEventListener('scroll',function(){
+    if(!ticking){ticking=true;requestAnimationFrame(function(){
+      localStorage.setItem(key,String(window.scrollY));ticking=false;
+    })}
+  },{passive:true});
+})();
+)JS";
+
+static const char* CODE_COPY_JS = R"JS(
+(function(){
+  document.querySelectorAll('.code-block').forEach(function(block){
+    var btn=document.createElement('button');
+    btn.className='code-copy';btn.textContent='Copy';btn.setAttribute('aria-label','Copy code');
+    block.style.position='relative';
+    block.appendChild(btn);
+    btn.addEventListener('click',function(){
+      var code=block.querySelector('code');
+      if(code){navigator.clipboard.writeText(code.textContent).then(function(){
+        btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy'},2000);
+      })}
+    });
+  });
+})();
+)JS";
+
+// ── PostGraph: tag-based relationship SVG ──
+
+Node PostGraph::render(const PostGraph& props, const Ctx&, Children)
+{
+    if (!props.posts || props.posts->size() < 3)
+        return Node{Node::Fragment, {}, {}, {}, {}};
+
+    const auto& posts = *props.posts;
+    auto n = std::min(posts.size(), size_t(20)); // limit to 20 posts for clarity
+
+    // Layout nodes in a circle
+    int w = 600, h = 300;
+    int cx = w / 2, cy = h / 2;
+    int rx = 250, ry = 110;
+
+    struct PNode { double x, y; std::string slug, title; };
+    std::vector<PNode> nodes;
+    for (size_t i = 0; i < n; ++i)
+    {
+        double angle = (2.0 * 3.14159265 * i) / n - 3.14159265 / 2;
+        nodes.push_back({
+            cx + rx * std::cos(angle),
+            cy + ry * std::sin(angle),
+            posts[i].slug.get(),
+            posts[i].title.get().substr(0, 30)
+        });
+    }
+
+    // Build edges based on shared tags
+    struct Edge { size_t a, b; int weight; };
+    std::vector<Edge> edges;
+    for (size_t i = 0; i < n; ++i)
+    {
+        for (size_t j = i + 1; j < n; ++j)
+        {
+            int shared = 0;
+            for (const auto& ti : posts[i].tags)
+                for (const auto& tj : posts[j].tags)
+                    if (ti.get() == tj.get()) ++shared;
+            if (shared > 0) edges.push_back({i, j, shared});
+        }
+    }
+
+    // Generate SVG
+    std::string svg;
+    svg += "<svg class=\"post-graph\" viewBox=\"0 0 " + std::to_string(w) + " " + std::to_string(h)
+         + "\" xmlns=\"http://www.w3.org/2000/svg\">";
+
+    // Edges
+    for (const auto& e : edges)
+    {
+        auto opacity = e.weight >= 3 ? "0.4" : (e.weight >= 2 ? "0.25" : "0.12");
+        auto width = e.weight >= 3 ? "2" : (e.weight >= 2 ? "1.5" : "1");
+        svg += "<line x1=\"" + std::to_string((int)nodes[e.a].x) + "\" y1=\"" + std::to_string((int)nodes[e.a].y)
+             + "\" x2=\"" + std::to_string((int)nodes[e.b].x) + "\" y2=\"" + std::to_string((int)nodes[e.b].y)
+             + "\" stroke=\"var(--accent)\" stroke-opacity=\"" + opacity + "\" stroke-width=\"" + width + "\"/>";
+    }
+
+    // Nodes
+    for (size_t i = 0; i < n; ++i)
+    {
+        auto& nd = nodes[i];
+        svg += "<a href=\"/post/" + nd.slug + "\">";
+        svg += "<circle cx=\"" + std::to_string((int)nd.x) + "\" cy=\"" + std::to_string((int)nd.y)
+             + "\" r=\"5\" fill=\"var(--accent)\" class=\"post-graph-node\"/>";
+        // Title — position based on quadrant
+        auto tx = (nd.x > cx) ? "start" : "end";
+        auto dx = (nd.x > cx) ? 10 : -10;
+        svg += "<text x=\"" + std::to_string((int)nd.x + dx) + "\" y=\"" + std::to_string((int)nd.y + 4)
+             + "\" text-anchor=\"" + tx + "\" class=\"post-graph-label\">" + nd.title + "</text>";
+        svg += "</a>";
+    }
+
+    svg += "</svg>";
+
+    return section(class_("post-graph-section"),
+        h3("Post Connections"),
+        raw(svg)
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  Ctx helpers
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -1035,23 +1329,96 @@ Node Ctx::page(const PageMeta& meta, Node content,
     if (site.layout.external_links_new_tab)
         result = apply_external_new_tab(result);
 
-    // Inject back-to-top button before </body>
+    // Inject back-to-top button and UX scripts before </body>
     {
-        static const char BTT[] =
-            "<a class=\"back-to-top\" id=\"backToTop\" href=\"#\" title=\"Back to top\">&uarr;</a>"
-            "<script>(function(){var b=document.getElementById('backToTop');"
-            "if(b)window.addEventListener('scroll',function(){"
-            "b.classList.toggle('visible',window.scrollY>400)},{passive:true});})()</script>";
+        std::string inject;
+        inject += "<a class=\"back-to-top\" id=\"backToTop\" href=\"#\" title=\"Back to top\">&uarr;</a>";
+        if (assets && !assets->js_url.empty())
+        {
+            // External JS: content-hashed, immutably cached, deferred
+            inject += "<script src=\"";
+            inject += assets->js_url;
+            inject += "\" defer></script>";
+        }
+        else
+        {
+            // Fallback: inline JS
+            inject += "<script>(function(){var b=document.getElementById('backToTop');"
+                "if(b)window.addEventListener('scroll',function(){"
+                "b.classList.toggle('visible',window.scrollY>400)},{passive:true});})()</script>";
+            inject += "<script>";
+            inject += CMD_PALETTE_JS;
+            inject += KEYBOARD_NAV_JS;
+            inject += ACTIVE_TOC_JS;
+            inject += IMAGE_ZOOM_JS;
+            inject += READING_POS_JS;
+            inject += CODE_COPY_JS;
+            inject += "</script>";
+        }
         auto body_end = result.rfind("</body>");
         if (body_end != std::string::npos)
-            result.insert(body_end, BTT);
+            result.insert(body_end, inject);
     }
 
     // Return as raw node so it can be composed further if needed
     return dom::raw(std::move(result));
 }
 
-Ctx Ctx::from(const Site& site)
+std::string build_combined_css(const Site& site)
+{
+    std::string css;
+
+    // Base CSS (or custom override)
+    css += site.theme.css.empty() ? DEFAULT_CSS : site.theme.css;
+
+    // Theme CSS
+    if (site.theme.name != "default" && site.theme.name != "custom")
+    {
+        auto& themes = builtin_themes();
+        auto it = themes.find(site.theme.name);
+        if (it != themes.end()) css += theme::compile(it->second);
+    }
+
+    // Variable overrides
+    if (!site.theme.variables.empty())
+    {
+        std::string lv, dv;
+        for (const auto& [key, value] : site.theme.variables)
+        {
+            if (key.substr(0, 5) == "dark-") dv += "--" + key.substr(5) + ":" + value + ";";
+            else lv += "--" + key + ":" + value + ";";
+        }
+        if (!lv.empty()) css += ":root{" + lv + "}";
+        if (!dv.empty()) css += "[data-theme=\"dark\"]{" + dv + "}";
+    }
+
+    // Custom CSS
+    if (!site.layout.custom_css.empty())
+        css += site.layout.custom_css;
+
+    return css;
+}
+
+std::string build_ux_js_bundle()
+{
+    std::string js;
+
+    // Back-to-top scroll handler
+    js += "(function(){var b=document.getElementById('backToTop');"
+          "if(b)window.addEventListener('scroll',function(){"
+          "b.classList.toggle('visible',window.scrollY>400)},{passive:true});})();";
+
+    js += CMD_PALETTE_JS;
+    js += KEYBOARD_NAV_JS;
+    js += ACTIVE_TOC_JS;
+    js += IMAGE_ZOOM_JS;
+    js += READING_POS_JS;
+    js += CODE_COPY_JS;
+
+    return js;
+}
+
+Ctx Ctx::from(const Site& site, const AssetManifest* assets)
 {
     // Resolve theme component overrides and ThemeDef pointer
     auto& themes = builtin_themes();
@@ -1059,9 +1426,10 @@ Ctx Ctx::from(const Site& site)
     if (it != themes.end())
         return {site,
                 it->second.components ? it->second.components.get() : nullptr,
-                &it->second};
+                &it->second,
+                assets};
 
-    return {site, nullptr, nullptr};
+    return {site, nullptr, nullptr, assets};
 }
 
 } // namespace loom::component

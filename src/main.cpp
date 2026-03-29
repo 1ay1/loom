@@ -115,6 +115,11 @@ struct SiteCache
     CachedPage robots;
     CachedPage rss;
     CachedPage search_json;
+
+    // Content-hashed external assets (CSS/JS)
+    CachedPage css_asset;
+    CachedPage js_asset;
+    loom::AssetManifest manifest;
 };
 
 static constexpr std::string_view status_line_for(int status) noexcept
@@ -130,7 +135,8 @@ static constexpr std::string_view status_line_for(int status) noexcept
 static CachedPage make_cached(std::string html,
     std::string_view content_type = "text/html; charset=utf-8",
     bool do_minify = true,
-    int status = 200)
+    int status = 200,
+    const std::string& link_preload = "")
 {
     if (do_minify)
         html = loom::minify_html(html);
@@ -143,29 +149,121 @@ static CachedPage make_cached(std::string html,
     CachedPage page;
     page.etag = etag;
 
+    // Build headers with optional Link preload for CSS/JS
+    auto build_variants = [&](std::string_view body_data,
+                              bool is_gzip) {
+        // We need to build the response manually to support optional headers
+        auto build = [&](bool keep_alive) {
+            std::string out;
+            out.reserve(512 + body_data.size());
+            out.append(sl.data(), sl.size());
+            out += "Content-Type: ";
+            out.append(content_type.data(), content_type.size());
+            out += "\r\nETag: ";
+            out += etag;
+            out += "\r\nCache-Control: public, max-age=60, must-revalidate\r\n";
+            if (!link_preload.empty())
+            {
+                out += "Link: ";
+                out += link_preload;
+                out += "\r\n";
+            }
+            if (is_gzip)
+                out += "Content-Encoding: gzip\r\n";
+            out += "Content-Length: ";
+            out += std::to_string(body_data.size());
+            out += "\r\nConnection: ";
+            out += keep_alive ? "keep-alive" : "close";
+            out += "\r\n\r\n";
+            out.append(body_data.data(), body_data.size());
+            return out;
+        };
+        return std::make_pair(build(true), build(false));
+    };
+
+    auto [gz_ka, gz_close] = build_variants(gz, true);
+    page.gzip_ka = std::move(gz_ka);
+    page.gzip_close = std::move(gz_close);
+
+    auto [pl_ka, pl_close] = build_variants(html, false);
+    page.plain_ka = std::move(pl_ka);
+    page.plain_close = std::move(pl_close);
+
+    // 304 responses
+    auto build_304 = [&](bool keep_alive) {
+        std::string out;
+        out.reserve(256);
+        out += "HTTP/1.1 304 Not Modified\r\n";
+        out += "ETag: ";
+        out += etag;
+        out += "\r\nCache-Control: public, max-age=60, must-revalidate\r\n";
+        if (!link_preload.empty())
+        {
+            out += "Link: ";
+            out += link_preload;
+            out += "\r\n";
+        }
+        out += "Content-Length: 0\r\nConnection: ";
+        out += keep_alive ? "keep-alive" : "close";
+        out += "\r\n\r\n";
+        return out;
+    };
+    page.not_modified_ka = build_304(true);
+    page.not_modified_close = build_304(false);
+
+    return page;
+}
+
+// Convenience: make_cached for HTML pages with Link preload header
+static CachedPage make_cached_html(std::string html, const std::string& link_preload,
+    int status = 200)
+{
+    return make_cached(std::move(html), "text/html; charset=utf-8", true, status, link_preload);
+}
+
+// Content-hashed hex slug for asset URLs
+static std::string content_hash(const std::string& content)
+{
+    auto h = std::hash<std::string>{}(content);
+    char buf[17];
+    std::snprintf(buf, sizeof(buf), "%016zx", h);
+    return std::string(buf, 8);  // 8-char hex
+}
+
+// Immutable asset: Cache-Control: public, max-age=31536000, immutable
+static CachedPage make_immutable_asset(const std::string& body,
+    std::string_view content_type)
+{
+    auto etag = "\"" + std::to_string(std::hash<std::string>{}(body)) + "\"";
+    auto gz = loom::gzip_compress(body);
+
+    CachedPage page;
+    page.etag = etag;
+
+    auto sl = status_line_for(200);
+    auto cc = "public, max-age=31536000, immutable";
+
     page.gzip_ka = build_http_response(sl,
         {{"Content-Type", content_type}, {"ETag", etag},
-         {"Cache-Control", "public, max-age=60, must-revalidate"},
-         {"Content-Encoding", "gzip"}},
+         {"Cache-Control", cc}, {"Content-Encoding", "gzip"}},
         gz, true);
     page.gzip_close = build_http_response(sl,
         {{"Content-Type", content_type}, {"ETag", etag},
-         {"Cache-Control", "public, max-age=60, must-revalidate"},
-         {"Content-Encoding", "gzip"}},
+         {"Cache-Control", cc}, {"Content-Encoding", "gzip"}},
         gz, false);
     page.plain_ka = build_http_response(sl,
         {{"Content-Type", content_type}, {"ETag", etag},
-         {"Cache-Control", "public, max-age=60, must-revalidate"}},
-        html, true);
+         {"Cache-Control", cc}},
+        body, true);
     page.plain_close = build_http_response(sl,
         {{"Content-Type", content_type}, {"ETag", etag},
-         {"Cache-Control", "public, max-age=60, must-revalidate"}},
-        html, false);
+         {"Cache-Control", cc}},
+        body, false);
     page.not_modified_ka = build_http_response("HTTP/1.1 304 Not Modified\r\n",
-        {{"ETag", etag}, {"Cache-Control", "public, max-age=60, must-revalidate"}},
+        {{"ETag", etag}, {"Cache-Control", cc}},
         "", true);
     page.not_modified_close = build_http_response("HTTP/1.1 304 Not Modified\r\n",
-        {{"ETag", etag}, {"Cache-Control", "public, max-age=60, must-revalidate"}},
+        {{"ETag", etag}, {"Cache-Control", cc}},
         "", false);
 
     return page;
@@ -268,7 +366,17 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
     auto site = loom::build_site(source, std::move(config));
     loom::BlogEngine engine(site);
 
-    auto ctx = c::Ctx::from(site);
+    // ── Build content-hashed external CSS/JS assets ──
+    auto combined_css = c::build_combined_css(site);
+    auto css_hash = content_hash(combined_css);
+    auto css_url = "/assets/style-" + css_hash + ".css";
+
+    auto combined_js = c::build_ux_js_bundle();
+    auto js_hash = content_hash(combined_js);
+    auto js_url = "/assets/app-" + js_hash + ".js";
+
+    loom::AssetManifest manifest{css_url, js_url};
+    auto ctx = c::Ctx::from(site, &manifest);
 
     auto all_tags = engine.all_tags();
     auto all_tag_infos = engine.tag_info();
@@ -276,11 +384,20 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
     auto all_series_infos = engine.series_info();
     c::SidebarData sidebar_data{engine.list_posts(), all_tags, all_tag_infos, all_series, all_series_infos};
 
+    // Link preload hints: browser starts fetching CSS before parsing HTML
+    std::string link_preload = "<" + css_url + ">; rel=preload; as=style, <"
+                              + js_url + ">; rel=preload; as=script";
+
     auto render_page = [&](loom::PageMeta meta, loom::dom::Node content) -> std::string {
         return ctx.page(meta, std::move(content), &sidebar_data).render();
     };
 
     auto cache = std::make_shared<SiteCache>();
+
+    // Store manifest and build immutable assets
+    cache->manifest = manifest;
+    cache->css_asset = make_immutable_asset(combined_css, "text/css; charset=utf-8");
+    cache->js_asset = make_immutable_asset(combined_js, "application/javascript; charset=utf-8");
 
     // Paginated index with featured posts
     int total_pages = 1;
@@ -319,12 +436,12 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
 
             auto* feat_ptr = (page == 1 && !featured.empty()) ? &featured : nullptr;
 
-            cache->pages[meta.canonical_path] = make_cached(
+            cache->pages[meta.canonical_path] = make_cached_html(
                 render_page(meta, ctx(c::Index{
                     .posts = &page_posts,
                     .featured = feat_ptr,
                     .pagination = &pinfo
-                })));
+                })), link_preload);
         }
     }
 
@@ -378,8 +495,8 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         }
         pctx.toc = c::extract_toc(post.content.get());
 
-        cache->pages["/post/" + post.slug.get()] = make_cached(
-            render_page(meta, ctx(c::PostFull{.post = &post, .context = &pctx})));
+        cache->pages["/post/" + post.slug.get()] = make_cached_html(
+            render_page(meta, ctx(c::PostFull{.post = &post, .context = &pctx})), link_preload);
     }
 
     // Tag pages
@@ -390,17 +507,17 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         meta.title = "Posts tagged \"" + tag.get() + "\"";
         meta.canonical_path = "/tag/" + tag.get();
         meta.description = "All posts tagged with " + tag.get() + " on " + site.title;
-        cache->pages["/tag/" + tag.get()] = make_cached(
+        cache->pages["/tag/" + tag.get()] = make_cached_html(
             render_page(meta, ctx(c::TagPage{.tag = tag, .posts = &tag_posts,
-                                              .post_count = static_cast<int>(tag_posts.size())})));
+                                              .post_count = static_cast<int>(tag_posts.size())})), link_preload);
     }
     {
         loom::PageMeta meta;
         meta.title = "Tags";
         meta.canonical_path = "/tags";
         meta.description = "Browse all tags on " + site.title;
-        cache->pages["/tags"] = make_cached(
-            render_page(meta, ctx(c::TagIndex{.tag_infos = &all_tag_infos})));
+        cache->pages["/tags"] = make_cached_html(
+            render_page(meta, ctx(c::TagIndex{.tag_infos = &all_tag_infos})), link_preload);
     }
 
     // Archives
@@ -410,8 +527,8 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         meta.title = "Archives";
         meta.canonical_path = "/archives";
         meta.description = "All posts on " + site.title;
-        cache->pages["/archives"] = make_cached(
-            render_page(meta, ctx(c::Archives{.by_year = &by_year})));
+        cache->pages["/archives"] = make_cached_html(
+            render_page(meta, ctx(c::Archives{.by_year = &by_year})), link_preload);
     }
 
     // Series
@@ -422,8 +539,8 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         meta.title = "Series: " + series.get();
         meta.canonical_path = "/series/" + series.get();
         meta.description = "Posts in the " + series.get() + " series on " + site.title;
-        cache->pages["/series/" + series.get()] = make_cached(
-            render_page(meta, ctx(c::SeriesPage{.series = series, .posts = &series_posts})));
+        cache->pages["/series/" + series.get()] = make_cached_html(
+            render_page(meta, ctx(c::SeriesPage{.series = series, .posts = &series_posts})), link_preload);
     }
     if (!all_series.empty())
     {
@@ -431,8 +548,8 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         meta.title = "Series";
         meta.canonical_path = "/series";
         meta.description = "Browse all series on " + site.title;
-        cache->pages["/series"] = make_cached(
-            render_page(meta, ctx(c::SeriesIndex{.all_series_info = &all_series_infos})));
+        cache->pages["/series"] = make_cached_html(
+            render_page(meta, ctx(c::SeriesIndex{.all_series_info = &all_series_infos})), link_preload);
     }
 
     // Static pages
@@ -443,8 +560,8 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         meta.canonical_path = "/" + page.slug.get();
         meta.og_image = page.image;
         auto page_toc = c::extract_toc(page.content.get());
-        cache->pages["/" + page.slug.get()] = make_cached(
-            render_page(meta, ctx(c::PageView{.page = &page, .toc = std::move(page_toc)})));
+        cache->pages["/" + page.slug.get()] = make_cached_html(
+            render_page(meta, ctx(c::PageView{.page = &page, .toc = std::move(page_toc)})), link_preload);
     }
 
     // 404
@@ -452,9 +569,8 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         loom::PageMeta meta;
         meta.title = "404 \xe2\x80\x94 Not Found";
         meta.noindex = true;
-        cache->not_found = make_cached(
-            render_page(meta, ctx(c::NotFound{})),
-            "text/html; charset=utf-8", true, 404);
+        cache->not_found = make_cached_html(
+            render_page(meta, ctx(c::NotFound{})), link_preload, 404);
     }
 
     // Search page
@@ -462,8 +578,8 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         loom::PageMeta meta;
         meta.title = "Search";
         meta.canonical_path = "/search";
-        cache->pages["/search"] = make_cached(
-            render_page(meta, ctx(c::SearchPage{})));
+        cache->pages["/search"] = make_cached_html(
+            render_page(meta, ctx(c::SearchPage{})), link_preload);
     }
 
     // Search JSON index
@@ -652,6 +768,18 @@ static void run_with_filesystem(const std::string& content_dir)
         auto s = cache.load(); return serve_cached(s->search_json, req, s);
     };
 
+    // Content-hashed assets (CSS/JS) — served with immutable cache headers
+    auto assets = [&cache](const loom::HttpRequest& req) {
+        auto snap = cache.load();
+        // Match against current manifest URLs
+        if (req.path == snap->manifest.css_url)
+            return serve_cached(snap->css_asset, req, snap);
+        if (req.path == snap->manifest.js_url)
+            return serve_cached(snap->js_asset, req, snap);
+        // Old hashes get 404 — browsers will re-fetch HTML → new hash
+        return serve_cached(snap->not_found, req, snap);
+    };
+
     // Static file fallback
     auto fb = [&cache, &content_dir](loom::HttpRequest& req) -> loom::HttpResponse {
         if (!safe_path(req.path))
@@ -695,6 +823,8 @@ static void run_with_filesystem(const std::string& content_dir)
         get<"/robots.txt">(robots),
         get<"/feed.xml">(rss),
         get<"/search.json">(search_json),
+        // Content-hashed assets (immutable cache)
+        get<"/assets/:file">(assets),
         // Parameterized routes (prefix match)
         get<"/post/:slug">(cached),
         get<"/tag/:slug">(cached),
@@ -772,6 +902,15 @@ static void run_with_git(const std::string& repo_path, const std::string& branch
         auto s = cache.load(); return serve_cached(s->search_json, req, s);
     };
 
+    auto assets_h = [&cache](const loom::HttpRequest& req) {
+        auto snap = cache.load();
+        if (req.path == snap->manifest.css_url)
+            return serve_cached(snap->css_asset, req, snap);
+        if (req.path == snap->manifest.js_url)
+            return serve_cached(snap->js_asset, req, snap);
+        return serve_cached(snap->not_found, req, snap);
+    };
+
     auto fb = [&cache, repo_path, branch, content_prefix, raw_base](loom::HttpRequest& req) -> loom::HttpResponse {
         if (!safe_path(req.path))
             return loom::DynamicResponse::not_found();
@@ -826,6 +965,7 @@ static void run_with_git(const std::string& repo_path, const std::string& branch
         get<"/robots.txt">(robots_h),
         get<"/feed.xml">(rss_h),
         get<"/search.json">(search_json_h),
+        get<"/assets/:file">(assets_h),
         get<"/post/:slug">(cached),
         get<"/tag/:slug">(cached),
         get<"/series/:slug">(cached),

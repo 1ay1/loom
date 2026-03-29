@@ -66,6 +66,14 @@ struct PageMeta
     bool noindex = false;
 };
 
+// ── Asset manifest — content-hashed URLs for external CSS/JS ──
+// Computed once per cache build, shared across all pages.
+struct AssetManifest
+{
+    std::string css_url;    // e.g. "/assets/style-a1b2c3d4.css"
+    std::string js_url;     // e.g. "/assets/app-e5f6g7h8.js"
+};
+
 struct Site
 {
     std::string title;

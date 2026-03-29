@@ -289,6 +289,11 @@ namespace loom
         auto* write = std::get_if<WritePhase>(&conn.phase);
         if (!write) return;
 
+        // TCP_CORK: coalesce small writes into fewer TCP segments.
+        // Headers + body in one packet instead of two.
+        int cork = 1;
+        setsockopt(fd, IPPROTO_TCP, TCP_CORK, &cork, sizeof(cork));
+
         // std::visit over OwnedWrite | ViewWrite — both share the
         // cursor/remaining/advance interface via structural typing
         while (true)
@@ -327,6 +332,10 @@ namespace loom
             close_connection(fd);
             return;
         }
+
+        // Uncork: flush any remaining buffered data immediately
+        cork = 0;
+        setsockopt(fd, IPPROTO_TCP, TCP_CORK, &cork, sizeof(cork));
 
         // Write complete
         conn.last_activity_ms = now_ms();
