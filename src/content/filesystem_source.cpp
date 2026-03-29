@@ -196,6 +196,8 @@ void FileSystemSource::load_config()
         config_.layout.custom_css = cfg["custom_css"];
     if (cfg.count("custom_head_html"))
         config_.layout.custom_head_html = cfg["custom_head_html"];
+    if (cfg.count("posts_per_page"))
+        config_.layout.posts_per_page = std::stoi(cfg["posts_per_page"]);
 
     // Parse footer
     config_.footer.copyright = cfg["footer_copyright"];
@@ -399,6 +401,10 @@ static Post load_post(const std::string& path, const std::string& series_name, i
     if (doc.meta.count("draft"))
         draft = (doc.meta["draft"] == "true");
 
+    bool featured = false;
+    if (doc.meta.count("featured"))
+        featured = (doc.meta["featured"] == "true");
+
     auto html_content = markdown_to_html(doc.body);
     inject_image_dims(html_content, content_dir);
 
@@ -459,6 +465,7 @@ static Post load_post(const std::string& path, const std::string& series_name, i
         std::move(tags),
         date,
         draft,
+        featured,
         std::move(excerpt),
         std::move(image),
         reading_time,

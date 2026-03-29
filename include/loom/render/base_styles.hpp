@@ -484,7 +484,20 @@ inline css::Sheet base_series()
         ".series-list a"_s | color(raw("var(--accent)")) | text_decoration(none),
         ".series-list a:hover"_s | text_decoration(underline),
         ".series-current"_s | font_weight(600) | color(raw("var(--text)")),
-        ".archive-year"_s | margin_top(px(24))
+        ".archive-year"_s | margin_top(px(24)),
+
+        // Series cards (series index page)
+        ".series-card"_s
+            | margin_bottom(px(20)) | padding(px(16))
+            | border(px(1), solid, raw("var(--border)"))
+            | border_radius(raw("var(--border-radius)")),
+        ".series-card h3"_s | margin_top(px(0)) | margin_bottom(px(6)) | font_size(px(18))
+            | prop("font-family", raw("var(--heading-font)")),
+        ".series-card h3 a"_s | color(raw("var(--text)")) | text_decoration(none),
+        ".series-card h3 a:hover"_s | color(raw("var(--accent)")),
+        ".series-meta"_s | font_size(px(13)) | color(raw("var(--muted)")) | display(raw("flex")) | gap(px(12)),
+        ".series-latest"_s | font_size(px(14)) | margin_top(px(6)) | color(raw("var(--muted)")),
+        ".series-count"_s | color(raw("var(--muted)")) | font_size(px(12))
     );
 }
 
@@ -503,6 +516,91 @@ inline css::Sheet base_breadcrumbs()
         "nav.breadcrumb a"_s | color(raw("var(--muted)")) | text_decoration(none),
         "nav.breadcrumb a:hover"_s | color(raw("var(--accent)")) | text_decoration(underline),
         "nav.breadcrumb li:last-child"_s | color(raw("var(--text)"))
+    );
+}
+
+// ── Featured posts ──
+
+inline css::Sheet base_featured()
+{
+    return sheet(
+        ".featured-posts"_s
+            | margin_bottom(px(32)) | padding_bottom(px(24))
+            | prop("border-bottom", raw("2px solid var(--accent)")),
+        ".featured-posts h2"_s
+            | font_size(px(14)) | font_weight(600)
+            | text_transform(uppercase) | letter_spacing(raw("0.8px"))
+            | color(raw("var(--accent)")) | margin_top(px(0)) | margin_bottom(px(16)),
+        ".featured-posts .post-card"_s
+            | border_left(px(3), solid, raw("var(--accent)"))
+    );
+}
+
+// ── Tag cloud ──
+
+inline css::Sheet base_tag_cloud()
+{
+    return sheet(
+        ".tag-cloud"_s
+            | display(raw("flex")) | prop("flex-wrap", raw("wrap"))
+            | gap(px(8)) | prop("align-items", baseline),
+        ".tag-cloud .tag"_s
+            | transition(raw("font-size 0.2s, color 0.15s"))
+    );
+}
+
+// ── Pagination ──
+
+inline css::Sheet base_pagination()
+{
+    return sheet(
+        ".pagination"_s
+            | display(raw("flex")) | prop("justify-content", center)
+            | prop("align-items", center) | gap(px(8))
+            | margin_top(px(32)) | padding_top(px(20))
+            | prop("border-top", raw("1px solid var(--border)")),
+        ".page-numbers"_s
+            | display(raw("flex")) | gap(px(4)),
+        ".page-num"_s
+            | display(raw("inline-flex")) | prop("justify-content", center)
+            | prop("align-items", center)
+            | min_width(px(36)) | height(px(36))
+            | border_radius(raw("var(--border-radius)"))
+            | font_size(px(14)) | text_decoration(none)
+            | color(raw("var(--text)"))
+            | transition(raw("background 0.15s, color 0.15s")),
+        ".page-num:hover"_s
+            | bg(raw("var(--tag-bg)")),
+        ".page-num.current"_s
+            | bg(raw("var(--accent)")) | color(raw("var(--bg)"))
+            | font_weight(600),
+        ".page-prev,.page-next"_s
+            | color(raw("var(--muted)")) | text_decoration(none)
+            | font_size(px(14)) | transition(raw("color 0.15s")),
+        ".page-prev:hover,.page-next:hover"_s
+            | color(raw("var(--accent)"))
+    );
+}
+
+// ── Search ──
+
+inline css::Sheet base_search()
+{
+    return sheet(
+        ".search-box"_s | margin_bottom(px(24)),
+        "#searchInput"_s
+            | width(raw("100%")) | padding(raw("10px 14px"))
+            | border(px(1), solid, raw("var(--border)"))
+            | border_radius(raw("var(--border-radius)"))
+            | bg(raw("var(--bg)")) | color(raw("var(--text)"))
+            | font_size(px(16))
+            | prop("font-family", raw("var(--font)"))
+            | transition(raw("border-color 0.2s"))
+            | prop("outline", none),
+        "#searchInput:focus"_s
+            | border_color(raw("var(--accent)")),
+        ".search-empty"_s
+            | color(raw("var(--muted)")) | font_style(italic)
     );
 }
 
@@ -600,6 +698,10 @@ inline std::string compile_base_styles()
              + base_post_nav()
              + base_series()
              + base_breadcrumbs()
+             + base_featured()
+             + base_tag_cloud()
+             + base_pagination()
+             + base_search()
              + base_responsive();
 
     return all.compile();

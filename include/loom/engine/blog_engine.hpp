@@ -12,6 +12,22 @@
 
 namespace loom
 {
+    struct TagInfo
+    {
+        Tag tag;
+        int count = 0;
+        float weight = 0.0f;
+    };
+
+    struct SeriesInfo
+    {
+        Series name{""};
+        int post_count = 0;
+        std::chrono::system_clock::time_point first_date;
+        std::chrono::system_clock::time_point last_date;
+        Title latest_post_title{""};
+    };
+
     class BlogEngine
     {
         public:
@@ -119,6 +135,85 @@ namespace loom
                     result.push_back(p.series);
             }
             std::sort(result.begin(), result.end());
+            return result;
+        }
+
+        std::vector<PostSummary> featured_posts() const
+        {
+            std::vector<PostSummary> result;
+            auto now = std::chrono::system_clock::now();
+            for (const auto& p : site_.posts)
+            {
+                if (p.draft || p.published > now || !p.featured)
+                    continue;
+                result.push_back(make_summary(p));
+            }
+            std::sort(result.begin(), result.end(), [](const auto& a, const auto& b) {
+                if (a.published != b.published) return a.published > b.published;
+                return a.modified_at > b.modified_at;
+            });
+            return result;
+        }
+
+        std::vector<TagInfo> tag_info() const
+        {
+            std::map<std::string, int> counts;
+            auto now = std::chrono::system_clock::now();
+            for (const auto& p : site_.posts)
+            {
+                if (p.draft || p.published > now) continue;
+                for (const auto& t : p.tags)
+                    ++counts[t.get()];
+            }
+            int max_count = 0;
+            for (const auto& [_, c] : counts)
+                if (c > max_count) max_count = c;
+
+            std::vector<TagInfo> result;
+            result.reserve(counts.size());
+            for (auto& [name, c] : counts)
+                result.push_back({Tag(name), c, max_count > 0 ? static_cast<float>(c) / max_count : 0.0f});
+
+            std::sort(result.begin(), result.end(), [](const auto& a, const auto& b) {
+                return a.tag.get() < b.tag.get();
+            });
+            return result;
+        }
+
+        std::vector<SeriesInfo> series_info() const
+        {
+            auto now = std::chrono::system_clock::now();
+            std::map<std::string, SeriesInfo> info_map;
+
+            for (const auto& p : site_.posts)
+            {
+                if (p.draft || p.published > now || p.series.empty())
+                    continue;
+
+                auto& si = info_map[p.series.get()];
+                if (si.name.empty())
+                {
+                    si.name = p.series;
+                    si.first_date = p.published;
+                    si.last_date = p.published;
+                    si.latest_post_title = p.title;
+                }
+                ++si.post_count;
+                if (p.published < si.first_date) si.first_date = p.published;
+                if (p.published > si.last_date)
+                {
+                    si.last_date = p.published;
+                    si.latest_post_title = p.title;
+                }
+            }
+
+            std::vector<SeriesInfo> result;
+            result.reserve(info_map.size());
+            for (auto& [_, si] : info_map)
+                result.push_back(std::move(si));
+            std::sort(result.begin(), result.end(), [](const auto& a, const auto& b) {
+                return a.last_date > b.last_date;
+            });
             return result;
         }
 

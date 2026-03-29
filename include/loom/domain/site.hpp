@@ -33,6 +33,9 @@ struct LayoutConfig
     bool show_excerpts = true;
     bool show_reading_time = true;
 
+    // Pagination
+    int posts_per_page = 12;
+
     // Sidebar
     std::string sidebar_position = "right"; // right, left, none
 

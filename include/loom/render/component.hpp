@@ -45,6 +45,7 @@
 #include "../domain/post.hpp"
 #include "../domain/post_summary.hpp"
 #include "../domain/page.hpp"
+#include "../engine/blog_engine.hpp"
 
 namespace loom::theme { struct ThemeDef; }
 
@@ -74,11 +75,28 @@ struct PostContext
     Series series_name{""};
 };
 
+struct PaginationInfo
+{
+    int current_page = 1;
+    int total_pages = 1;
+    bool has_prev() const { return current_page > 1; }
+    bool has_next() const { return current_page < total_pages; }
+    std::string prev_url() const {
+        if (current_page == 2) return "/";
+        return "/page/" + std::to_string(current_page - 1);
+    }
+    std::string next_url() const {
+        return "/page/" + std::to_string(current_page + 1);
+    }
+};
+
 struct SidebarData
 {
     std::vector<PostSummary> recent_posts;
     std::vector<Tag> tags;
+    std::vector<TagInfo> tag_infos;
     std::vector<Series> series;
+    std::vector<SeriesInfo> series_infos;
 };
 
 // ─────────────────────────────────────────────────────────────────────
@@ -113,14 +131,17 @@ struct RelatedPosts    { const std::vector<PostSummary>* posts = nullptr; static
 struct SeriesNav       { std::string series_name; const std::vector<PostSummary>* posts = nullptr; std::string current_slug; static Node render(const SeriesNav&, const Ctx&, Children); };
 struct TagList         { const std::vector<Tag>* tags = nullptr; static Node render(const TagList&, const Ctx&, Children); };
 
-struct Index           { const std::vector<PostSummary>* posts = nullptr; static Node render(const Index&, const Ctx&, Children); };
-struct TagPage         { Tag tag{""}; const std::vector<PostSummary>* posts = nullptr; static Node render(const TagPage&, const Ctx&, Children); };
-struct TagIndex        { const std::vector<Tag>* tags = nullptr; static Node render(const TagIndex&, const Ctx&, Children); };
+struct Index           { const std::vector<PostSummary>* posts = nullptr; const std::vector<PostSummary>* featured = nullptr; const PaginationInfo* pagination = nullptr; static Node render(const Index&, const Ctx&, Children); };
+struct FeaturedSection { const std::vector<PostSummary>* posts = nullptr; static Node render(const FeaturedSection&, const Ctx&, Children); };
+struct Pagination      { PaginationInfo info; static Node render(const Pagination&, const Ctx&, Children); };
+struct TagPage         { Tag tag{""}; const std::vector<PostSummary>* posts = nullptr; int post_count = 0; static Node render(const TagPage&, const Ctx&, Children); };
+struct TagIndex        { const std::vector<TagInfo>* tag_infos = nullptr; static Node render(const TagIndex&, const Ctx&, Children); };
 struct Archives        { const std::map<int, std::vector<PostSummary>, std::greater<int>>* by_year = nullptr; static Node render(const Archives&, const Ctx&, Children); };
 struct SeriesPage      { Series series{""}; const std::vector<PostSummary>* posts = nullptr; static Node render(const SeriesPage&, const Ctx&, Children); };
-struct SeriesIndex     { const std::vector<Series>* all_series = nullptr; static Node render(const SeriesIndex&, const Ctx&, Children); };
+struct SeriesIndex     { const std::vector<SeriesInfo>* all_series_info = nullptr; static Node render(const SeriesIndex&, const Ctx&, Children); };
 struct PageView        { const Page* page = nullptr; static Node render(const PageView&, const Ctx&, Children); };
 struct NotFound        { static Node render(const NotFound&, const Ctx&, Children); };
+struct SearchPage      { static Node render(const SearchPage&, const Ctx&, Children); };
 
 // ─────────────────────────────────────────────────────────────────────
 //  ComponentOverrides — one std::function slot per component
@@ -153,10 +174,12 @@ struct ComponentOverrides
     RenderFn<RelatedPosts> related_posts{}; RenderFn<SeriesNav>   series_nav{};
     RenderFn<TagList>    tag_list{};
 
-    RenderFn<Index>      index{};       RenderFn<TagPage>         tag_page{};
+    RenderFn<Index>      index{};       RenderFn<FeaturedSection> featured_section{};
+    RenderFn<Pagination> pagination{};  RenderFn<TagPage>         tag_page{};
     RenderFn<TagIndex>   tag_index{};   RenderFn<Archives>        archives{};
     RenderFn<SeriesPage> series_page{}; RenderFn<SeriesIndex>     series_index{};
     RenderFn<PageView>   page_view{};   RenderFn<NotFound>        not_found{};
+    RenderFn<SearchPage> search_page{};
 
     // Type-safe lookup — resolves component type to the correct slot
     template<typename C>
@@ -188,6 +211,8 @@ struct ComponentOverrides
         else if constexpr (std::is_same_v<C, SeriesNav>)         return series_nav;
         else if constexpr (std::is_same_v<C, TagList>)           return tag_list;
         else if constexpr (std::is_same_v<C, Index>)             return index;
+        else if constexpr (std::is_same_v<C, FeaturedSection>)   return featured_section;
+        else if constexpr (std::is_same_v<C, Pagination>)        return pagination;
         else if constexpr (std::is_same_v<C, TagPage>)           return tag_page;
         else if constexpr (std::is_same_v<C, TagIndex>)          return tag_index;
         else if constexpr (std::is_same_v<C, Archives>)          return archives;
@@ -195,6 +220,7 @@ struct ComponentOverrides
         else if constexpr (std::is_same_v<C, SeriesIndex>)       return series_index;
         else if constexpr (std::is_same_v<C, PageView>)          return page_view;
         else if constexpr (std::is_same_v<C, NotFound>)          return not_found;
+        else if constexpr (std::is_same_v<C, SearchPage>)        return search_page;
     }
 };
 
@@ -311,6 +337,7 @@ using component::fragment;
 using component::PostContext;
 using component::PostNavigation;
 using component::SidebarData;
+using component::PaginationInfo;
 
 // All component structs
 using component::Document;
@@ -340,6 +367,8 @@ using component::RelatedPosts;
 using component::SeriesNav;
 using component::TagList;
 using component::Index;
+using component::FeaturedSection;
+using component::Pagination;
 using component::TagPage;
 using component::TagIndex;
 using component::Archives;
@@ -347,6 +376,7 @@ using component::SeriesPage;
 using component::SeriesIndex;
 using component::PageView;
 using component::NotFound;
+using component::SearchPage;
 
 // DOM elements (the ones theme authors actually use)
 using dom::div;

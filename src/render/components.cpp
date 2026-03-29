@@ -417,9 +417,15 @@ Node TagCloudWidget::render(const TagCloudWidget& props, const Ctx& ctx, Childre
 {
     if (!props.data) return Node{Node::Fragment, {}, {}, {}, {}};
     return ctx(Widget{.heading = "Tags"},
-        div(class_("post-tags"),
-            each(props.data->tags, [](const Tag& t) {
-                return a(class_("tag"), href("/tag/" + t.get()), t.get());
+        div(class_("post-tags tag-cloud"),
+            each(props.data->tag_infos, [](const TagInfo& ti) {
+                auto size = 0.8f + ti.weight * 0.8f;
+                auto s = std::to_string(size);
+                s.erase(s.find_last_not_of('0') + 1);
+                if (s.back() == '.') s.pop_back();
+                return a(class_("tag"), href("/tag/" + ti.tag.get()),
+                    attr("style", "font-size:" + s + "em"),
+                    ti.tag.get());
             }))
     );
 }
@@ -433,10 +439,12 @@ Node ArchivesWidget::render(const ArchivesWidget&, const Ctx& ctx, Children)
 
 Node SeriesWidget::render(const SeriesWidget& props, const Ctx& ctx, Children)
 {
-    if (!props.data || props.data->series.empty()) return Node{Node::Fragment, {}, {}, {}, {}};
+    if (!props.data || props.data->series_infos.empty()) return Node{Node::Fragment, {}, {}, {}, {}};
     return ctx(Widget{.heading = "Series"},
-        ul(each(props.data->series, [](const Series& s) {
-            return li(a(href("/series/" + s.get()), s.get()));
+        ul(each(props.data->series_infos, [](const SeriesInfo& si) {
+            return li(
+                a(href("/series/" + si.name.get()), si.name.get()),
+                span(class_("series-count"), " (" + std::to_string(si.post_count) + ")"));
         }))
     );
 }
@@ -625,6 +633,42 @@ Node PostCard::render(const PostCard& props, const Ctx& ctx, Children)
 //  Page-level component defaults
 // ═══════════════════════════════════════════════════════════════════════
 
+Node FeaturedSection::render(const FeaturedSection& props, const Ctx& ctx, Children)
+{
+    if (!props.posts || props.posts->empty()) return Node{Node::Fragment, {}, {}, {}, {}};
+    return section(class_("featured-posts"),
+        h2("Featured"),
+        div(class_("post-cards"),
+            each(*props.posts, [&](const PostSummary& p) {
+                return ctx(PostCard{.post = &p});
+            }))
+    );
+}
+
+Node Pagination::render(const Pagination& props, const Ctx&, Children)
+{
+    const auto& info = props.info;
+    if (info.total_pages <= 1) return Node{Node::Fragment, {}, {}, {}, {}};
+
+    Children page_links;
+    for (int i = 1; i <= info.total_pages; ++i)
+    {
+        std::string url = (i == 1) ? "/" : "/page/" + std::to_string(i);
+        if (i == info.current_page)
+            page_links.push_back(span(class_("page-num current"), std::to_string(i)));
+        else
+            page_links.push_back(a(class_("page-num"), href(url), std::to_string(i)));
+    }
+
+    return nav(class_("pagination"), aria_label("Pagination"),
+        when(info.has_prev(),
+            a(class_("page-prev"), href(info.prev_url()), raw("&larr; Prev"))),
+        div(class_("page-numbers"), component::fragment(std::move(page_links))),
+        when(info.has_next(),
+            a(class_("page-next"), href(info.next_url()), raw("Next &rarr;")))
+    );
+}
+
 Node Index::render(const Index& props, const Ctx& ctx, Children)
 {
     if (!props.posts) return Node{Node::Fragment, {}, {}, {}, {}};
@@ -633,22 +677,34 @@ Node Index::render(const Index& props, const Ctx& ctx, Children)
                               ? ctx.theme_def->index_heading.c_str()
                               : "Recent Posts";
 
+    auto featured_node = (props.featured && !props.featured->empty())
+        ? ctx(FeaturedSection{.posts = props.featured})
+        : Node{Node::Fragment, {}, {}, {}, {}};
+
+    auto pagination_node = props.pagination
+        ? ctx(Pagination{.info = *props.pagination})
+        : Node{Node::Fragment, {}, {}, {}, {}};
+
     if (layout.post_list_style == "cards")
     {
         return section(
+            featured_node,
             h2(heading),
             div(class_("post-cards"),
                 each(*props.posts, [&](const PostSummary& p) {
                     return ctx(PostCard{.post = &p});
-                }))
+                })),
+            pagination_node
         );
     }
 
     return section(
+        featured_node,
         h2(heading),
         each(*props.posts, [&](const PostSummary& p) {
             return ctx(PostListing{.post = &p});
-        })
+        }),
+        pagination_node
     );
 }
 
@@ -656,19 +712,28 @@ Node TagPage::render(const TagPage& props, const Ctx& ctx, Children)
 {
     if (!props.posts) return Node{Node::Fragment, {}, {}, {}, {}};
     return section(
-        h2(raw("Posts tagged &ldquo;" + props.tag.get() + "&rdquo;")),
+        h2(raw("Posts tagged &ldquo;" + props.tag.get() + "&rdquo; (" + std::to_string(props.post_count) + ")")),
         each(*props.posts, [&](const PostSummary& p) {
             return ctx(PostListing{.post = &p});
         })
     );
 }
 
-Node TagIndex::render(const TagIndex& props, const Ctx& ctx, Children)
+Node TagIndex::render(const TagIndex& props, const Ctx&, Children)
 {
-    if (!props.tags) return Node{Node::Fragment, {}, {}, {}, {}};
+    if (!props.tag_infos) return Node{Node::Fragment, {}, {}, {}, {}};
     return section(
         h2("Tags"),
-        ctx(TagList{.tags = props.tags})
+        div(class_("post-tags tag-cloud"),
+            each(*props.tag_infos, [](const TagInfo& ti) {
+                auto size = 0.8f + ti.weight * 0.8f;
+                auto s = std::to_string(size);
+                s.erase(s.find_last_not_of('0') + 1);
+                if (s.back() == '.') s.pop_back();
+                return a(class_("tag"), href("/tag/" + ti.tag.get()),
+                    attr("style", "font-size:" + s + "em"),
+                    ti.tag.get() + " (" + std::to_string(ti.count) + ")");
+            }))
     );
 }
 
@@ -711,14 +776,25 @@ Node SeriesPage::render(const SeriesPage& props, const Ctx& ctx, Children)
     );
 }
 
-Node SeriesIndex::render(const SeriesIndex& props, const Ctx&, Children)
+Node SeriesIndex::render(const SeriesIndex& props, const Ctx& ctx, Children)
 {
-    if (!props.all_series) return Node{Node::Fragment, {}, {}, {}, {}};
+    if (!props.all_series_info) return Node{Node::Fragment, {}, {}, {}, {}};
+    const auto& dfmt = resolve_date_format(ctx);
+
     return section(
         h2("Series"),
-        ul(each(*props.all_series, [](const Series& s) {
-            return li(a(href("/series/" + s.get()), s.get()));
-        }))
+        each(*props.all_series_info, [&](const SeriesInfo& si) {
+            return article(class_("series-card"),
+                h3(a(href("/series/" + si.name.get()), si.name.get())),
+                div(class_("series-meta"),
+                    span(std::to_string(si.post_count) + (si.post_count == 1 ? " post" : " posts")),
+                    span(class_("date"),
+                        format_date(si.first_date, dfmt) + " \xe2\x80\x93 " + format_date(si.last_date, dfmt))),
+                when(!si.latest_post_title.get().empty(),
+                    p_(class_("series-latest"),
+                        raw("Latest: " + si.latest_post_title.get())))
+            );
+        })
     );
 }
 
@@ -737,6 +813,63 @@ Node NotFound::render(const NotFound&, const Ctx&, Children)
     return section(
         h2("404 \xe2\x80\x94 Not Found"),
         p_("The page you're looking for doesn't exist.")
+    );
+}
+
+static const char* SEARCH_JS = R"JS(
+(function() {
+    var data = null;
+    var input = document.getElementById('searchInput');
+    var results = document.getElementById('searchResults');
+    if (!input || !results) return;
+
+    fetch('/search.json')
+        .then(function(r) { return r.json(); })
+        .then(function(d) { data = d; });
+
+    input.addEventListener('input', function() {
+        if (!data) return;
+        var q = input.value.toLowerCase().trim();
+        if (q.length < 2) { results.innerHTML = ''; return; }
+
+        var terms = q.split(/\s+/);
+        var matches = data.filter(function(p) {
+            var haystack = (p.t + ' ' + p.e + ' ' + p.g.join(' ')).toLowerCase();
+            return terms.every(function(t) { return haystack.indexOf(t) !== -1; });
+        });
+
+        if (matches.length === 0) {
+            results.innerHTML = '<p class="search-empty">No results found.</p>';
+            return;
+        }
+
+        var html = '';
+        var esc = function(s) {
+            var d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        };
+        matches.forEach(function(p) {
+            html += '<article class="post-listing"><a href="/post/' + esc(p.s) + '">' + esc(p.t) + '</a>';
+            if (p.e) html += '<p class="excerpt">' + esc(p.e).substring(0, 150) + '</p>';
+            html += '</article>';
+        });
+        results.innerHTML = html;
+    });
+})();
+)JS";
+
+Node SearchPage::render(const SearchPage&, const Ctx&, Children)
+{
+    return section(class_("search-page"),
+        h2("Search"),
+        div(class_("search-box"),
+            input(attr("type", "text"), id("searchInput"),
+                attr("placeholder", "Search posts..."),
+                attr("autocomplete", "off"),
+                attr("autofocus", ""))),
+        div(id("searchResults")),
+        script(raw(SEARCH_JS))
     );
 }
 

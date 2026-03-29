@@ -194,6 +194,8 @@ void GitSource::load_config()
         config_data_.layout.custom_css = cfg["custom_css"];
     if (cfg.count("custom_head_html"))
         config_data_.layout.custom_head_html = cfg["custom_head_html"];
+    if (cfg.count("posts_per_page"))
+        config_data_.layout.posts_per_page = std::stoi(cfg["posts_per_page"]);
 
     // Footer
     config_data_.footer.copyright = cfg["footer_copyright"];
@@ -280,6 +282,10 @@ Post GitSource::load_git_post(const std::string& rel_path, const std::string& se
     if (doc.meta.count("draft"))
         draft = (doc.meta["draft"] == "true");
 
+    bool featured = false;
+    if (doc.meta.count("featured"))
+        featured = (doc.meta["featured"] == "true");
+
     auto html_content = markdown_to_html(doc.body);
 
     int reading_time = 0;
@@ -339,6 +345,7 @@ Post GitSource::load_git_post(const std::string& rel_path, const std::string& se
         std::move(tags),
         date,
         draft,
+        featured,
         std::move(excerpt),
         std::move(image),
         reading_time,

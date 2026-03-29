@@ -19,6 +19,7 @@ namespace loom
         std::chrono::system_clock::time_point published;
 
         bool draft = false;
+        bool featured = false;
         std::string excerpt;
         std::string image;
         int reading_time_minutes = 0;

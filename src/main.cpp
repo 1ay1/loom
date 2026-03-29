@@ -6,6 +6,7 @@
 #include <ctime>
 #include <sstream>
 #include <fstream>
+#include <set>
 #include "loom/util/gzip.hpp"
 #include "loom/util/minify.hpp"
 #include "loom/util/git.hpp"
@@ -113,6 +114,7 @@ struct SiteCache
     CachedPage sitemap;
     CachedPage robots;
     CachedPage rss;
+    CachedPage search_json;
 };
 
 static constexpr std::string_view status_line_for(int status) noexcept
@@ -217,6 +219,25 @@ static std::string format_rfc822_date(std::chrono::system_clock::time_point tp)
     return buf;
 }
 
+static std::string json_escape_str(const std::string& s)
+{
+    std::string out;
+    out.reserve(s.size());
+    for (char c : s)
+    {
+        switch (c)
+        {
+            case '"': out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            default: out += c;
+        }
+    }
+    return out;
+}
+
 static std::string xml_escape(const std::string& s)
 {
     std::string out;
@@ -250,8 +271,10 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
     auto ctx = c::Ctx::from(site);
 
     auto all_tags = engine.all_tags();
+    auto all_tag_infos = engine.tag_info();
     auto all_series = engine.all_series();
-    c::SidebarData sidebar_data{engine.list_posts(), all_tags, all_series};
+    auto all_series_infos = engine.series_info();
+    c::SidebarData sidebar_data{engine.list_posts(), all_tags, all_tag_infos, all_series, all_series_infos};
 
     auto render_page = [&](loom::PageMeta meta, loom::dom::Node content) -> std::string {
         return ctx.page(meta, std::move(content), &sidebar_data).render();
@@ -259,12 +282,50 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
 
     auto cache = std::make_shared<SiteCache>();
 
-    // Index
+    // Paginated index with featured posts
+    int total_pages = 1;
     {
-        loom::PageMeta meta;
-        meta.canonical_path = "/";
-        auto posts = engine.list_posts();
-        cache->pages["/"] = make_cached(render_page(meta, ctx(c::Index{.posts = &posts})));
+        auto all_posts = engine.list_posts();
+        auto featured = engine.featured_posts();
+
+        // Build set of featured slugs for dedup
+        std::set<std::string> featured_slugs;
+        for (const auto& fp : featured)
+            featured_slugs.insert(fp.slug.get());
+
+        // Remove featured from regular listing
+        std::vector<loom::PostSummary> regular;
+        regular.reserve(all_posts.size());
+        for (auto& p : all_posts)
+            if (!featured_slugs.count(p.slug.get()))
+                regular.push_back(std::move(p));
+
+        int per_page = site.layout.posts_per_page;
+        int total = static_cast<int>(regular.size());
+        total_pages = std::max(1, (total + per_page - 1) / per_page);
+
+        for (int page = 1; page <= total_pages; ++page)
+        {
+            int start = (page - 1) * per_page;
+            int end = std::min(start + per_page, total);
+            std::vector<loom::PostSummary> page_posts(regular.begin() + start, regular.begin() + end);
+
+            c::PaginationInfo pinfo{page, total_pages};
+
+            loom::PageMeta meta;
+            meta.canonical_path = (page == 1) ? "/" : "/page/" + std::to_string(page);
+            if (page > 1)
+                meta.title = "Page " + std::to_string(page);
+
+            auto* feat_ptr = (page == 1 && !featured.empty()) ? &featured : nullptr;
+
+            cache->pages[meta.canonical_path] = make_cached(
+                render_page(meta, ctx(c::Index{
+                    .posts = &page_posts,
+                    .featured = feat_ptr,
+                    .pagination = &pinfo
+                })));
+        }
     }
 
     // Posts
@@ -329,7 +390,8 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         meta.canonical_path = "/tag/" + tag.get();
         meta.description = "All posts tagged with " + tag.get() + " on " + site.title;
         cache->pages["/tag/" + tag.get()] = make_cached(
-            render_page(meta, ctx(c::TagPage{.tag = tag, .posts = &tag_posts})));
+            render_page(meta, ctx(c::TagPage{.tag = tag, .posts = &tag_posts,
+                                              .post_count = static_cast<int>(tag_posts.size())})));
     }
     {
         loom::PageMeta meta;
@@ -337,7 +399,7 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         meta.canonical_path = "/tags";
         meta.description = "Browse all tags on " + site.title;
         cache->pages["/tags"] = make_cached(
-            render_page(meta, ctx(c::TagIndex{.tags = &all_tags})));
+            render_page(meta, ctx(c::TagIndex{.tag_infos = &all_tag_infos})));
     }
 
     // Archives
@@ -369,7 +431,7 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         meta.canonical_path = "/series";
         meta.description = "Browse all series on " + site.title;
         cache->pages["/series"] = make_cached(
-            render_page(meta, ctx(c::SeriesIndex{.all_series = &all_series})));
+            render_page(meta, ctx(c::SeriesIndex{.all_series_info = &all_series_infos})));
     }
 
     // Static pages
@@ -393,12 +455,46 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
             "text/html; charset=utf-8", true, 404);
     }
 
+    // Search page
+    {
+        loom::PageMeta meta;
+        meta.title = "Search";
+        meta.canonical_path = "/search";
+        cache->pages["/search"] = make_cached(
+            render_page(meta, ctx(c::SearchPage{})));
+    }
+
+    // Search JSON index
+    {
+        std::string json = "[";
+        auto posts = engine.list_posts();
+        for (size_t i = 0; i < posts.size(); ++i)
+        {
+            const auto& p = posts[i];
+            if (i > 0) json += ',';
+            json += "{\"s\":\"" + json_escape_str(p.slug.get())
+                 + "\",\"t\":\"" + json_escape_str(p.title.get())
+                 + "\",\"e\":\"" + json_escape_str(p.excerpt.substr(0, 200)) + "\",\"g\":[";
+            for (size_t j = 0; j < p.tags.size(); ++j)
+            {
+                if (j > 0) json += ',';
+                json += "\"" + json_escape_str(p.tags[j].get()) + "\"";
+            }
+            json += "]}";
+        }
+        json += "]";
+        cache->search_json = make_cached(json, "application/json; charset=utf-8", false);
+    }
+
     // Sitemap
     {
         std::string sitemap;
         sitemap += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
         sitemap += "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n";
         sitemap += "  <url><loc>" + site.base_url + "/</loc><priority>1.0</priority></url>\n";
+        for (int page = 2; page <= total_pages; ++page)
+            sitemap += "  <url><loc>" + site.base_url + "/page/" + std::to_string(page) + "</loc><priority>0.5</priority></url>\n";
+        sitemap += "  <url><loc>" + site.base_url + "/search</loc><priority>0.3</priority></url>\n";
 
         auto posts = engine.list_posts();
         for (const auto& post : posts)
@@ -550,6 +646,9 @@ static void run_with_filesystem(const std::string& content_dir)
     auto rss = [&cache](const loom::HttpRequest& req) {
         auto s = cache.load(); return serve_cached(s->rss, req, s);
     };
+    auto search_json = [&cache](const loom::HttpRequest& req) {
+        auto s = cache.load(); return serve_cached(s->search_json, req, s);
+    };
 
     // Static file fallback
     auto fb = [&cache, &content_dir](loom::HttpRequest& req) -> loom::HttpResponse {
@@ -589,13 +688,16 @@ static void run_with_filesystem(const std::string& content_dir)
         get<"/tags">(cached),
         get<"/archives">(cached),
         get<"/series">(cached),
+        get<"/search">(cached),
         get<"/sitemap.xml">(sitemap),
         get<"/robots.txt">(robots),
         get<"/feed.xml">(rss),
+        get<"/search.json">(search_json),
         // Parameterized routes (prefix match)
         get<"/post/:slug">(cached),
         get<"/tag/:slug">(cached),
-        get<"/series/:slug">(cached)
+        get<"/series/:slug">(cached),
+        get<"/page/:num">(cached)
     );
 
     // Server socket typestate: Unbound → Bound → Listening
@@ -664,6 +766,9 @@ static void run_with_git(const std::string& repo_path, const std::string& branch
     auto rss_h = [&cache](const loom::HttpRequest& req) {
         auto s = cache.load(); return serve_cached(s->rss, req, s);
     };
+    auto search_json_h = [&cache](const loom::HttpRequest& req) {
+        auto s = cache.load(); return serve_cached(s->search_json, req, s);
+    };
 
     auto fb = [&cache, repo_path, branch, content_prefix, raw_base](loom::HttpRequest& req) -> loom::HttpResponse {
         if (!safe_path(req.path))
@@ -714,12 +819,15 @@ static void run_with_git(const std::string& repo_path, const std::string& branch
         get<"/tags">(cached),
         get<"/archives">(cached),
         get<"/series">(cached),
+        get<"/search">(cached),
         get<"/sitemap.xml">(sitemap_h),
         get<"/robots.txt">(robots_h),
         get<"/feed.xml">(rss_h),
+        get<"/search.json">(search_json_h),
         get<"/post/:slug">(cached),
         get<"/tag/:slug">(cached),
-        get<"/series/:slug">(cached)
+        get<"/series/:slug">(cached),
+        get<"/page/:num">(cached)
     );
 
     // Server socket typestate: Unbound → Bound → Listening

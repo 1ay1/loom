@@ -63,6 +63,7 @@ draft: true
 | `excerpt` | no | auto-generated | Summary for listings and meta tags |
 | `image` | no | first image in post | Social preview image (`og:image`, `twitter:image`) |
 | `draft` | no | false | Set `true` to hide from all listings |
+| `featured` | no | false | Set `true` to pin the post in a featured section on the homepage |
 
 If `excerpt` is omitted, the first ~200 characters of content are used.
 
@@ -96,6 +97,44 @@ posts/
 Each post in a series displays a navigation panel listing all parts, with the current post highlighted.
 
 Series appear in the sidebar widget and at `/series` and `/series/:name`.
+
+The `/series` index page displays each series as a card with post count, date range, and the title of the latest post. The sidebar series widget also shows post counts.
+
+## Pagination
+
+The homepage is paginated. Posts are split across pages of 12 (configurable via `posts_per_page` in `site.conf`). Navigation links appear at the bottom of each page.
+
+```
+/           → page 1
+/page/2     → page 2
+/page/3     → page 3
+```
+
+All pages are pre-rendered at startup. The pagination URLs are path-based, matching the compile-time routing system.
+
+## Featured Posts
+
+Mark posts with `featured: true` in frontmatter to pin them in a dedicated section at the top of the homepage (page 1 only). Featured posts are excluded from the regular chronological listing to avoid duplicates.
+
+```
+---
+title: Important Announcement
+date: 2025-12-01
+featured: true
+---
+```
+
+## Search
+
+A client-side search page is available at `/search`. At startup, Loom generates a JSON index at `/search.json` containing the slug, title, excerpt, and tags for every post. The search page fetches this index once and filters it in the browser as you type — no server round-trips, no external dependencies.
+
+Search matches all terms against the combined title, excerpt, and tags of each post.
+
+## Tags
+
+The `/tags` page and the sidebar tag cloud display tags with weighted font sizes based on post frequency. Tags used more often appear larger. Each tag shows its post count.
+
+Individual tag pages (`/tag/:name`) also display the post count in the heading.
 
 ## Site Configuration
 
@@ -136,6 +175,7 @@ Available widgets: `recent_posts`, `tag_cloud`, `archives`, `series`, `about`.
 | `header_style` | `default`, `centered`, `minimal` | `default` | Header layout |
 | `show_description` | `true`, `false` | `false` | Show site description below title |
 | `show_theme_toggle` | `true`, `false` | `true` | Dark/light mode toggle button |
+| `posts_per_page` | integer | `12` | Posts per page on the index (pagination) |
 | `post_list_style` | `list`, `cards` | `list` | Index page layout |
 | `show_post_dates` | `true`, `false` | `true` | Publication dates on listings |
 | `show_post_tags` | `true`, `false` | `true` | Tags on listings |
@@ -201,12 +241,15 @@ Something[^1] interesting.
 
 | Route | Description |
 |-------|-------------|
-| `/` | Post index |
+| `/` | Post index (page 1) |
+| `/page/:num` | Paginated post index |
 | `/post/:slug` | Single post (with prev/next, related posts, series nav) |
-| `/tag/:tag` | Posts filtered by tag |
-| `/tags` | All tags |
+| `/search` | Client-side full-text search |
+| `/search.json` | Search index (JSON, built at startup) |
+| `/tag/:tag` | Posts filtered by tag (with post count) |
+| `/tags` | All tags with post counts and weighted sizing |
 | `/archives` | Posts grouped by year |
-| `/series` | All series |
+| `/series` | All series with post count, date range, and latest post |
 | `/series/:name` | Posts in a series |
 | `/:slug` | Static page |
 | `/feed.xml` | RSS 2.0 feed (latest 20 posts) |
