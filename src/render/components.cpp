@@ -1211,9 +1211,13 @@ var W=data.w,H=data.h;
 var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
 svg.setAttribute('viewBox','0 0 '+W+' '+H);
 svg.setAttribute('class','post-graph');
-svg.style.width='100%';
-svg.style.height='100%';
 el.appendChild(svg);
+
+// Hint overlay
+var hint=document.createElement('div');
+hint.className='post-graph-hint';
+hint.textContent='Click to explore';
+el.appendChild(hint);
 
 // Transform group for pan/zoom
 var g=document.createElementNS('http://www.w3.org/2000/svg','g');
@@ -1221,9 +1225,9 @@ svg.appendChild(g);
 
 // State
 var zoom=1,panX=0,panY=0,dragging=false,dragX=0,dragY=0;
-var activeNode=-1;
+var activeNode=-1,expanded=false;
 
-// Build adjacency for highlight lookup
+// Build adjacency
 var adj={};
 E.forEach(function(e){
   if(!adj[e.a])adj[e.a]=[];
@@ -1234,6 +1238,49 @@ E.forEach(function(e){
 
 function updateTransform(){
   g.setAttribute('transform','translate('+panX+','+panY+') scale('+zoom+')');
+}
+
+// ── Expand/collapse: fill the window on interaction ──
+
+function expand(){
+  if(expanded)return;
+  expanded=true;
+  hint.style.opacity='0';
+  el.classList.add('expanded');
+  // Close button
+  var close=document.createElement('button');
+  close.className='post-graph-close';
+  close.innerHTML='&times;';
+  close.title='Close (Esc)';
+  close.addEventListener('click',function(ev){ev.stopPropagation();collapse()});
+  el.appendChild(close);
+  el._close=close;
+  // Show all labels in expanded mode
+  labelEls.forEach(function(t){t.style.opacity='1'});
+  document.body.style.overflow='hidden';
+}
+
+function collapse(){
+  if(!expanded)return;
+  expanded=false;
+  el.classList.remove('expanded');
+  if(el._close){el._close.remove();el._close=null}
+  zoom=1;panX=0;panY=0;
+  updateTransform();
+  labelEls.forEach(function(t){t.style.opacity='0'});
+  document.body.style.overflow='';
+  activeNode=-1;
+  unhighlight();
+}
+
+document.addEventListener('keydown',function(ev){
+  if(ev.key==='Escape'&&expanded)collapse();
+});
+
+// First interaction expands
+var firstInteraction=true;
+function maybeExpand(){
+  if(firstInteraction){firstInteraction=false;expand()}
 }
 
 // Draw edges
@@ -1254,7 +1301,6 @@ var nodeEls=[],labelEls=[];
 N.forEach(function(nd,i){
   var gr=document.createElementNS('http://www.w3.org/2000/svg','g');
   gr.style.cursor='pointer';
-  gr.dataset.idx=i;
 
   var c=document.createElementNS('http://www.w3.org/2000/svg','circle');
   c.setAttribute('cx',nd.x);c.setAttribute('cy',nd.y);
@@ -1265,28 +1311,28 @@ N.forEach(function(nd,i){
 
   var t=document.createElementNS('http://www.w3.org/2000/svg','text');
   var anchor=nd.x>W/2?'start':'end';
-  var dx=nd.x>W/2?(nd.r+5):-(nd.r+5);
-  t.setAttribute('x',nd.x+dx);t.setAttribute('y',nd.y+2.5);
+  var dx=nd.x>W/2?(nd.r+4):-(nd.r+4);
+  t.setAttribute('x',nd.x+dx);t.setAttribute('y',nd.y+2);
   t.setAttribute('text-anchor',anchor);
-  t.setAttribute('font-size','7');
+  t.setAttribute('font-size','6');
   t.setAttribute('fill','var(--text)');
   t.setAttribute('font-family','var(--font)');
-  t.setAttribute('class','post-graph-label');
   t.style.opacity='0';
   t.style.pointerEvents='none';
   t.textContent=nd.t;
   gr.appendChild(t);
 
-  gr.addEventListener('mouseenter',function(){highlight(i)});
+  gr.addEventListener('mouseenter',function(){maybeExpand();highlight(i)});
   gr.addEventListener('mouseleave',function(){unhighlight()});
   gr.addEventListener('click',function(ev){
+    if(!expanded){ev.preventDefault();expand();return}
     ev.preventDefault();window.location='/post/'+nd.s;
   });
 
-  // Touch: tap to highlight, double-tap to navigate
   var lastTap=0;
   gr.addEventListener('touchend',function(ev){
     var now=Date.now();
+    if(!expanded){expand();ev.preventDefault();return}
     if(now-lastTap<300){window.location='/post/'+nd.s}
     else{highlight(i)}
     lastTap=now;
@@ -1305,65 +1351,59 @@ function highlight(i){
   connected.forEach(function(j){connSet[j]=1});
 
   nodeEls.forEach(function(c,j){
-    c.setAttribute('fill-opacity',connSet[j]?'1':'0.08');
-    if(j===i)c.setAttribute('r',parseFloat(c.getAttribute('r'))*1.4);
+    c.setAttribute('fill-opacity',connSet[j]?'1':'0.06');
+    if(j===i)c.setAttribute('r',N[j].r*1.5);
   });
   labelEls.forEach(function(t,j){
     t.style.opacity=connSet[j]?'1':'0';
+    t.setAttribute('font-weight',j===i?'bold':'normal');
   });
   edgeEls.forEach(function(line){
     var a=+line.dataset.a,b=+line.dataset.b;
     var on=(a===i||b===i);
-    line.setAttribute('stroke-opacity',on?'0.7':'0.03');
+    line.setAttribute('stroke-opacity',on?'0.8':'0.02');
     line.setAttribute('stroke-width',on?'2.5':'0.5');
   });
 }
 
 function unhighlight(){
+  if(activeNode<0)return;
   activeNode=-1;
   nodeEls.forEach(function(c,j){
     c.setAttribute('fill-opacity',N[j].d>0?'0.7':'0.3');
     c.setAttribute('r',N[j].r);
   });
   labelEls.forEach(function(t){
-    t.style.opacity=zoom>=2?'1':'0';
+    t.style.opacity=expanded?'1':'0';
+    t.setAttribute('font-weight','normal');
   });
   edgeEls.forEach(function(line){
-    var w=E.find(function(e){return e.a==+line.dataset.a&&e.b==+line.dataset.b});
-    if(w){
-      line.setAttribute('stroke-opacity',w.w>=4?'0.4':w.w>=3?'0.25':'0.12');
-      line.setAttribute('stroke-width',w.w>=4?'2':w.w>=3?'1.5':'1');
+    var e=E.find(function(e){return e.a==+line.dataset.a&&e.b==+line.dataset.b});
+    if(e){
+      line.setAttribute('stroke-opacity',e.w>=4?'0.4':e.w>=3?'0.25':'0.12');
+      line.setAttribute('stroke-width',e.w>=4?'2':e.w>=3?'1.5':'1');
     }
   });
 }
 
-// Semantic zoom: labels appear when zoomed in
-function updateLabels(){
-  if(activeNode>=0)return;
-  var show=zoom>=2;
-  labelEls.forEach(function(t){t.style.opacity=show?'1':'0'});
-}
+// ── Pan/Zoom ──
 
-// Zoom with wheel — zoom toward cursor position
 svg.addEventListener('wheel',function(ev){
   ev.preventDefault();
+  maybeExpand();
   var rect=svg.getBoundingClientRect();
   var mx=(ev.clientX-rect.left)/rect.width*W;
   var my=(ev.clientY-rect.top)/rect.height*H;
-
   var oldZ=zoom;
-  var delta=ev.deltaY>0?0.9:1.1;
-  zoom=Math.max(0.5,Math.min(8,zoom*delta));
-
-  // Zoom toward cursor
+  zoom=Math.max(0.3,Math.min(10,zoom*(ev.deltaY>0?0.9:1.1)));
   panX=mx-(mx-panX)*(zoom/oldZ);
   panY=my-(my-panY)*(zoom/oldZ);
-  updateTransform();updateLabels();
+  updateTransform();
 },{passive:false});
 
-// Pan with mouse drag
 svg.addEventListener('mousedown',function(ev){
   if(ev.button!==0)return;
+  maybeExpand();
   dragging=true;dragX=ev.clientX;dragY=ev.clientY;
   svg.style.cursor='grabbing';
   ev.preventDefault();
@@ -1371,19 +1411,20 @@ svg.addEventListener('mousedown',function(ev){
 window.addEventListener('mousemove',function(ev){
   if(!dragging)return;
   var rect=svg.getBoundingClientRect();
-  var scaleX=W/rect.width,scaleY=H/rect.height;
-  panX+=(ev.clientX-dragX)*scaleX;
-  panY+=(ev.clientY-dragY)*scaleY;
+  panX+=(ev.clientX-dragX)*(W/rect.width);
+  panY+=(ev.clientY-dragY)*(H/rect.height);
   dragX=ev.clientX;dragY=ev.clientY;
   updateTransform();
 });
 window.addEventListener('mouseup',function(){
+  if(!dragging)return;
   dragging=false;svg.style.cursor='grab';
 });
 
-// Touch pan/pinch zoom
+// Touch
 var touches={};
 svg.addEventListener('touchstart',function(ev){
+  maybeExpand();
   for(var i=0;i<ev.changedTouches.length;i++){
     var t=ev.changedTouches[i];
     touches[t.identifier]={x:t.clientX,y:t.clientY};
@@ -1391,9 +1432,7 @@ svg.addEventListener('touchstart',function(ev){
 },{passive:true});
 svg.addEventListener('touchmove',function(ev){
   ev.preventDefault();
-  var keys=Object.keys(touches);
-  if(keys.length===1&&ev.touches.length===1){
-    // Pan
+  if(ev.touches.length===1){
     var t=ev.touches[0],prev=touches[t.identifier];
     if(prev){
       var rect=svg.getBoundingClientRect();
@@ -1403,13 +1442,11 @@ svg.addEventListener('touchmove',function(ev){
       updateTransform();
     }
   }else if(ev.touches.length===2){
-    // Pinch zoom
     var t1=ev.touches[0],t2=ev.touches[1];
-    var dist=Math.sqrt(Math.pow(t1.clientX-t2.clientX,2)+Math.pow(t1.clientY-t2.clientY,2));
+    var dist=Math.hypot(t1.clientX-t2.clientX,t1.clientY-t2.clientY);
     if(touches._pinch){
-      var delta=dist/touches._pinch;
-      zoom=Math.max(0.5,Math.min(8,zoom*delta));
-      updateTransform();updateLabels();
+      zoom=Math.max(0.3,Math.min(10,zoom*dist/touches._pinch));
+      updateTransform();
     }
     touches._pinch=dist;
     touches[t1.identifier]={x:t1.clientX,y:t1.clientY};
@@ -1422,16 +1459,16 @@ svg.addEventListener('touchend',function(ev){
   if(ev.touches.length<2)delete touches._pinch;
 },{passive:true});
 
-// Double-click to reset view
+// Double-click: reset if expanded, expand if not
 svg.addEventListener('dblclick',function(ev){
   ev.preventDefault();
+  if(!expanded){expand();return}
   zoom=1;panX=0;panY=0;
-  updateTransform();updateLabels();
+  updateTransform();
 });
 
 svg.style.cursor='grab';
 updateTransform();
-updateLabels();
 })();
 )JS";
 

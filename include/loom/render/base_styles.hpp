@@ -991,19 +991,57 @@ inline css::Sheet base_post_graph()
             | font_size(px(13)) | font_weight(600) | color(raw("var(--muted)"))
             | text_transform(uppercase) | letter_spacing(raw("1px"))
             | margin_bottom(px(8)),
+
+        // Inline preview
         "#post-graph-container"_s
-            | width(raw("100%")) | height(px(420))
+            | width(raw("100%")) | height(px(280))
             | prop("border-radius", raw("var(--border-radius)"))
             | border(1_px, solid, raw("var(--border)"))
             | overflow(hidden)
-            | prop("touch-action", none),
+            | prop("touch-action", none)
+            | position(relative)
+            | transition(raw("all 0.3s ease")),
+
+        // Expanded: fill the viewport
+        "#post-graph-container.expanded"_s
+            | position(fixed) | prop("top", raw("0")) | prop("left", raw("0"))
+            | width(raw("100vw")) | height(raw("100vh"))
+            | prop("z-index", raw("9999"))
+            | bg(raw("var(--bg)"))
+            | prop("border-radius", raw("0"))
+            | border(0_px, solid, raw("transparent")),
+
         ".post-graph"_s
             | width(raw("100%")) | height(raw("100%"))
             | display(block),
         ".post-graph line"_s
             | transition(raw("stroke-opacity 0.15s, stroke-width 0.15s")),
         ".post-graph-label"_s
-            | transition(raw("opacity 0.15s ease"))
+            | transition(raw("opacity 0.12s ease")),
+
+        // Hint overlay
+        ".post-graph-hint"_s
+            | position(absolute) | prop("bottom", raw("12px")) | prop("left", raw("50%"))
+            | prop("transform", raw("translateX(-50%)"))
+            | font_size(px(12)) | color(raw("var(--muted)"))
+            | padding(raw("4px 14px"))
+            | prop("border-radius", raw("20px"))
+            | bg(raw("color-mix(in srgb, var(--text) 8%, var(--bg))"))
+            | prop("pointer-events", none)
+            | transition(raw("opacity 0.3s ease")),
+
+        // Close button
+        ".post-graph-close"_s
+            | position(absolute) | prop("top", raw("16px")) | prop("right", raw("16px"))
+            | prop("z-index", raw("10000"))
+            | width(px(40)) | height(px(40))
+            | prop("border-radius", raw("50%"))
+            | border(1_px, solid, raw("var(--border)"))
+            | bg(raw("var(--bg)"))
+            | color(raw("var(--text)"))
+            | font_size(px(22)) | prop("cursor", raw("pointer"))
+            | display(raw("flex")) | prop("align-items", raw("center")) | prop("justify-content", raw("center"))
+            | padding(px(0)) | prop("line-height", raw("1"))
     );
 }
 
