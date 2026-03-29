@@ -1265,10 +1265,15 @@ N.forEach(function(nd,i){
 
   var t=document.createElementNS('http://www.w3.org/2000/svg','text');
   var anchor=nd.x>W/2?'start':'end';
-  var dx=nd.x>W/2?(nd.r+8):-(nd.r+8);
-  t.setAttribute('x',nd.x+dx);t.setAttribute('y',nd.y+4);
+  var dx=nd.x>W/2?(nd.r+5):-(nd.r+5);
+  t.setAttribute('x',nd.x+dx);t.setAttribute('y',nd.y+2.5);
   t.setAttribute('text-anchor',anchor);
+  t.setAttribute('font-size','7');
+  t.setAttribute('fill','var(--text)');
+  t.setAttribute('font-family','var(--font)');
   t.setAttribute('class','post-graph-label');
+  t.style.opacity='0';
+  t.style.pointerEvents='none';
   t.textContent=nd.t;
   gr.appendChild(t);
 
@@ -1320,9 +1325,8 @@ function unhighlight(){
     c.setAttribute('fill-opacity',N[j].d>0?'0.7':'0.3');
     c.setAttribute('r',N[j].r);
   });
-  labelEls.forEach(function(t,i){
-    var isHub=N[i].d>=5;
-    t.style.opacity=(zoom>=1.4||isHub)?'1':'0';
+  labelEls.forEach(function(t){
+    t.style.opacity=zoom>=2?'1':'0';
   });
   edgeEls.forEach(function(line){
     var w=E.find(function(e){return e.a==+line.dataset.a&&e.b==+line.dataset.b});
@@ -1333,13 +1337,11 @@ function unhighlight(){
   });
 }
 
-// Semantic zoom: hub labels visible at default zoom, all labels when zoomed
+// Semantic zoom: labels appear when zoomed in
 function updateLabels(){
   if(activeNode>=0)return;
-  labelEls.forEach(function(t,i){
-    var isHub=N[i].d>=5;
-    t.style.opacity=(zoom>=1.4||isHub)?'1':'0';
-  });
+  var show=zoom>=2;
+  labelEls.forEach(function(t){t.style.opacity=show?'1':'0'});
 }
 
 // Zoom with wheel — zoom toward cursor position

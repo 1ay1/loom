@@ -1003,10 +1003,7 @@ inline css::Sheet base_post_graph()
         ".post-graph line"_s
             | transition(raw("stroke-opacity 0.15s, stroke-width 0.15s")),
         ".post-graph-label"_s
-            | font_size(px(11)) | prop("fill", raw("var(--text)"))
-            | prop("font-family", raw("var(--font)"))
-            | opacity(0) | transition(raw("opacity 0.15s ease"))
-            | prop("pointer-events", none)
+            | transition(raw("opacity 0.15s ease"))
     );
 }
 
