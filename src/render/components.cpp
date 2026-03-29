@@ -1206,28 +1206,24 @@ if(!el)return;
 var data=JSON.parse(document.getElementById('post-graph-data').textContent);
 var N=data.nodes,E=data.edges;
 var W=data.w,H=data.h;
+var FS=6; // base font size in SVG units
 
-// Create SVG
 var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
 svg.setAttribute('viewBox','0 0 '+W+' '+H);
 svg.setAttribute('class','post-graph');
 el.appendChild(svg);
 
-// Hint overlay
 var hint=document.createElement('div');
 hint.className='post-graph-hint';
 hint.textContent='Click to explore';
 el.appendChild(hint);
 
-// Transform group for pan/zoom
 var g=document.createElementNS('http://www.w3.org/2000/svg','g');
 svg.appendChild(g);
 
-// State
 var zoom=1,panX=0,panY=0,dragging=false,dragX=0,dragY=0;
 var activeNode=-1,expanded=false;
 
-// Build adjacency
 var adj={};
 E.forEach(function(e){
   if(!adj[e.a])adj[e.a]=[];
@@ -1240,14 +1236,13 @@ function updateTransform(){
   g.setAttribute('transform','translate('+panX+','+panY+') scale('+zoom+')');
 }
 
-// ── Expand/collapse: fill the window on interaction ──
+// ── Expand / Collapse ──
 
 function expand(){
   if(expanded)return;
   expanded=true;
   hint.style.opacity='0';
   el.classList.add('expanded');
-  // Close button
   var close=document.createElement('button');
   close.className='post-graph-close';
   close.innerHTML='&times;';
@@ -1255,8 +1250,7 @@ function expand(){
   close.addEventListener('click',function(ev){ev.stopPropagation();collapse()});
   el.appendChild(close);
   el._close=close;
-  // Show all labels in expanded mode
-  labelEls.forEach(function(t){t.style.opacity='1'});
+  showLabels();
   document.body.style.overflow='hidden';
 }
 
@@ -1267,37 +1261,36 @@ function collapse(){
   if(el._close){el._close.remove();el._close=null}
   zoom=1;panX=0;panY=0;
   updateTransform();
-  labelEls.forEach(function(t){t.style.opacity='0'});
+  hideLabels();
   document.body.style.overflow='';
   activeNode=-1;
-  unhighlight();
+  resetStyles();
 }
 
 document.addEventListener('keydown',function(ev){
   if(ev.key==='Escape'&&expanded)collapse();
 });
 
-// First interaction expands
-var firstInteraction=true;
-function maybeExpand(){
-  if(firstInteraction){firstInteraction=false;expand()}
-}
+var firstClick=true;
+function maybeExpand(){if(firstClick){firstClick=false;expand()}}
 
-// Draw edges
+// ── Draw edges ──
+
 var edgeEls=[];
 E.forEach(function(e){
   var line=document.createElementNS('http://www.w3.org/2000/svg','line');
   line.setAttribute('x1',N[e.a].x);line.setAttribute('y1',N[e.a].y);
   line.setAttribute('x2',N[e.b].x);line.setAttribute('y2',N[e.b].y);
   line.setAttribute('stroke','var(--accent)');
-  line.setAttribute('stroke-width',e.w>=4?'2':e.w>=3?'1.5':'1');
-  line.setAttribute('stroke-opacity',e.w>=4?'0.4':e.w>=3?'0.25':'0.12');
+  line.setAttribute('stroke-width',e.w>=4?'1.8':e.w>=3?'1.2':'0.8');
+  line.setAttribute('stroke-opacity',e.w>=4?'0.35':e.w>=3?'0.2':'0.1');
   line.dataset.a=e.a;line.dataset.b=e.b;
   g.appendChild(line);edgeEls.push(line);
 });
 
-// Draw nodes
-var nodeEls=[],labelEls=[];
+// ── Draw nodes + labels ──
+
+var nodeEls=[],labelEls=[],labelBoxes=[];
 N.forEach(function(nd,i){
   var gr=document.createElementNS('http://www.w3.org/2000/svg','g');
   gr.style.cursor='pointer';
@@ -1310,11 +1303,7 @@ N.forEach(function(nd,i){
   gr.appendChild(c);
 
   var t=document.createElementNS('http://www.w3.org/2000/svg','text');
-  var anchor=nd.x>W/2?'start':'end';
-  var dx=nd.x>W/2?(nd.r+4):-(nd.r+4);
-  t.setAttribute('x',nd.x+dx);t.setAttribute('y',nd.y+2);
-  t.setAttribute('text-anchor',anchor);
-  t.setAttribute('font-size','6');
+  t.setAttribute('font-size',FS);
   t.setAttribute('fill','var(--text)');
   t.setAttribute('font-family','var(--font)');
   t.style.opacity='0';
@@ -1325,23 +1314,108 @@ N.forEach(function(nd,i){
   gr.addEventListener('mouseenter',function(){maybeExpand();highlight(i)});
   gr.addEventListener('mouseleave',function(){unhighlight()});
   gr.addEventListener('click',function(ev){
-    if(!expanded){ev.preventDefault();expand();return}
-    ev.preventDefault();window.location='/post/'+nd.s;
+    ev.preventDefault();
+    if(!expanded){expand();return}
+    window.location='/post/'+nd.s;
   });
-
   var lastTap=0;
   gr.addEventListener('touchend',function(ev){
-    var now=Date.now();
-    if(!expanded){expand();ev.preventDefault();return}
-    if(now-lastTap<300){window.location='/post/'+nd.s}
-    else{highlight(i)}
-    lastTap=now;
     ev.preventDefault();
+    if(!expanded){expand();return}
+    var now=Date.now();
+    if(now-lastTap<300) window.location='/post/'+nd.s;
+    else highlight(i);
+    lastTap=now;
   });
 
   g.appendChild(gr);
   nodeEls.push(c);labelEls.push(t);
 });
+
+// ── Label collision resolution ──
+// After all labels are in the DOM, measure their bounding boxes with
+// getBBox() and nudge overlapping labels. Runs once on init and uses
+// the resolved positions for all future show/hide.
+
+function resolveLabels(){
+  // Temporarily show all labels so getBBox works
+  labelEls.forEach(function(t){t.style.opacity='1'});
+
+  // Initial placement: right of node by default
+  var placements=[];
+  N.forEach(function(nd,i){
+    var t=labelEls[i];
+    var right=nd.x<=W*0.75; // prefer right unless node is far right
+    var dx=right?(nd.r+4):-(nd.r+4);
+    t.setAttribute('text-anchor',right?'start':'end');
+    t.setAttribute('x',nd.x+dx);
+    t.setAttribute('y',nd.y+2);
+    var bb=t.getBBox();
+    placements.push({i:i,x:bb.x,y:bb.y,w:bb.width,h:bb.height,
+                     nx:nd.x,ny:nd.y,nr:nd.r,right:right});
+  });
+
+  // Sort by y for efficient overlap checking
+  function boxesOverlap(a,b){
+    return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y;
+  }
+
+  // Multi-pass collision resolution
+  for(var pass=0;pass<8;pass++){
+    var moved=false;
+    for(var i=0;i<placements.length;i++){
+      var a=placements[i];
+      for(var j=i+1;j<placements.length;j++){
+        var b=placements[j];
+        if(!boxesOverlap(a,b))continue;
+        moved=true;
+
+        // Strategy 1: flip the label to the other side of its node
+        var p=a.h<b.h?a:b; // flip the smaller label
+        p.right=!p.right;
+        var dx=p.right?(p.nr+4):-(p.nr+4);
+        var t=labelEls[p.i];
+        t.setAttribute('text-anchor',p.right?'start':'end');
+        t.setAttribute('x',p.nx+dx);
+        var bb=t.getBBox();
+        p.x=bb.x;p.y=bb.y;p.w=bb.width;p.h=bb.height;
+
+        // If still overlapping, push vertically
+        if(boxesOverlap(a,b)){
+          var overlap_y=Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y);
+          var shift=(overlap_y/2)+1;
+          if(a.ny<b.ny){
+            a.y-=shift;b.y+=shift;
+          }else{
+            a.y+=shift;b.y-=shift;
+          }
+          labelEls[a.i].setAttribute('y',a.y+a.h-1);
+          labelEls[b.i].setAttribute('y',b.y+b.h-1);
+          var bba=labelEls[a.i].getBBox();
+          a.x=bba.x;a.y=bba.y;a.w=bba.width;a.h=bba.height;
+          var bbb=labelEls[b.i].getBBox();
+          b.x=bbb.x;b.y=bbb.y;b.w=bbb.width;b.h=bbb.height;
+        }
+      }
+    }
+    if(!moved)break;
+  }
+
+  // Store final positions, then hide
+  labelEls.forEach(function(t){t.style.opacity='0'});
+}
+
+// Run after a frame so SVG is laid out
+requestAnimationFrame(function(){requestAnimationFrame(resolveLabels)});
+
+// ── Show/hide helpers ──
+
+function showLabels(){
+  labelEls.forEach(function(t){t.style.opacity='1'});
+}
+function hideLabels(){
+  labelEls.forEach(function(t){t.style.opacity='0'});
+}
 
 function highlight(i){
   if(activeNode===i)return;
@@ -1352,7 +1426,7 @@ function highlight(i){
 
   nodeEls.forEach(function(c,j){
     c.setAttribute('fill-opacity',connSet[j]?'1':'0.06');
-    if(j===i)c.setAttribute('r',N[j].r*1.5);
+    if(j===i)c.setAttribute('r',N[j].r*1.4);
   });
   labelEls.forEach(function(t,j){
     t.style.opacity=connSet[j]?'1':'0';
@@ -1361,14 +1435,18 @@ function highlight(i){
   edgeEls.forEach(function(line){
     var a=+line.dataset.a,b=+line.dataset.b;
     var on=(a===i||b===i);
-    line.setAttribute('stroke-opacity',on?'0.8':'0.02');
-    line.setAttribute('stroke-width',on?'2.5':'0.5');
+    line.setAttribute('stroke-opacity',on?'0.7':'0.02');
+    line.setAttribute('stroke-width',on?'2':'0.3');
   });
 }
 
 function unhighlight(){
   if(activeNode<0)return;
   activeNode=-1;
+  resetStyles();
+}
+
+function resetStyles(){
   nodeEls.forEach(function(c,j){
     c.setAttribute('fill-opacity',N[j].d>0?'0.7':'0.3');
     c.setAttribute('r',N[j].r);
@@ -1380,17 +1458,16 @@ function unhighlight(){
   edgeEls.forEach(function(line){
     var e=E.find(function(e){return e.a==+line.dataset.a&&e.b==+line.dataset.b});
     if(e){
-      line.setAttribute('stroke-opacity',e.w>=4?'0.4':e.w>=3?'0.25':'0.12');
-      line.setAttribute('stroke-width',e.w>=4?'2':e.w>=3?'1.5':'1');
+      line.setAttribute('stroke-opacity',e.w>=4?'0.35':e.w>=3?'0.2':'0.1');
+      line.setAttribute('stroke-width',e.w>=4?'1.8':e.w>=3?'1.2':'0.8');
     }
   });
 }
 
-// ── Pan/Zoom ──
+// ── Pan / Zoom ──
 
 svg.addEventListener('wheel',function(ev){
-  ev.preventDefault();
-  maybeExpand();
+  ev.preventDefault();maybeExpand();
   var rect=svg.getBoundingClientRect();
   var mx=(ev.clientX-rect.left)/rect.width*W;
   var my=(ev.clientY-rect.top)/rect.height*H;
@@ -1402,11 +1479,9 @@ svg.addEventListener('wheel',function(ev){
 },{passive:false});
 
 svg.addEventListener('mousedown',function(ev){
-  if(ev.button!==0)return;
-  maybeExpand();
+  if(ev.button!==0)return;maybeExpand();
   dragging=true;dragX=ev.clientX;dragY=ev.clientY;
-  svg.style.cursor='grabbing';
-  ev.preventDefault();
+  svg.style.cursor='grabbing';ev.preventDefault();
 });
 window.addEventListener('mousemove',function(ev){
   if(!dragging)return;
@@ -1417,11 +1492,9 @@ window.addEventListener('mousemove',function(ev){
   updateTransform();
 });
 window.addEventListener('mouseup',function(){
-  if(!dragging)return;
-  dragging=false;svg.style.cursor='grab';
+  if(!dragging)return;dragging=false;svg.style.cursor='grab';
 });
 
-// Touch
 var touches={};
 svg.addEventListener('touchstart',function(ev){
   maybeExpand();
@@ -1459,12 +1532,10 @@ svg.addEventListener('touchend',function(ev){
   if(ev.touches.length<2)delete touches._pinch;
 },{passive:true});
 
-// Double-click: reset if expanded, expand if not
 svg.addEventListener('dblclick',function(ev){
   ev.preventDefault();
   if(!expanded){expand();return}
-  zoom=1;panX=0;panY=0;
-  updateTransform();
+  zoom=1;panX=0;panY=0;updateTransform();
 });
 
 svg.style.cursor='grab';
