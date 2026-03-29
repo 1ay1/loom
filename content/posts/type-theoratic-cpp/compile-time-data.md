@@ -1,6 +1,6 @@
 ---
 title: "Compile-Time Data — When Values Become Types"
-date: 2026-03-25
+date: 2026-03-26
 slug: compile-time-data
 tags: [c++20, type-theory, constexpr, nttp, compile-time, dependent-types]
 excerpt: "C++20 lets values enter the type system. This is the gateway to dependent types — Pi types, Sigma types, and the calculus of constructions. The compiler becomes a staged computation engine."

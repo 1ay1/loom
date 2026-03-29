@@ -359,7 +359,7 @@ auto eval(const Expr& e) -> double {
 }
 ```
 
-No dynamic dispatch. No inheritance hierarchy. Just types and catamorphisms. We will explore the theory of recursive types much more deeply in [part 9](/post/recursive-types-and-fixed-points).
+No dynamic dispatch. No inheritance hierarchy. Just types and catamorphisms. We will explore the theory of recursive types much more deeply in [part 10](/post/recursive-types-and-fixed-points).
 
 ## In Loom
 
@@ -480,4 +480,4 @@ The next time you define a struct, count its inhabitants. Multiply the cardinali
 
 The fix is either to restrict construction (private constructors, factory functions — tightening the introduction rule) or to restructure the type (sums instead of products-with-tags — changing the algebraic expression). The semiring laws tell you which transformations are valid. The distributive law tells you when to factor. The initial algebra tells you that folding is the fundamental way to consume data.
 
-In the [next post](/post/phantom-types), we will see how to add type-level distinctions that carry *zero data* — phantom types that leverage parametricity to make the compiler see differences that do not exist at runtime.
+In the [next post](/post/pattern-matching), we dive deep into pattern matching — the elimination rule for algebraic types, exhaustiveness, nested patterns, and why a missing case is not a warning but a logical gap.

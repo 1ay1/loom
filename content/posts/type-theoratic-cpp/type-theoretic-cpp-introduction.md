@@ -251,7 +251,7 @@ The corners of the cube give us named systems:
 
 C++ sits somewhere between System Fω and the Calculus of Constructions. It has full polymorphism (templates), full type constructors (template template parameters), and a restricted form of dependent types (NTTPs must be `constexpr`). It does not have full dependent types — you cannot write `Vec<int, n>` where `n` is computed at runtime. This restriction keeps type checking decidable.
 
-We will explore what C++ can and cannot do along each axis throughout this series, especially in [part 6](/post/compile-time-data) on compile-time data.
+We will explore what C++ can and cannot do along each axis throughout this series, especially in [part 7](/post/compile-time-data) on compile-time data.
 
 ## What a Type System Is *Not* — Soundness and Its Limits
 

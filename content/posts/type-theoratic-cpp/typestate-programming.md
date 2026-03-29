@@ -1,12 +1,12 @@
 ---
 title: "Typestate Programming — When Types Remember What Happened"
-date: 2026-03-23
+date: 2026-03-24
 slug: typestate-programming
 tags: [c++20, type-theory, typestate, state-machines, linear-logic, protocols]
 excerpt: "States as types. Transitions as functions that consume and produce. Grounded in linear logic — where every resource must be used exactly once — typestate turns protocol violations into compile errors."
 ---
 
-In [part 3](/post/phantom-types) we used phantom types to distinguish values that look the same but mean different things. Now we go further. Instead of tagging values with *what they are*, we tag them with *where they are in a process* — encoding sequential protocols directly in the type system.
+In [part 4](/post/phantom-types) we used phantom types to distinguish values that look the same but mean different things. Now we go further. Instead of tagging values with *what they are*, we tag them with *where they are in a process* — encoding sequential protocols directly in the type system.
 
 The idea is called **typestate**: the state of an object is part of its type. Transitions between states are function calls that *consume* a value of one type and *produce* a value of another. If you try to skip a step or repeat a step or do steps out of order, the program does not compile.
 
@@ -133,7 +133,7 @@ Each transition is a linear implication. The input state is consumed. The output
 
 C++ does not have true linear types. It has something close: **affine types** through move semantics.
 
-The substructural type hierarchy (explored fully in [part 8](/post/substructural-types)):
+The substructural type hierarchy (explored fully in [part 9](/post/substructural-types)):
 
 | System | Can copy? | Can discard? | Use pattern |
 |---|---|---|---|

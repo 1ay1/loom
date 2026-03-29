@@ -1,18 +1,18 @@
 ---
 title: "Phantom Types — Making the Compiler See What Isn't There"
-date: 2026-03-22
+date: 2026-03-23
 slug: phantom-types
 tags: [c++20, type-theory, phantom-types, templates, zero-cost, parametricity]
 excerpt: "A phantom type parameter exists only in the type system — it carries no data, occupies no memory, and vanishes in the binary. Parametricity guarantees it works. Representation independence makes it free."
 ---
 
-In the [last post](/post/algebraic-data-types), we saw how product and sum types shape the space of possible values. But sometimes the distinction you need to enforce is not between different *data* — it is between different *meanings* of the same data.
+In the [last post](/post/pattern-matching), we saw how pattern matching deconstructs algebraic types — the elimination rule that mirrors construction, with exhaustiveness enforced by the compiler. But sometimes the distinction you need to enforce is not between different *data* — it is between different *meanings* of the same data.
 
 A user ID and an order ID are both integers. A meters value and a feet value are both doubles. A validated string and an unvalidated string are both `std::string`. Structurally identical. Semantically incompatible.
 
 We need the compiler to see a difference that does not exist in the data. The technique is called **phantom types** — type parameters that appear in the type signature but are never stored, never accessed, and never present at runtime. They are ghosts in the type system. And they are one of the most powerful tools in type-theoretic C++.
 
-The deep reason phantom types work — the reason they are safe and zero-cost — comes from a property called **parametricity**. We will introduce it here and explore it fully in [part 7](/post/parametricity).
+The deep reason phantom types work — the reason they are safe and zero-cost — comes from a property called **parametricity**. We will introduce it here and explore it fully in [part 8](/post/parametricity).
 
 ## The Problem: Structural Equality
 
@@ -73,7 +73,7 @@ The crucial consequence: **the function cannot break tag safety**. It cannot con
 
 This is why phantom types are *safe*: the code cannot observe the tag, so it cannot violate the abstraction. And it is why they are *zero-cost*: there is nothing to observe at runtime.
 
-We will formalize this as "free theorems" in [part 7](/post/parametricity): from the type signature alone, without reading the function body, you can prove that `increment` preserves the tag.
+We will formalize this as "free theorems" in [part 8](/post/parametricity): from the type signature alone, without reading the function body, you can prove that `increment` preserves the tag.
 
 ## Representation Independence
 

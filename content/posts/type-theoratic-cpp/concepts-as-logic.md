@@ -1,6 +1,6 @@
 ---
 title: "Concepts as Logic — Propositions, Proofs, and Predicates"
-date: 2026-03-24
+date: 2026-03-25
 slug: concepts-as-logic
 tags: [c++20, type-theory, concepts, logic, curry-howard, natural-deduction]
 excerpt: "C++20 concepts are propositions in intuitionistic logic. Requires-expressions are constructive proofs. Subsumption is modus ponens. This is natural deduction, hiding in your compiler."

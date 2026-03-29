@@ -1,14 +1,15 @@
 ---
 title: "Building a Type-Safe Protocol — The Grand Synthesis"
-date: 2026-03-29
+date: 2026-03-30
 slug: type-safe-protocol
 tags: [c++20, type-theory, typestate, protocols, compile-time, capstone]
-excerpt: "We combine every technique from this series — algebraic types, phantom types, typestate, concepts, compile-time data, parametricity, linear logic, F-algebras — to build a compile-time verified protocol where violations are type errors, not runtime surprises."
+excerpt: "We combine every technique from this series — algebraic types, pattern matching, phantom types, typestate, concepts, compile-time data, parametricity, linear logic, F-algebras — to build a compile-time verified protocol where violations are type errors, not runtime surprises."
 ---
 
-This is the final post in the series. Over nine posts, we have built a vocabulary:
+This is the final post in the series. Over ten posts, we have built a vocabulary:
 
 - [Algebraic types](/post/algebraic-data-types) to model domain data with semiring arithmetic
+- [Pattern matching](/post/pattern-matching) as the elimination rule for algebraic types
 - [Phantom types](/post/phantom-types) to create zero-cost distinctions via parametricity
 - [Typestate](/post/typestate-programming) to encode state machines grounded in linear logic
 - [Concepts](/post/concepts-as-logic) as propositions in intuitionistic natural deduction
@@ -63,7 +64,7 @@ struct ResponseReceived {
 
 `Idle` has no socket — you have not connected. `Connected` has a socket but no header state. `ResponseReceived` has the full response. No dead fields. The cardinality of each type matches the domain.
 
-Through the substructural lens ([part 8](/post/substructural-types)): each state value is *affine* — it can be consumed (moved into a transition) or discarded (destructor cleanup), but not copied. This prevents two parts of the code from holding the same connection in different states.
+Through the substructural lens ([part 9](/post/substructural-types)): each state value is *affine* — it can be consumed (moved into a transition) or discarded (destructor cleanup), but not copied. This prevents two parts of the code from holding the same connection in different states.
 
 ## Step 2: Phantom Tags for Header Requirements (Phantom Types + Parametricity)
 
@@ -84,11 +85,11 @@ struct Headers {
 
 `Headers<NoHost, NoCT>` means no required headers set. `Headers<HasHost, HasCT>` means both set. Four distinct types, same runtime layout.
 
-Through parametricity ([part 7](/post/parametricity)): functions generic in `HostState` and `CTState` cannot inspect the phantom tags. They must propagate them faithfully. `set_header<HS, CS>` (for optional headers) preserves whatever state the phantoms encode — parametricity *guarantees* it cannot corrupt the tags.
+Through parametricity ([part 8](/post/parametricity)): functions generic in `HostState` and `CTState` cannot inspect the phantom tags. They must propagate them faithfully. `set_header<HS, CS>` (for optional headers) preserves whatever state the phantoms encode — parametricity *guarantees* it cannot corrupt the tags.
 
 ## Step 3: Transition Functions (Linear Logic)
 
-Each transition consumes the current state and produces the next — the linear implication A ⊸ B from [part 4](/post/typestate-programming):
+Each transition consumes the current state and produces the next — the linear implication A ⊸ B from [part 5](/post/typestate-programming):
 
 ```cpp
 auto connect(Idle, std::string_view host, int port) -> Headers<NoHost, NoCT> {
@@ -128,7 +129,7 @@ Each function takes its input by value: `Idle` consumed by `connect`, `Headers<N
 
 ## Step 4: The Gate (Concepts as Logic)
 
-Sending the body requires both headers. This is a concept — a proposition in intuitionistic logic ([part 5](/post/concepts-as-logic)):
+Sending the body requires both headers. This is a concept — a proposition in intuitionistic logic ([part 6](/post/concepts-as-logic)):
 
 ```cpp
 auto send_body(Headers<HasHost, HasCT> h, std::string_view method,
@@ -253,7 +254,7 @@ The `&&` qualifier on methods means they consume the client — each call produc
 
 ## Adding Compile-Time Routes (Dependent Types)
 
-Using the techniques from [part 6](/post/compile-time-data):
+Using the techniques from [part 7](/post/compile-time-data):
 
 ```cpp
 template<Lit Method, Lit Path>
@@ -307,17 +308,17 @@ At `-O2`, the entire protocol compiles to the same instructions as a hand-writte
 
 1. **Enumerate the states.** Each state becomes a type with exactly the data relevant to that state. (Algebraic types — [part 2](/post/algebraic-data-types))
 
-2. **Identify independent axes.** Use phantom types for boolean requirements that can be set independently. (Phantom types — [part 3](/post/phantom-types))
+2. **Identify independent axes.** Use phantom types for boolean requirements that can be set independently. (Phantom types — [part 4](/post/phantom-types))
 
-3. **Define transitions as consuming functions.** Each transition takes the source state by value (move) and returns the target state. (Typestate + linear logic — [part 4](/post/typestate-programming), [part 8](/post/substructural-types))
+3. **Define transitions as consuming functions.** Each transition takes the source state by value (move) and returns the target state. (Typestate + linear logic — [part 5](/post/typestate-programming), [part 9](/post/substructural-types))
 
-4. **Gate critical transitions with concepts.** Entry to irreversible operations requires a concept that encodes all prerequisites. (Concepts as logic — [part 5](/post/concepts-as-logic))
+4. **Gate critical transitions with concepts.** Entry to irreversible operations requires a concept that encodes all prerequisites. (Concepts as logic — [part 6](/post/concepts-as-logic))
 
-5. **Use compile-time data for static structure.** Route patterns, endpoint definitions, configuration known at build time. (Compile-time data — [part 6](/post/compile-time-data))
+5. **Use compile-time data for static structure.** Route patterns, endpoint definitions, configuration known at build time. (Compile-time data — [part 7](/post/compile-time-data))
 
-6. **Keep tag-generic code parametric.** Functions that do not need to inspect phantom tags should be generic in them — parametricity guarantees safety. (Parametricity — [part 7](/post/parametricity))
+6. **Keep tag-generic code parametric.** Functions that do not need to inspect phantom tags should be generic in them — parametricity guarantees safety. (Parametricity — [part 8](/post/parametricity))
 
-7. **Use the substructural hierarchy.** Move-only types for affine resources, `[[nodiscard]]` for must-use return values, deleted copy constructors to prevent aliasing. (Substructural types — [part 8](/post/substructural-types))
+7. **Use the substructural hierarchy.** Move-only types for affine resources, `[[nodiscard]]` for must-use return values, deleted copy constructors to prevent aliasing. (Substructural types — [part 9](/post/substructural-types))
 
 ## Beyond HTTP
 
@@ -671,21 +672,23 @@ We started with a provocation: *a program is a theory*. Over ten posts, we built
 
 1. **Types are propositions.** Values are proofs. The compiler is a theorem prover. ([Part 1](/post/type-theoretic-foundations) — type judgments, Curry-Howard, formation/introduction/elimination rules)
 
-2. **Types have algebra.** Products multiply, sums add, the distributive law lets you factor. Recursive types are fixed points. Folds are catamorphisms. ([Part 2](/post/algebraic-data-types), [Part 9](/post/recursive-types-and-fixed-points) — semirings, initial algebras, F-algebras)
+2. **Types have algebra.** Products multiply, sums add, the distributive law lets you factor. Recursive types are fixed points. Folds are catamorphisms. ([Part 2](/post/algebraic-data-types), [Part 10](/post/recursive-types-and-fixed-points) — semirings, initial algebras, F-algebras)
 
-3. **Phantoms encode invisible truths.** Zero-cost type distinctions, safe because parametricity prevents tag inspection. ([Part 3](/post/phantom-types) — representation independence, proof witnesses)
+3. **Patterns deconstruct values.** Exhaustive case analysis is the elimination rule for sums. Missing a case is a logical gap. ([Part 3](/post/pattern-matching) — elimination rules, exhaustiveness, nested matching)
 
-4. **State lives in types.** Transitions consume and produce. Linear logic ensures resources are tracked. ([Part 4](/post/typestate-programming) — linear implication, session types)
+4. **Phantoms encode invisible truths.** Zero-cost type distinctions, safe because parametricity prevents tag inspection. ([Part 4](/post/phantom-types) — representation independence, proof witnesses)
 
-5. **Concepts are logic.** Natural deduction with introduction and elimination rules. Intuitionistic: constructive proofs only. ([Part 5](/post/concepts-as-logic) — BHK interpretation, modus ponens via subsumption)
+5. **State lives in types.** Transitions consume and produce. Linear logic ensures resources are tracked. ([Part 5](/post/typestate-programming) — linear implication, session types)
 
-6. **Values enter types.** Dependent typing through NTTPs. The compiler is a staged computation engine. ([Part 6](/post/compile-time-data) — Pi types, Sigma types, the lambda cube, multi-stage programming)
+6. **Concepts are logic.** Natural deduction with introduction and elimination rules. Intuitionistic: constructive proofs only. ([Part 6](/post/concepts-as-logic) — BHK interpretation, modus ponens via subsumption)
 
-7. **Types constrain behavior.** Parametricity gives theorems from signatures alone. The less a function can do, the more you know. ([Part 7](/post/parametricity) — Reynolds, free theorems, naturality)
+7. **Values enter types.** Dependent typing through NTTPs. The compiler is a staged computation engine. ([Part 7](/post/compile-time-data) — Pi types, Sigma types, the lambda cube, multi-stage programming)
 
-8. **Resources demand discipline.** Affine types prevent duplication. Linear types ensure consumption. RAII is substructural logic in practice. ([Part 8](/post/substructural-types) — Girard's linear logic, structural rules)
+8. **Types constrain behavior.** Parametricity gives theorems from signatures alone. The less a function can do, the more you know. ([Part 8](/post/parametricity) — Reynolds, free theorems, naturality)
 
-9. **Data is algebra.** Recursive types are fixed points. Every fold is a catamorphism. Every unfold is an anamorphism. ([Part 9](/post/recursive-types-and-fixed-points) — mu types, F-algebras, hylomorphisms)
+9. **Resources demand discipline.** Affine types prevent duplication. Linear types ensure consumption. RAII is substructural logic in practice. ([Part 9](/post/substructural-types) — Girard's linear logic, structural rules)
+
+10. **Data is algebra.** Recursive types are fixed points. Every fold is a catamorphism. Every unfold is an anamorphism. ([Part 10](/post/recursive-types-and-fixed-points) — mu types, F-algebras, hylomorphisms)
 
 ## Closing: Does It Compile?
 

@@ -1,6 +1,6 @@
 ---
 title: "Recursive Types and Fixed Points — The Algebra of Data"
-date: 2026-03-28
+date: 2026-03-29
 slug: recursive-types-and-fixed-points
 tags: [c++20, type-theory, recursive-types, fixed-points, f-algebras, catamorphisms]
 excerpt: "A list contains lists. A tree contains trees. How do you define a type in terms of itself? Fixed points, F-algebras, and catamorphisms — the formal machinery behind every fold, every visitor, and every recursive data structure."
@@ -338,7 +338,7 @@ The algebraic data types from [part 2](/post/algebraic-data-types) are initial a
 
 `std::visit` from [part 2](/post/algebraic-data-types) is a catamorphism for non-recursive sums. `std::accumulate` is a catamorphism for lists. Every fold, every reduce, every recursive visitor — all catamorphisms.
 
-The substructural discipline from [part 8](/post/substructural-types) applies to recursive types too: each `unique_ptr` in a recursive variant enforces affine (move-only) ownership of sub-trees, preventing shared mutable aliases.
+The substructural discipline from [part 9](/post/substructural-types) applies to recursive types too: each `unique_ptr` in a recursive variant enforces affine (move-only) ownership of sub-trees, preventing shared mutable aliases.
 
 ## In Loom
 

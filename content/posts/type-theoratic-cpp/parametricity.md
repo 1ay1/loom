@@ -1,6 +1,6 @@
 ---
 title: "Parametricity — Theorems for Free"
-date: 2026-03-26
+date: 2026-03-27
 slug: parametricity
 tags: [c++20, type-theory, parametricity, free-theorems, polymorphism]
 excerpt: "If a function works for any type and never inspects it, its behavior is constrained by the type signature alone. You get theorems without proofs. This is parametricity — and it explains why phantom types, generic algorithms, and templates are more powerful than they look."
@@ -8,7 +8,7 @@ excerpt: "If a function works for any type and never inspects it, its behavior i
 
 In 1989, Philip Wadler published a paper called "Theorems for Free!" with an exclamation mark that was entirely earned. The paper showed that from the *type signature alone* of a polymorphic function — without reading a single line of the implementation — you can deduce non-trivial facts about its behavior.
 
-This result, called **parametricity**, is one of the most beautiful ideas in type theory. It explains why generic programming works, why phantom types ([part 3](/post/phantom-types)) are safe, and why the most constrained code is often the most powerful.
+This result, called **parametricity**, is one of the most beautiful ideas in type theory. It explains why generic programming works, why phantom types ([part 4](/post/phantom-types)) are safe, and why the most constrained code is often the most powerful.
 
 ## The Core Idea
 
@@ -214,7 +214,7 @@ auto sort(std::vector<T> v) -> std::vector<T>;
 
 ## Why Phantom Types Work: The Parametricity Explanation
 
-In [part 3](/post/phantom-types), we built `Strong<Tag, T>` — a wrapper parameterized by a phantom tag. The tag is never stored or accessed. Why is this safe?
+In [part 4](/post/phantom-types), we built `Strong<Tag, T>` — a wrapper parameterized by a phantom tag. The tag is never stored or accessed. Why is this safe?
 
 Because code parametric in `Tag` cannot inspect the tag. Consider:
 
@@ -227,7 +227,7 @@ auto increment(Strong<Tag, int> s) -> Strong<Tag, int> {
 
 Free theorem: for any two tags `A` and `B`, if `Strong<A, int>` and `Strong<B, int>` contain the same `int` value, then `increment` produces outputs containing the same `int` value. The function cannot distinguish tags. It cannot convert a `Strong<PassengerTag>` into a `Strong<FlightTag>`. Parametricity *proves* tag safety.
 
-This is the formal justification behind the informal claim in part 3. Phantom types are safe because parametricity constrains what tag-polymorphic code can do.
+This is the formal justification behind the informal claim in part 4. Phantom types are safe because parametricity constrains what tag-polymorphic code can do.
 
 ## Practical Benefits of Parametric Code
 

@@ -1,6 +1,6 @@
 ---
 title: "Substructural Types — When Resources Are Not Free"
-date: 2026-03-27
+date: 2026-03-28
 slug: substructural-types
 tags: [c++20, type-theory, linear-types, affine-types, raii, move-semantics]
 excerpt: "Classical logic lets you copy and discard premises freely. Remove those abilities and you get the logic of resources — linear, affine, relevant, ordered. RAII, move semantics, and unique_ptr are fragments of this theory. C++ is a substructural language and doesn't know it."
