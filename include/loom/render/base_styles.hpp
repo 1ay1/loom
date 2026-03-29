@@ -645,6 +645,43 @@ inline css::Sheet base_toc()
     );
 }
 
+// ── Back to top ──
+
+inline css::Sheet base_back_to_top()
+{
+    return sheet(
+        ".back-to-top"_s
+            | position(fixed) | bottom(px(24)) | right_(px(24))
+            | width(px(40)) | height(px(40))
+            | border_radius(raw("50%"))
+            | bg(raw("var(--accent)")) | color(raw("var(--bg)"))
+            | display(raw("flex")) | prop("justify-content", center)
+            | prop("align-items", center)
+            | text_decoration(none) | font_size(px(18))
+            | opacity(0) | prop("pointer-events", none)
+            | transition(raw("opacity 0.25s, transform 0.25s"))
+            | prop("transform", raw("translateY(10px)"))
+            | z_index(100),
+        ".back-to-top.visible"_s
+            | opacity(0.8) | prop("pointer-events", raw("auto"))
+            | prop("transform", raw("translateY(0)")),
+        ".back-to-top:hover"_s
+            | opacity(1.0)
+    );
+}
+
+// ── Nav search link ──
+
+inline css::Sheet base_nav_search()
+{
+    return sheet(
+        ".nav-search"_s
+            | font_size(px(18)) | opacity(0.5)
+            | text_decoration(none) | line_height(raw("1")),
+        ".nav-search:hover"_s | opacity(1.0)
+    );
+}
+
 // ── Reading progress bar ──
 
 inline css::Sheet base_reading_progress()
@@ -761,6 +798,8 @@ inline std::string compile_base_styles()
              + base_search()
              + base_toc()
              + base_reading_progress()
+             + base_back_to_top()
+             + base_nav_search()
              + base_responsive();
 
     return all.compile();

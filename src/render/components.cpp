@@ -377,9 +377,12 @@ Node Footer::render(const Footer&, const Ctx& ctx, Children ch)
 Node Nav::render(const Nav&, const Ctx& ctx, Children)
 {
     return nav(
-        ul(each(ctx.site.navigation.items, [](const auto& item) {
-            return li(a(href(item.url), item.title));
-        }))
+        ul(
+            each(ctx.site.navigation.items, [](const auto& item) {
+                return li(a(href(item.url), item.title));
+            }),
+            li(a(class_("nav-search"), href("/search"), attr("title", "Search"), raw("&#x2315;")))
+        )
     );
 }
 
@@ -1031,6 +1034,18 @@ Node Ctx::page(const PageMeta& meta, Node content,
 
     if (site.layout.external_links_new_tab)
         result = apply_external_new_tab(result);
+
+    // Inject back-to-top button before </body>
+    {
+        static const char BTT[] =
+            "<a class=\"back-to-top\" id=\"backToTop\" href=\"#\" title=\"Back to top\">&uarr;</a>"
+            "<script>(function(){var b=document.getElementById('backToTop');"
+            "if(b)window.addEventListener('scroll',function(){"
+            "b.classList.toggle('visible',window.scrollY>400)},{passive:true});})()</script>";
+        auto body_end = result.rfind("</body>");
+        if (body_end != std::string::npos)
+            result.insert(body_end, BTT);
+    }
 
     // Return as raw node so it can be composed further if needed
     return dom::raw(std::move(result));

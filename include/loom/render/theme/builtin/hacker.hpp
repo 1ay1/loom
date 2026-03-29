@@ -280,6 +280,15 @@ inline const ThemeDef hacker = {
         // ── Reading progress ──
         ".reading-progress-fill"_s | bg(dim_p),
 
+        // ── Back to top ──
+        ".back-to-top"_s | bg(gray) | color(phosphor) | border(1_px, dashed, dim_p)
+                         | border_radius(0_px) | font_size(14_px),
+        ".back-to-top:hover"_s | bg(dark_g) | color(phosphor),
+
+        // ── Nav search ──
+        ".nav-search"_s | color(dim_p) | font_size(14_px) | opacity(0.6),
+        ".nav-search:hover"_s | color(phosphor) | opacity(1.0),
+
         // ── Page info ──
         ".page-info"_s | color(dim_txt) | font_size(12_px),
 
