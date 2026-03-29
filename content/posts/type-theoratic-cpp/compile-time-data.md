@@ -343,6 +343,112 @@ But not for:
 
 The art is knowing where the boundary falls and designing so that as much structure as possible lives on the compile-time side. Everything decided at compile time is a decision that never costs a cycle at runtime, never fails in production, never depends on external state.
 
+## In Loom
+
+Loom's compile-time route table is Pi types in practice. The entire routing system lives in `include/loom/http/route.hpp`, and it uses every technique discussed in this post.
+
+### The Literal Type
+
+Loom defines `Lit<N>` as a structural type suitable for NTTPs — a compile-time string that can appear in a template parameter:
+
+```cpp
+template<size_t N>
+struct Lit {
+    char buf[N]{};
+
+    constexpr Lit(const char (&s)[N]) noexcept
+    { for (size_t i = 0; i < N; ++i) buf[i] = s[i]; }
+
+    constexpr std::string_view sv() const noexcept { return {buf, N - 1}; }
+    constexpr size_t size()         const noexcept { return N - 1; }
+    constexpr char operator[](size_t i) const noexcept { return buf[i]; }
+};
+```
+
+When you write `get<"/post/:slug">`, the string `"/post/:slug"` becomes a compile-time value embedded in the type. `Route<HttpMethod::GET, Lit<"/post/:slug">, H>` is a different type from `Route<HttpMethod::GET, Lit<"/">, H>`. The route pattern is part of the type — this is a dependent type.
+
+### Compile-Time Pattern Analysis
+
+`Traits<P>` analyzes the pattern at compile time using `consteval` methods:
+
+```cpp
+template<Lit P>
+struct Traits {
+    static consteval bool is_static() noexcept
+    {
+        for (size_t i = 0; i < P.size(); ++i)
+            if (P[i] == ':') return false;
+        return true;
+    }
+
+    static consteval size_t prefix_len() noexcept
+    {
+        for (size_t i = 0; i < P.size(); ++i)
+            if (P[i] == ':') return i;
+        return P.size();
+    }
+
+    static bool match(std::string_view path) noexcept
+    {
+        if constexpr (is_static())
+            return path == P.sv();
+        else
+        {
+            constexpr std::string_view prefix{P.buf, prefix_len()};
+            return path.size() > prefix.size() && path.starts_with(prefix);
+        }
+    }
+};
+```
+
+The `consteval` functions run during compilation. `is_static()` and `prefix_len()` are not runtime calls — they are stage-0 computations whose results become compile-time constants. The `if constexpr` in `match()` selects the matching strategy at compile time: static routes get exact string comparison, parameterized routes get prefix matching. The dead branch is not compiled.
+
+This is a Pi type: the *behavior* of `match()` depends on the *value* of the pattern string. Different patterns produce different code paths. The function's semantics are indexed by data.
+
+### The Compile-Time Fold
+
+The `compile()` function assembles the route table as a fold expression over a tuple of routes:
+
+```cpp
+template<typename FB, typename... Rs>
+struct Compiled {
+    std::tuple<Rs...> routes;
+    FB fb;
+
+    HttpResponse operator()(HttpRequest& req) const
+    {
+        HttpResponse result;
+        bool found = false;
+
+        auto try_one = [&](const auto& route) {
+            if (!found && route.try_dispatch(req, result))
+                found = true;
+        };
+
+        std::apply([&](const auto&... route) {
+            (try_one(route), ...);    // fold expression over the route tuple
+        }, routes);
+
+        return found ? result : fb.handler(req);
+    }
+};
+```
+
+The caller writes:
+
+```cpp
+auto dispatch = compile(
+    fallback(not_found_handler),
+    get<"/">(index_handler),
+    get<"/post/:slug">(post_handler),
+    get<"/tag/:slug">(tag_handler)
+);
+```
+
+Each `get<"/post/:slug">(handler)` produces a `Route<HttpMethod::GET, Lit<"/post/:slug">, H>` — a type that encodes the method, the pattern, and the handler. The `compile()` call packs them into a tuple. The fold expression `(try_one(route), ...)` expands at compile time into a chain of dispatch attempts, one per route. The compiler sees every pattern as a constant and generates an optimal if-else chain. No vtable, no hash map, no trie, no heap allocation. The entire route table is a compile-time data structure that the optimizer can reason about.
+
+This is the staging model in action: the route table is a stage-0 (compile-time) computation that produces a stage-1 (runtime) dispatch function. The patterns are analyzed, the branches are selected, and the dead code is eliminated — all before the binary is emitted.
+
 ## Closing: The Compiler as an Interpreter
 
 The traditional view: the compiler translates source to machine code. The type-theoretic view: the compiler *executes a program* (the type-level program) and emits the result.

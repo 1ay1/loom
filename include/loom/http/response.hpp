@@ -1,43 +1,67 @@
 #pragma once
 
+// ═══════════════════════════════════════════════════════════════════════
+//  response.hpp — HTTP response as a sum type
+//
+//  A response is EITHER a dynamically-built response (status + headers +
+//  body, serialized on demand) OR a prebuilt wire-format response (a
+//  pointer into the cache, served zero-copy).
+//
+//  The old design had both sets of fields in one struct with an
+//  is_prebuilt() runtime check — dead fields in every state. The
+//  variant makes the two cases structurally distinct: each carries
+//  exactly the data it needs, nothing more. (Part 2: algebraic types)
+// ═══════════════════════════════════════════════════════════════════════
+
 #include <string>
 #include <string_view>
 #include <vector>
 #include <memory>
 #include <utility>
+#include <variant>
 
 namespace loom
 {
-    struct HttpResponse
-    {
-        int status = 200;
-        std::vector<std::pair<std::string, std::string>> headers;
-        std::string body;
 
-        // Pre-serialized wire data — when set, serialize() is bypassed entirely.
-        // wire_owner_ keeps the backing memory alive (typically a SiteCache snapshot).
-        std::shared_ptr<const void> wire_owner_;
-        const char* wire_data_ = nullptr;
-        size_t wire_len_ = 0;
+// ── Alternative 1: dynamically-built response ─────────────────
 
-        bool is_prebuilt() const noexcept { return wire_data_ != nullptr; }
+struct DynamicResponse
+{
+    int status = 200;
+    std::vector<std::pair<std::string, std::string>> headers;
+    std::string body;
 
-        static HttpResponse prebuilt(std::shared_ptr<const void> owner,
-                                      const std::string& wire)
-        {
-            HttpResponse r;
-            r.wire_owner_ = std::move(owner);
-            r.wire_data_ = wire.data();
-            r.wire_len_ = wire.size();
-            return r;
-        }
+    static DynamicResponse ok(std::string body,
+                              const std::string& content_type = "text/html");
+    static DynamicResponse not_found(std::string body = "");
+    static DynamicResponse bad_request(std::string body = "");
+    static DynamicResponse method_not_allowed();
+    static DynamicResponse internal_error(std::string body = "");
+    static DynamicResponse redirect(int code, std::string location);
 
-        static HttpResponse ok(std::string body, const std::string& content_type = "text/html");
-        static HttpResponse not_found(std::string body = "");
-        static HttpResponse bad_request(std::string body = "");
-        static HttpResponse method_not_allowed();
-        static HttpResponse internal_error(std::string body = "");
+    std::string serialize(bool keep_alive) const;
+};
 
-        std::string serialize(bool keep_alive) const;
-    };
-}
+// ── Alternative 2: prebuilt wire-format response ──────────────
+// Zero-copy: points directly into the SiteCache wire buffers.
+
+struct PrebuiltResponse
+{
+    std::shared_ptr<const void> owner;
+    const char* data;
+    size_t len;
+};
+
+// ── HttpResponse: the sum type ────────────────────────────────
+// DynamicResponse + PrebuiltResponse. The caller must handle both
+// cases — std::visit enforces exhaustive matching.
+
+using HttpResponse = std::variant<DynamicResponse, PrebuiltResponse>;
+
+// Convenience: overloaded pattern for std::visit
+template<typename... Ts>
+struct overloaded : Ts... { using Ts::operator()...; };
+template<typename... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
+
+} // namespace loom

@@ -248,22 +248,63 @@ The phantom tag, the struct wrapper, the explicit constructor — all gone. The 
 
 ## Phantom Types in Loom
 
-Loom uses this pattern extensively. The `StrongType` template:
+Loom uses phantom-tagged strong types for every domain string. The `StrongType` template in `include/loom/core/strong_type.hpp`:
 
 ```cpp
-template<typename Tag, typename T>
-struct StrongType {
-    T value;
-    // ...conditional methods based on T's interface...
-};
+template<typename T, typename Tag>
+class StrongType {
+    T value_;
+public:
+    explicit StrongType(T value) : value_(std::move(value)) {}
 
-using Slug    = StrongType<struct SlugTag, std::string>;
-using Title   = StrongType<struct TitleTag, std::string>;
-using Content = StrongType<struct ContentTag, std::string>;
-using PostId  = StrongType<struct PostIdTag, std::string>;
+    T get() const { return value_; }
+
+    bool empty() const requires requires(const T& v) { v.empty(); }
+    { return value_.empty(); }
+
+    bool operator==(const StrongType& other) const { return value_ == other.value_; }
+    bool operator!=(const StrongType& other) const { return value_ != other.value_; }
+    bool operator<(const StrongType& other) const { return value_ < other.value_; }
+};
 ```
 
-Four types. All strings underneath. All distinct in the type system. A function that expects a `Slug` cannot accidentally receive a `Title`. The phantom tags compile away to nothing.
+The `Tag` parameter is the phantom. It occupies zero bytes, appears nowhere in the object layout, and vanishes completely in the binary. The `explicit` constructor prevents implicit conversion — you must deliberately introduce a value into the type.
+
+The full set of domain types in `include/loom/core/types.hpp`:
+
+```cpp
+struct SlugTag {};
+struct TitleTag {};
+struct PostIdTag {};
+struct TagTag {};
+struct ContentTag {};
+struct SeriesTag {};
+
+using Slug    = StrongType<std::string, SlugTag>;
+using Title   = StrongType<std::string, TitleTag>;
+using PostId  = StrongType<std::string, PostIdTag>;
+using Tag     = StrongType<std::string, TagTag>;
+using Content = StrongType<std::string, ContentTag>;
+using Series  = StrongType<std::string, SeriesTag>;
+```
+
+Six types. All `std::string` underneath. All distinct in the type system.
+
+### Bugs This Prevents
+
+Consider a function that builds a URL for a post:
+
+```cpp
+auto post_url(Slug slug) -> std::string {
+    return "/post/" + slug.get();
+}
+```
+
+If a caller accidentally passes a `Title` — which is also a string and might even look like a slug — the compiler rejects it. Without phantom types, this is a silent bug: the URL works for some titles, breaks for titles with spaces or special characters, and the error surfaces only at runtime.
+
+The same protection applies throughout the domain model. A `Post` struct holds `Slug`, `Title`, `PostId`, `Content`, `Series` — each a `std::string` internally, each a distinct type externally. The struct fields cannot be swapped accidentally because the types forbid it.
+
+The `requires` clause on `empty()` is a conditional formation rule: the method exists only when the underlying type supports it. For `StrongType<std::string, SlugTag>`, `empty()` is available because `std::string` has `empty()`. For a hypothetical `StrongType<int, CountTag>`, it would not be — the formation rule would not be satisfied.
 
 ## When Not to Use Phantom Types
 

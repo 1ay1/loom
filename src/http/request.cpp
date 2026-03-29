@@ -36,24 +36,29 @@ namespace loom
         return true;
     }
 
-    bool parse_request(std::string& raw, HttpRequest& request)
+    auto parse_request(std::string& raw) -> ParseResult
     {
+        HttpRequest request;
         std::string_view sv(raw);
 
         auto header_end = sv.find("\r\n\r\n");
-        if (header_end == std::string_view::npos) return false;
+        if (header_end == std::string_view::npos)
+            return ParseError{"incomplete headers"};
 
         auto first_line_end = sv.find("\r\n");
-        if (first_line_end == std::string_view::npos) return false;
+        if (first_line_end == std::string_view::npos)
+            return ParseError{"no request line"};
 
         auto method_end = sv.find(' ');
-        if (method_end == std::string_view::npos || method_end >= first_line_end) return false;
+        if (method_end == std::string_view::npos || method_end >= first_line_end)
+            return ParseError{"malformed request line"};
 
         request.method = parse_method(sv.substr(0, method_end));
 
         auto path_start = method_end + 1;
         auto path_end = sv.find(' ', path_start);
-        if (path_end == std::string_view::npos || path_end >= first_line_end) return false;
+        if (path_end == std::string_view::npos || path_end >= first_line_end)
+            return ParseError{"malformed URI"};
 
         auto uri = sv.substr(path_start, path_end - path_start);
         auto qpos = uri.find('?');
@@ -102,12 +107,13 @@ namespace loom
                 for (char c : h.value)
                     if (c >= '0' && c <= '9') cl = cl * 10 + (c - '0');
                 size_t body_start = header_end + 4;
-                if (sv.size() - body_start < cl) return false;
+                if (sv.size() - body_start < cl)
+                    return ParseError{"incomplete body"};
                 request.body = sv.substr(body_start, cl);
                 break;
             }
         }
 
-        return true;
+        return request;
     }
 }

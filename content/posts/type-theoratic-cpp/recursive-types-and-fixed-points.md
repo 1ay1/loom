@@ -340,6 +340,111 @@ The algebraic data types from [part 2](/post/algebraic-data-types) are initial a
 
 The substructural discipline from [part 8](/post/substructural-types) applies to recursive types too: each `unique_ptr` in a recursive variant enforces affine (move-only) ownership of sub-trees, preventing shared mutable aliases.
 
+## In Loom
+
+Loom's DOM system in `include/loom/render/dom.hpp` is a recursive type. The `Node` struct is the central data structure for the entire HTML rendering pipeline:
+
+```cpp
+struct Node
+{
+    enum Kind { Element, Void, Text, Raw, Fragment } kind = Fragment;
+    std::string tag;
+    std::vector<Attr> attrs;
+    std::vector<Node> children;   // ← recursive: Node contains Nodes
+    std::string content;
+};
+```
+
+The `children` field is `std::vector<Node>` — a `Node` contains a list of `Node`s. This is a recursive type. In the notation from this post:
+
+```
+Node = Element × Tag × Attrs × List<Node>
+     + Void × Tag × Attrs
+     + Text × Content
+     + Raw × Content
+     + Fragment × List<Node>
+```
+
+Or, factoring out the recursion into a shape functor F:
+
+```
+F(X) = Tag × Attrs × List<X>        -- Element
+     + Tag × Attrs                   -- Void
+     + Content                       -- Text
+     + Content                       -- Raw
+     + List<X>                       -- Fragment
+
+Node = μX. F(X)
+```
+
+The `Node` type is the least fixed point of F. The `Kind` enum selects which alternative of the sum type is active (an approximation of a tagged union — in practice the enum and fields coexist in a single struct rather than a proper variant, but the structure is the same).
+
+### The Catamorphism: render()
+
+The `render_to()` method is a catamorphism — it tears down the recursive `Node` tree into a flat `std::string`:
+
+```cpp
+void render_to(std::string& out) const
+{
+    switch (kind)
+    {
+        case Text:     escape_text(out, content); break;
+        case Raw:      out += content; break;
+        case Fragment:
+            for (const auto& c : children) c.render_to(out);
+            break;
+        case Void:
+            out += '<'; out += tag;
+            render_attrs(out);
+            out += '>';
+            break;
+        case Element:
+            out += '<'; out += tag;
+            render_attrs(out);
+            out += '>';
+            for (const auto& c : children) c.render_to(out);
+            out += "</"; out += tag; out += '>';
+            break;
+    }
+}
+```
+
+The carrier type is `std::string` (the HTML output buffer). The algebra map provides one case per alternative of the sum type — `Text` escapes and appends, `Element` wraps children in tags, `Fragment` concatenates children. The recursive calls on `children` are the catamorphism descending through the fixed point.
+
+### Why Not a Pointer?
+
+Earlier in this post, we noted that recursive types in C++ typically require indirection (`unique_ptr`, `shared_ptr`) to break the infinite size problem. Loom's `Node` avoids explicit pointers because `std::vector<Node>` handles the indirection internally — the vector allocates its elements on the heap. The `Node` struct has a fixed size (the `vector` is a pointer + size + capacity), and the recursion goes through the heap-allocated vector storage. This is the same mechanism as `unique_ptr` — heap indirection breaking the infinite nesting — but wrapped in a container.
+
+### Building Up: The Anamorphism
+
+Loom's element factories are anamorphisms — they build `Node` trees from data:
+
+```cpp
+template<typename... Args>
+Node elem(const char* tag, Args&&... args)
+{
+    Node n{Node::Element, tag, {}, {}, {}};
+    (detail::add(n, std::forward<Args>(args)), ...);
+    return n;
+}
+```
+
+The `each()` combinator is an explicit anamorphism, unfolding a collection into a fragment:
+
+```cpp
+template<typename Container, typename Fn>
+Node each(const Container& items, Fn&& fn)
+{
+    Node n{Node::Fragment, {}, {}, {}, {}};
+    n.children.reserve(items.size());
+    for (const auto& item : items)
+        n.children.push_back(fn(item));
+    return n;
+}
+```
+
+A typical Loom page is a hylomorphism: the template code unfolds domain data (posts, pages, metadata) into a `Node` tree using `elem`, `each`, `when`, and the other combinators — then `render()` immediately folds the tree into an HTML string. The `Node` tree is the intermediate recursive structure, built by the anamorphism and consumed by the catamorphism.
+
 ## Closing: Data Is Algebra
 
 Recursive data structures are not ad-hoc programming constructs. They are fixed points of polynomial functors. The operations on them — folds, unfolds, maps, traversals — are algebraic homomorphisms with precise mathematical characterizations.

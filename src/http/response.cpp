@@ -20,58 +20,67 @@ namespace loom
         }
     }
 
-    HttpResponse HttpResponse::ok(std::string body, const std::string& content_type)
+    DynamicResponse DynamicResponse::ok(std::string body, const std::string& content_type)
     {
-        HttpResponse r;
+        DynamicResponse r;
         r.status = 200;
         r.headers = {{"Content-Type", content_type}};
         r.body = std::move(body);
         return r;
     }
 
-    HttpResponse HttpResponse::not_found(std::string body)
+    DynamicResponse DynamicResponse::not_found(std::string body)
     {
         if (body.empty())
             body = "<html><body><h1>404 Not Found</h1></body></html>";
-        HttpResponse r;
+        DynamicResponse r;
         r.status = 404;
         r.headers = {{"Content-Type", "text/html"}};
         r.body = std::move(body);
         return r;
     }
 
-    HttpResponse HttpResponse::bad_request(std::string body)
+    DynamicResponse DynamicResponse::bad_request(std::string body)
     {
         if (body.empty())
             body = "<html><body><h1>400 Bad Request</h1></body></html>";
-        HttpResponse r;
+        DynamicResponse r;
         r.status = 400;
         r.headers = {{"Content-Type", "text/html"}};
         r.body = std::move(body);
         return r;
     }
 
-    HttpResponse HttpResponse::method_not_allowed()
+    DynamicResponse DynamicResponse::method_not_allowed()
     {
-        HttpResponse r;
+        DynamicResponse r;
         r.status = 405;
         r.headers = {{"Content-Type", "text/html"}};
         r.body = "<html><body><h1>405 Method Not Allowed</h1></body></html>";
         return r;
     }
 
-    HttpResponse HttpResponse::internal_error(std::string body)
+    DynamicResponse DynamicResponse::internal_error(std::string body)
     {
         if (body.empty())
             body = "<html><body><h1>500 Internal Server Error</h1></body></html>";
-        HttpResponse r;
+        DynamicResponse r;
         r.status = 500;
         r.headers = {{"Content-Type", "text/html"}};
         r.body = std::move(body);
         return r;
     }
 
-    std::string HttpResponse::serialize(bool keep_alive) const
+    DynamicResponse DynamicResponse::redirect(int code, std::string location)
+    {
+        DynamicResponse r;
+        r.status = code;
+        r.headers = {{"Location", std::move(location)},
+                     {"Cache-Control", "public, max-age=3600"}};
+        return r;
+    }
+
+    std::string DynamicResponse::serialize(bool keep_alive) const
     {
         std::string out;
         out.reserve(256 + body.size());

@@ -2,6 +2,7 @@
 
 #include <string>
 #include <string_view>
+#include <variant>
 #include <vector>
 #include <cstdint>
 
@@ -25,7 +26,20 @@ namespace loom
         bool keep_alive() const;
     };
 
+    // ── Parse result: sum type (Part 2) ──────────────────────────
+    // Instead of bool + out-parameter, the parser returns T + E:
+    // either a valid request or an error. The caller must handle both
+    // cases — the variant enforces exhaustive matching.
+
+    struct ParseError
+    {
+        std::string_view reason;
+    };
+
+    using ParseResult = std::variant<HttpRequest, ParseError>;
+
     // Parses an HTTP request. Modifies raw in-place (lowercases header keys).
-    // The HttpRequest contains string_views into raw — raw must outlive the request.
-    bool parse_request(std::string& raw, HttpRequest& request);
+    // On success, the HttpRequest contains string_views into raw —
+    // raw must outlive the request.
+    auto parse_request(std::string& raw) -> ParseResult;
 }

@@ -308,6 +308,97 @@ Typestate is not free in code complexity. Each state is a separate type. Generic
 
 The litmus test: *would a violation of this protocol be a serious bug?* If yes, typestate makes it unconstructible. If no, a runtime flag is fine.
 
+## In Loom
+
+Loom's server socket uses typestate to enforce a three-phase lifecycle at compile time: create, bind, listen. The implementation lives in `include/loom/http/server.hpp`.
+
+### The Three States
+
+Each state is a distinct type. Each carries exactly the data relevant to that phase:
+
+```cpp
+struct Unbound {};
+struct Bound {};
+struct Listening {};
+
+template<typename State>
+class ServerSocket;
+```
+
+The template is specialized for each state:
+
+```cpp
+template<>
+class ServerSocket<Unbound> {
+    FileDescriptor fd_;
+public:
+    explicit ServerSocket(FileDescriptor fd) : fd_(std::move(fd)) {}
+
+    // Unbound ⊸ Bound: consume the unbound socket, produce a bound one
+    [[nodiscard]] auto bind(int port) && -> ServerSocket<Bound>;
+};
+
+template<>
+class ServerSocket<Bound> {
+    FileDescriptor fd_;
+public:
+    explicit ServerSocket(FileDescriptor fd) : fd_(std::move(fd)) {}
+
+    // Bound ⊸ Listening: consume the bound socket, produce a listening one
+    [[nodiscard]] auto listen() && -> ServerSocket<Listening>;
+};
+
+template<>
+class ServerSocket<Listening> {
+    FileDescriptor fd_;
+public:
+    explicit ServerSocket(FileDescriptor fd) : fd_(std::move(fd)) {}
+    int fd() const noexcept { return fd_.get(); }
+};
+```
+
+### Transitions Consume the Source
+
+The `&&` qualifier on `bind()` and `listen()` is the key. It means the method can only be called on an rvalue — the source state is consumed by the transition. After calling `.bind(8080)`, the `ServerSocket<Unbound>` no longer exists:
+
+```cpp
+auto socket = create_server_socket()   // ServerSocket<Unbound>
+    .bind(8080)                        // ServerSocket<Bound>  (Unbound consumed)
+    .listen();                         // ServerSocket<Listening> (Bound consumed)
+```
+
+This is a chain of linear implications: `Unbound ⊸ Bound ⊸ Listening`.
+
+### Protocol Violations Are Type Errors
+
+Calling `.listen()` on an unbound socket does not compile — `ServerSocket<Unbound>` has no `listen()` method:
+
+```cpp
+auto socket = create_server_socket();
+socket.listen();  // ERROR: no member 'listen' in ServerSocket<Unbound>
+```
+
+Calling `.bind()` on an already-listening socket does not compile either:
+
+```cpp
+auto listening = create_server_socket().bind(8080).listen();
+listening.bind(9090);  // ERROR: no member 'bind' in ServerSocket<Listening>
+```
+
+### The HttpServer Requires the Final State
+
+The server constructor accepts only a `ServerSocket<Listening>` — typestate guarantees that setup is complete before the server can be constructed:
+
+```cpp
+explicit HttpServer(ServerSocket<Listening> socket);
+```
+
+Passing a `ServerSocket<Unbound>` or `ServerSocket<Bound>` is a type error. The `HttpServer` constructor is, through Curry-Howard, a proof consumer: it requires evidence (a `ServerSocket<Listening>`) that the protocol has been followed.
+
+### Affine Ownership
+
+The `FileDescriptor` inside each socket specialization is move-only (affine). The socket itself is move-only by composition — `FileDescriptor`'s deleted copy constructor propagates to `ServerSocket`. This means the file descriptor cannot be duplicated, and ownership transfers cleanly through each typestate transition. The `[[nodiscard]]` annotation ensures the caller cannot silently discard the new state.
+
 ## Closing: Protocols Are Types
 
 The traditional view of a protocol is a flowchart on a whiteboard. Developers study it, internalize it, and try to implement it correctly. When they get it wrong, the bug shows up at runtime.

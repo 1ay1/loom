@@ -249,6 +249,82 @@ In English: if the type system says a function is polymorphic, the function *mus
 
 C++ is not System F. It has escape hatches (specialization, type traits, RTTI). But within the fragment of C++ that is genuinely parametric — templates without specialization, without `if constexpr` on type identity — the abstraction theorem holds. And that fragment is large enough to be useful.
 
+## In Loom
+
+Loom uses parametric polymorphism in several key components. Each demonstrates free theorems in production code.
+
+### AtomicCache<T>: Parametric in T
+
+The `AtomicCache` in `include/loom/reload/hot_reloader.hpp` is a lock-free, atomically-swappable cache:
+
+```cpp
+template<typename T>
+class AtomicCache
+{
+public:
+    explicit AtomicCache(std::shared_ptr<const T> initial)
+        : data_(std::move(initial)) {}
+
+    std::shared_ptr<const T> load() const noexcept
+    {
+        return data_.load(std::memory_order_acquire);
+    }
+
+    void store(std::shared_ptr<const T> next) noexcept
+    {
+        data_.store(std::move(next), std::memory_order_release);
+    }
+
+private:
+    std::atomic<std::shared_ptr<const T>> data_;
+};
+```
+
+`AtomicCache` is parametric in `T`. It never inspects the cached value — it cannot, because it knows nothing about `T`. It only moves `shared_ptr<const T>` in and out. The free theorem: for any function `g : A → B`, if you transform the cached value via `g`, the cache's load/store behavior is identical. The cache is a container that shuffles pointers — the content is opaque.
+
+This is precisely why the cache is correct for any content type. Whether it holds a `SiteCache`, a `Config`, or anything else, the atomic swap semantics are identical. Parametricity guarantees that `AtomicCache` cannot corrupt or depend on the structure of the data it holds.
+
+### HotReloader: Parametric in the Cache Type
+
+The `HotReloader` is generic in `Source`, `Watcher`, and `Cache`:
+
+```cpp
+template<typename Source, WatchPolicy Watcher, typename Cache>
+    requires ContentSource<Source> && Reloadable<Source>
+class HotReloader
+{
+public:
+    using RebuildFn = std::function<std::shared_ptr<const Cache>(Source&, const ChangeSet&)>;
+    // ...
+};
+```
+
+The `RebuildFn` is parametric in `Cache`. The reloader calls `rebuild_(source_, pending)` and passes the result to `cache_.store()`. It never inspects the `Cache` value — it treats it as an opaque blob. Free theorem: for any transformation `g` on cache values, applying `g` before or after the reload yields the same observable behavior. The reloader is a scheduling mechanism, not a data processor.
+
+Note that `Source` and `Watcher` are constrained by concepts (`ContentSource`, `WatchPolicy`). These constraints make the polymorphism *ad-hoc* for those parameters — the reloader calls `source_.reload()` and `watcher_.poll()`, which are interface-specific operations. But the `Cache` parameter has no constraints beyond being a type. It is genuinely parametric, and the free theorem applies.
+
+### StrongType<T, Tag>: Parametric in Tag
+
+Loom's phantom type wrapper in `include/loom/core/strong_type.hpp`:
+
+```cpp
+template<typename T, typename Tag>
+class StrongType
+{
+public:
+    explicit StrongType(T value) : value_(std::move(value)) {}
+    T get() const { return value_; }
+    bool operator==(const StrongType& other) const { return value_ == other.value_; }
+    // ...
+private:
+    T value_;
+};
+```
+
+`StrongType` is parametric in `Tag`. The tag is never stored, never inspected, never used at runtime. The free theorem: for any two tags `A` and `B`, if `StrongType<std::string, A>` and `StrongType<std::string, B>` hold the same string, then every tag-polymorphic operation produces the same underlying result. Tag-polymorphic code cannot distinguish a `Slug` from a `Title` — it must treat them uniformly.
+
+This is exactly the parametricity guarantee from the phantom types discussion. The formal justification is not just an analogy: `StrongType` never branches on `Tag`, never specializes for `Tag`, never uses `if constexpr` to inspect it. The code is genuinely parametric, and the abstraction theorem applies. A `Slug` cannot be silently converted to a `Title` because parametricity constrains what tag-generic code can do.
+
 ## Closing: Constraints as Theorems
 
 The usual view of types is restrictive: types prevent you from doing things. Parametricity inverts this. Types do not just prevent errors — they *prove properties*. The more polymorphic a function's type, the less it can do, and therefore the more you know about what it *does* do.

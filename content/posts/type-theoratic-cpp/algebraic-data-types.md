@@ -361,6 +361,119 @@ auto eval(const Expr& e) -> double {
 
 No dynamic dispatch. No inheritance hierarchy. Just types and catamorphisms. We will explore the theory of recursive types much more deeply in [part 9](/post/recursive-types-and-fixed-points).
 
+## In Loom
+
+Loom's HTTP layer is built on sum types. Every major data structure uses variants instead of products-with-tags, eliminating dead fields and making the compiler enforce exhaustive handling.
+
+### Connection as a Sum Type
+
+A connection is either reading a request or writing a response. The old design would be a struct with a state flag and fields for both phases — most fields dead in any given state. Instead:
+
+```cpp
+struct ReadPhase  { std::string buf; };
+using WritePhase = std::variant<OwnedWrite, ViewWrite>;
+
+struct Connection {
+    std::variant<ReadPhase, WritePhase> phase{ReadPhase{}};
+    bool keep_alive = true;
+    int64_t last_activity_ms = 0;
+};
+```
+
+Cardinality analysis: `ReadPhase` carries a buffer. `WritePhase` carries write-specific cursor data. The variant `ReadPhase + WritePhase` has exactly the right size — no buffer field sitting unused during a write, no cursor field sitting unused during a read.
+
+### Nested Sums: WritePhase
+
+The write phase is itself a sum:
+
+```cpp
+struct OwnedWrite {
+    std::string data;
+    size_t offset = 0;
+};
+
+struct ViewWrite {
+    std::shared_ptr<const void> owner;
+    const char* data;
+    size_t len;
+    size_t offset = 0;
+};
+
+using WritePhase = std::variant<OwnedWrite, ViewWrite>;
+```
+
+`OwnedWrite` owns its data (dynamically serialized). `ViewWrite` borrows a pointer into the prebuilt cache (zero-copy). The two alternatives carry different fields — `ViewWrite` needs an `owner` pointer and a length; `OwnedWrite` uses `std::string` which manages its own length. A product type would carry all five fields with half of them meaningless in any given state.
+
+### HttpResponse: The Sum That Replaced a Flag
+
+Loom's HTTP response was the motivating example. The old design:
+
+```cpp
+// Before: product with dead fields
+struct Response {
+    int status;
+    std::vector<std::pair<std::string, std::string>> headers;
+    std::string body;
+    bool is_prebuilt;            // runtime tag
+    std::shared_ptr<const void> owner;  // dead if !is_prebuilt
+    const char* prebuilt_data;          // dead if !is_prebuilt
+    size_t prebuilt_len;                // dead if !is_prebuilt
+};
+```
+
+The variant version eliminates every dead field:
+
+```cpp
+struct DynamicResponse {
+    int status;
+    std::vector<std::pair<std::string, std::string>> headers;
+    std::string body;
+};
+
+struct PrebuiltResponse {
+    std::shared_ptr<const void> owner;
+    const char* data;
+    size_t len;
+};
+
+using HttpResponse = std::variant<DynamicResponse, PrebuiltResponse>;
+```
+
+The `is_prebuilt()` runtime check becomes structural pattern matching. The server's write path eliminates the variant with `std::visit` — owned responses are serialized and written; prebuilt responses are written zero-copy directly from the cache.
+
+### ParseResult: Error Handling as a Sum
+
+The HTTP parser returns success or failure as a variant:
+
+```cpp
+struct ParseError { std::string_view reason; };
+using ParseResult = std::variant<HttpRequest, ParseError>;
+```
+
+This is `T + E` — the sum of success and failure. The caller must handle both cases; `std::visit` enforces exhaustiveness. Compare to returning a bool with an out-parameter, where nothing prevents the caller from using the out-parameter on failure.
+
+### The Overloaded Pattern
+
+Loom defines the `overloaded` helper in `response.hpp`:
+
+```cpp
+template<typename... Ts>
+struct overloaded : Ts... { using Ts::operator()...; };
+template<typename... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
+```
+
+This single utility makes every `std::visit` in the codebase ergonomic. When the server writes a response:
+
+```cpp
+std::visit(overloaded{
+    [&](const DynamicResponse& dr) { start_write_owned(fd, dr.serialize(keep_alive)); },
+    [&](const PrebuiltResponse& pr) { start_write_view(fd, pr.owner, pr.data, pr.len); },
+}, response);
+```
+
+Two cases. Two handlers. No fallthrough, no forgotten branch. If a third response type were added, every `std::visit` in the codebase would fail to compile until updated. The elimination rule is enforced.
+
 ## Closing: Types Have Arithmetic
 
 The next time you define a struct, count its inhabitants. Multiply the cardinalities of its fields. If that number is vastly larger than the set of values that actually make sense, your type is too permissive. Some of those extra inhabitants are bugs waiting to happen.

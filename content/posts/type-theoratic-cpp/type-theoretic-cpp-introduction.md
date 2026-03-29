@@ -350,6 +350,71 @@ The `validate` function is, through Curry-Howard, a *proof procedure*: given a r
 
 This pattern — *parse, don't validate* — is one of the central techniques of type-theoretic design.
 
+## In Loom
+
+Loom itself is built around these principles. Every major abstraction in the codebase has explicit formation, introduction, and elimination rules — and the design rejects states that the domain forbids.
+
+### Formation Rules as Concepts
+
+Loom defines concepts that act as formation rules for entire subsystems. A content source must provide posts and pages:
+
+```cpp
+template<typename T>
+concept ContentSource = requires(T source) {
+    { source.all_posts() } -> std::same_as<std::vector<Post>>;
+    { source.all_pages() } -> std::same_as<std::vector<Page>>;
+};
+```
+
+This is a formation rule: it describes when a type is valid as a content source. A type that lacks `all_posts()` is not merely inconvenient — it is *ill-formed* in Loom's type system and rejected by the compiler.
+
+### Introduction Rules via StrongType
+
+Loom wraps every domain string in a phantom-tagged strong type:
+
+```cpp
+template<typename T, typename Tag>
+class StrongType {
+    T value_;
+public:
+    explicit StrongType(T value) : value_(std::move(value)) {}
+    T get() const { return value_; }
+    // ...
+};
+
+using Slug    = StrongType<std::string, SlugTag>;
+using Title   = StrongType<std::string, TitleTag>;
+using PostId  = StrongType<std::string, PostIdTag>;
+using Tag     = StrongType<std::string, TagTag>;
+using Content = StrongType<std::string, ContentTag>;
+using Series  = StrongType<std::string, SeriesTag>;
+```
+
+The `explicit` constructor is an introduction rule: you must *deliberately* construct a `Slug` from a string. Implicit conversion is forbidden. Six types, all `std::string` underneath, all incompatible at compile time. A function expecting a `Slug` rejects a `Title` — the introduction rules for each type are distinct.
+
+### Elimination Rules via Exhaustive Visitation
+
+Loom models HTTP responses as a sum type:
+
+```cpp
+using HttpResponse = std::variant<DynamicResponse, PrebuiltResponse>;
+```
+
+The elimination rule is `std::visit` — you must handle both cases. Loom provides the `overloaded` helper to make this ergonomic:
+
+```cpp
+template<typename... Ts>
+struct overloaded : Ts... { using Ts::operator()...; };
+```
+
+Together with the server's write path, the response variant is eliminated exhaustively: owned responses are serialized, prebuilt responses are written zero-copy. If a third response type were added, every `std::visit` call would fail to compile until it handled the new case.
+
+### The Design Philosophy
+
+The pattern repeats across the codebase: the server socket uses typestate (formation rules that restrict which operations are available in which state), the connection uses a variant (sum type — no dead fields), the request parser returns `variant<HttpRequest, ParseError>` (sum type for error handling). Each of these will appear in the posts that follow.
+
+The goal is the one stated above: **design a world where bad functions cannot exist.** Loom is the worked example.
+
 ## The Road Ahead
 
 This is the first post in a ten-part series. We are building toward real systems where protocols are encoded in types, state machines are enforced structurally, APIs are impossible to misuse, and all of it compiles down to the same machine code as the hand-written alternative.

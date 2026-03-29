@@ -183,17 +183,18 @@ static loom::HttpResponse serve_cached(
 {
     bool ka = req.keep_alive();
 
+    auto serve = [&](const std::string& wire) -> loom::HttpResponse {
+        return loom::PrebuiltResponse{snap, wire.data(), wire.size()};
+    };
+
     auto inm = req.header("if-none-match");
     if (!inm.empty() && inm == page.etag)
-        return loom::HttpResponse::prebuilt(snap,
-            ka ? page.not_modified_ka : page.not_modified_close);
+        return serve(ka ? page.not_modified_ka : page.not_modified_close);
 
     if (accepts_gzip(req))
-        return loom::HttpResponse::prebuilt(snap,
-            ka ? page.gzip_ka : page.gzip_close);
+        return serve(ka ? page.gzip_ka : page.gzip_close);
 
-    return loom::HttpResponse::prebuilt(snap,
-        ka ? page.plain_ka : page.plain_close);
+    return serve(ka ? page.plain_ka : page.plain_close);
 }
 
 static std::string format_iso_date(std::chrono::system_clock::time_point tp)
@@ -551,9 +552,9 @@ static void run_with_filesystem(const std::string& content_dir)
     };
 
     // Static file fallback
-    auto fb = [&cache, &content_dir](loom::HttpRequest& req) {
+    auto fb = [&cache, &content_dir](loom::HttpRequest& req) -> loom::HttpResponse {
         if (!safe_path(req.path))
-            return loom::HttpResponse::not_found();
+            return loom::DynamicResponse::not_found();
 
         auto snap = cache.load();
 
@@ -570,7 +571,7 @@ static void run_with_filesystem(const std::string& content_dir)
         std::string body((std::istreambuf_iterator<char>(file)),
                           std::istreambuf_iterator<char>());
 
-        loom::HttpResponse resp;
+        loom::DynamicResponse resp;
         resp.status = 200;
         resp.headers = {{"Content-Type", std::string(mime_type(req.path))},
                         {"Cache-Control", "public, max-age=3600"}};
@@ -597,7 +598,13 @@ static void run_with_filesystem(const std::string& content_dir)
         get<"/series/:slug">(cached)
     );
 
-    loom::HttpServer server(8080);
+    // Server socket typestate: Unbound → Bound → Listening
+    // Each transition consumes the source and produces the next state.
+    auto socket = loom::create_server_socket()
+        .bind(8080)
+        .listen();
+
+    loom::HttpServer server(std::move(socket));
     server.set_dispatch(dispatch);
 
     std::cout << "Serving at http://localhost:8080" << std::endl;
@@ -658,9 +665,9 @@ static void run_with_git(const std::string& repo_path, const std::string& branch
         auto s = cache.load(); return serve_cached(s->rss, req, s);
     };
 
-    auto fb = [&cache, repo_path, branch, content_prefix, raw_base](loom::HttpRequest& req) {
+    auto fb = [&cache, repo_path, branch, content_prefix, raw_base](loom::HttpRequest& req) -> loom::HttpResponse {
         if (!safe_path(req.path))
-            return loom::HttpResponse::not_found();
+            return loom::DynamicResponse::not_found();
 
         auto snap = cache.load();
 
@@ -679,18 +686,14 @@ static void run_with_git(const std::string& repo_path, const std::string& branch
 
         if (!raw_base.empty())
         {
-            loom::HttpResponse resp;
-            resp.status = 302;
-            resp.headers = {{"Location", raw_base + "/" + asset_path},
-                            {"Cache-Control", "public, max-age=3600"}};
-            return resp;
+            return loom::DynamicResponse::redirect(302, raw_base + "/" + asset_path);
         }
 
         try
         {
             auto body = loom::git_read_blob(repo_path, branch, asset_path);
 
-            loom::HttpResponse resp;
+            loom::DynamicResponse resp;
             resp.status = 200;
             resp.headers = {{"Content-Type", std::string(mime_type(req.path))},
                             {"Cache-Control", "public, max-age=3600"}};
@@ -719,7 +722,12 @@ static void run_with_git(const std::string& repo_path, const std::string& branch
         get<"/series/:slug">(cached)
     );
 
-    loom::HttpServer server(8080);
+    // Server socket typestate: Unbound → Bound → Listening
+    auto socket = loom::create_server_socket()
+        .bind(8080)
+        .listen();
+
+    loom::HttpServer server(std::move(socket));
     server.set_dispatch(dispatch);
 
     std::cout << "Serving at http://localhost:8080" << std::endl;
@@ -758,7 +766,8 @@ int main(int argc, char* argv[])
             }
         }
 
-        run_with_git(repo_path, branch, prefix, remote, remote ? repo_arg : "");
+        try { run_with_git(repo_path, branch, prefix, remote, remote ? repo_arg : ""); }
+        catch (const std::exception& e) { std::cerr << "Fatal: " << e.what() << std::endl; return 1; }
     }
     else
     {
@@ -766,6 +775,7 @@ int main(int argc, char* argv[])
         if (argc > 1)
             content_dir = argv[1];
 
-        run_with_filesystem(content_dir);
+        try { run_with_filesystem(content_dir); }
+        catch (const std::exception& e) { std::cerr << "Fatal: " << e.what() << std::endl; return 1; }
     }
 }

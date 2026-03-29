@@ -278,26 +278,79 @@ Not as elegant as Haskell's type class instances, but serves the same purpose: r
 
 C++ is not a proof assistant. The correspondence is imperfect — there is no termination checking, no universe hierarchy, no proof terms. But the fragment C++ supports is exactly the fragment that matters for practical engineering: stating requirements, checking them at compile time, and selecting the most specific implementation.
 
-## Concepts in Loom
+## In Loom
 
-Loom uses concepts for conditional operations:
+Loom uses concepts at three levels: defining capabilities for subsystems, constraining generic components, and expressing conditional method formation.
+
+### ContentSource: A Proposition About Data Providers
 
 ```cpp
-template<typename Tag, typename T>
-struct StrongType {
-    T value;
-
-    auto operator==(const StrongType& other) const -> bool
-        requires std::equality_comparable<T>
-    { return value == other.value; }
-
-    auto str() const -> const std::string&
-        requires std::same_as<T, std::string>
-    { return value; }
+template<typename T>
+concept ContentSource = requires(T source) {
+    { source.all_posts() } -> std::same_as<std::vector<Post>>;
+    { source.all_pages() } -> std::same_as<std::vector<Page>>;
 };
 ```
 
-The `requires` clause is a proposition: "this method exists if and only if the underlying type satisfies this predicate." This is conditional formation — the method's formation rule depends on the type parameter.
+This is the proposition: "T can provide posts and pages." Each line is a proof obligation — the type must provide `all_posts()` returning exactly `std::vector<Post>`, and `all_pages()` returning exactly `std::vector<Page>`. The `->` return-type constraint is a nested requirement: the expression must be well-formed *and* its result must satisfy a further concept.
+
+### WatchPolicy and Reloadable: Independent Capabilities
+
+```cpp
+template<typename W>
+concept WatchPolicy = requires(W w) {
+    { w.poll() } -> std::same_as<std::optional<ChangeSet>>;
+    { w.start() } -> std::same_as<void>;
+    { w.stop()  } -> std::same_as<void>;
+};
+
+template<typename S>
+concept Reloadable = requires(S s, const ChangeSet& cs) {
+    { s.reload(cs) } -> std::same_as<void>;
+};
+```
+
+`WatchPolicy` describes change detection. `Reloadable` describes the ability to update from a change set. These are orthogonal concepts — neither subsumes the other — and they combine by conjunction in the hot reloader.
+
+### HotReloader: Conjunction as a Requires Clause
+
+The `HotReloader` class template brings these concepts together:
+
+```cpp
+template<typename Source, WatchPolicy Watcher, typename Cache>
+    requires ContentSource<Source> && Reloadable<Source>
+class HotReloader { /* ... */ };
+```
+
+Read this through natural deduction. The `requires` clause is a conjunction:
+
+```
+  ContentSource<Source>    Reloadable<Source>
+  ──────────────────────────────────────────   (∧-intro)
+    ContentSource<Source> ∧ Reloadable<Source>
+```
+
+The compiler verifies both proof obligations independently. `Source` must provide posts and pages (`ContentSource`) *and* accept change-set reloads (`Reloadable`). `Watcher` must satisfy `WatchPolicy`. All three propositions must hold simultaneously for the class to be instantiated.
+
+This is modus ponens in action: `HotReloader` says "if these propositions hold, then this class exists." When you instantiate `HotReloader<FileSystemSource, InotifyWatcher, SiteCache>`, the compiler attempts to prove all three propositions. If any proof fails, the class does not exist — instantiation is rejected with a clear error message pointing to the unsatisfied concept.
+
+### Conditional Formation in StrongType
+
+At the method level, Loom uses `requires` for conditional formation:
+
+```cpp
+template<typename T, typename Tag>
+class StrongType {
+    T value_;
+public:
+    bool empty() const requires requires(const T& v) { v.empty(); }
+    { return value_.empty(); }
+};
+```
+
+The nested `requires` is a proof attempt: "does `v.empty()` compile for the underlying type?" If yes, `StrongType<T, Tag>::empty()` exists. If not, it does not. For `StrongType<std::string, SlugTag>`, the method is available because `std::string` has `empty()`. For a hypothetical `StrongType<int, CountTag>`, the formation rule is not satisfied, and the method simply does not exist — no error unless you try to call it.
+
+This is conditional formation driven by intuitionistic proof search. The compiler does not reason "either `empty()` exists or it doesn't" in the abstract — it *constructs* the proof by checking well-formedness. Success creates the method. Failure removes it from the type's interface.
 
 ## Closing: Logic You Already Use
 

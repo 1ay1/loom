@@ -332,6 +332,339 @@ The patterns generalize to any sequential protocol:
 
 Any protocol with ordered steps and preconditions can be encoded this way.
 
+## In Practice: Loom's Server
+
+The HTTP client protocol above is a pedagogical construction. Loom itself is a real HTTP server — a static site engine that serves a blog with hot reloading, compile-time routing, and type-safe HTML rendering. Every technique from this series appears in Loom's actual codebase. Here is how they come together.
+
+### Algebraic Types: Connection, Response, ParseResult
+
+Loom models HTTP connections, responses, and parse results as sum types using `std::variant`.
+
+**Connection phase** (`include/loom/http/server.hpp`): a connection is either reading a request or writing a response. Each phase carries exactly the data relevant to that phase:
+
+```cpp
+struct ReadPhase  { std::string buf; };
+
+struct OwnedWrite { std::string data; size_t offset = 0; };
+struct ViewWrite  { std::shared_ptr<const void> owner;
+                    const char* data; size_t len; size_t offset = 0; };
+using WritePhase = std::variant<OwnedWrite, ViewWrite>;
+
+struct Connection
+{
+    std::variant<ReadPhase, WritePhase> phase{ReadPhase{}};
+    bool keep_alive = true;
+    int64_t last_activity_ms = 0;
+};
+```
+
+The outer variant `ReadPhase + WritePhase` is the connection lifecycle. The inner variant `OwnedWrite + ViewWrite` is a nested sum type within the write phase: the response is either a dynamically serialized string (owned) or a zero-copy view into the cache (borrowed via `shared_ptr`). No dead fields. No `is_writing` boolean. The type encodes the state.
+
+**HttpResponse** (`include/loom/http/response.hpp`): the response itself is a sum type:
+
+```cpp
+struct DynamicResponse
+{
+    int status = 200;
+    std::vector<std::pair<std::string, std::string>> headers;
+    std::string body;
+};
+
+struct PrebuiltResponse
+{
+    std::shared_ptr<const void> owner;
+    const char* data;
+    size_t len;
+};
+
+using HttpResponse = std::variant<DynamicResponse, PrebuiltResponse>;
+```
+
+A `DynamicResponse` is built at request time — the handler constructs status, headers, and body. A `PrebuiltResponse` is a pointer into the cache — the entire wire-format HTTP response was pre-serialized, and serving it is a single `write()` call. The variant forces the server to handle both cases:
+
+```cpp
+std::visit(overloaded{
+    [&](const DynamicResponse& r) { start_write_owned(fd, r.serialize(keep_alive)); },
+    [&](const PrebuiltResponse& r) { start_write_view(fd, r.owner, r.data, r.len); },
+}, response);
+```
+
+The `overloaded` helper is itself a type-theoretic construction — an anonymous visitor built from a parameter pack of lambdas using aggregate inheritance:
+
+```cpp
+template<typename... Ts>
+struct overloaded : Ts... { using Ts::operator()...; };
+template<typename... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
+```
+
+**ParseResult** (`include/loom/http/request.hpp`): parsing an HTTP request produces either a valid request or an error:
+
+```cpp
+struct ParseError { std::string_view reason; };
+using ParseResult = std::variant<HttpRequest, ParseError>;
+```
+
+No boolean return with an out-parameter. No exception. The variant is the sum type `HttpRequest + ParseError`, and the caller must handle both cases. This is the `Either` monad from functional programming, expressed as a C++ variant.
+
+### Phantom Types: StrongType for Domain Safety
+
+Loom uses `StrongType<T, Tag>` (`include/loom/core/strong_type.hpp`) to prevent confusion between string-typed domain values:
+
+```cpp
+template<typename T, typename Tag>
+class StrongType
+{
+public:
+    explicit StrongType(T value) : value_(std::move(value)) {}
+    T get() const { return value_; }
+    bool operator==(const StrongType& other) const { return value_ == other.value_; }
+private:
+    T value_;
+};
+```
+
+The phantom `Tag` parameter creates distinct types for values that share the same runtime representation:
+
+```cpp
+using Slug    = StrongType<std::string, SlugTag>;
+using Title   = StrongType<std::string, TitleTag>;
+using PostId  = StrongType<std::string, PostIdTag>;
+using Content = StrongType<std::string, ContentTag>;
+```
+
+A `Slug` and a `Title` are both strings at runtime. But the compiler treats them as unrelated types. Passing a `Title` where a `Slug` is expected is a compile error. The `Tag` is never stored, never inspected — it is a phantom, and parametricity (Part 7) guarantees that tag-generic code cannot distinguish or convert between tags.
+
+### Typestate: ServerSocket<Unbound> to Listening
+
+The server socket lifecycle in `include/loom/http/server.hpp` is a typestate protocol:
+
+```cpp
+struct Unbound {};
+struct Bound {};
+struct Listening {};
+
+template<typename State> class ServerSocket;
+
+template<>
+class ServerSocket<Unbound>
+{
+    FileDescriptor fd_;
+public:
+    explicit ServerSocket(FileDescriptor fd) : fd_(std::move(fd)) {}
+    [[nodiscard]] auto bind(int port) && -> ServerSocket<Bound>;
+};
+
+template<>
+class ServerSocket<Bound>
+{
+    FileDescriptor fd_;
+public:
+    explicit ServerSocket(FileDescriptor fd) : fd_(std::move(fd)) {}
+    [[nodiscard]] auto listen() && -> ServerSocket<Listening>;
+};
+
+template<>
+class ServerSocket<Listening>
+{
+    FileDescriptor fd_;
+public:
+    explicit ServerSocket(FileDescriptor fd) : fd_(std::move(fd)) {}
+    int fd() const noexcept { return fd_.get(); }
+};
+```
+
+Three states, three types. The transitions are `&&`-qualified methods — they consume `*this` by move, producing the next state type. The `HttpServer` constructor requires a `ServerSocket<Listening>`:
+
+```cpp
+explicit HttpServer(ServerSocket<Listening> socket);
+```
+
+You cannot construct an `HttpServer` with an unbound or merely bound socket — it is a type error. The protocol is:
+
+```cpp
+auto socket = create_server_socket()   // ServerSocket<Unbound>
+    .bind(8080)                        // ServerSocket<Bound>
+    .listen();                         // ServerSocket<Listening>
+
+HttpServer server(std::move(socket));  // only Listening accepted
+```
+
+Calling `.listen()` on an `Unbound` socket is a compile error. Calling `.bind()` on a `Listening` socket is a compile error. The state machine is enforced by the type system.
+
+### Concepts: ContentSource, WatchPolicy as Logical Propositions
+
+Loom defines concepts as propositions that types must satisfy:
+
+```cpp
+// include/loom/content/content_source.hpp
+template<typename T>
+concept ContentSource =
+requires(T source)
+{
+    { source.all_posts() } -> std::same_as<std::vector<Post>>;
+    { source.all_pages() } -> std::same_as<std::vector<Page>>;
+};
+
+// include/loom/reload/watch_policy.hpp
+template<typename W>
+concept WatchPolicy = requires(W w)
+{
+    { w.poll() } -> std::same_as<std::optional<ChangeSet>>;
+    { w.start() } -> std::same_as<void>;
+    { w.stop()  } -> std::same_as<void>;
+};
+
+template<typename S>
+concept Reloadable = requires(S s, const ChangeSet& cs)
+{
+    { s.reload(cs) } -> std::same_as<void>;
+};
+```
+
+Each concept is a proposition in intuitionistic logic (Part 5). `ContentSource<T>` is the proposition "T provides `all_posts()` returning `vector<Post>` and `all_pages()` returning `vector<Page>`." A type that satisfies the concept is a proof of the proposition — a constructive witness.
+
+The `HotReloader` uses concepts as logical conjunctions — the `requires` clause demands that `Source` simultaneously satisfies `ContentSource` AND `Reloadable`:
+
+```cpp
+template<typename Source, WatchPolicy Watcher, typename Cache>
+    requires ContentSource<Source> && Reloadable<Source>
+class HotReloader { /* ... */ };
+```
+
+This is conjunction introduction (Part 5): the conjunction `ContentSource<Source> ∧ Reloadable<Source>` must be proven by the instantiating type. If a source type provides posts and pages but cannot reload, the template will not instantiate — the proof is incomplete.
+
+### Compile-Time Data: Route Table with NTTPs
+
+Loom's routing DSL (`include/loom/http/route.hpp`) uses compile-time strings as non-type template parameters:
+
+```cpp
+template<Lit P> inline constexpr get_t<P>  get{};
+
+auto dispatch = compile(
+    fallback(not_found_handler),
+    get<"/">(index_handler),
+    get<"/post/:slug">(post_handler),
+    get<"/tag/:slug">(tag_handler)
+);
+```
+
+Each route is a `Route<HttpMethod::GET, Lit<"/post/:slug">, H>` — a type parameterized by a compile-time string value. The `Traits<P>` struct analyzes the pattern at compile time with `consteval` methods:
+
+```cpp
+template<Lit P>
+struct Traits {
+    static consteval bool is_static() noexcept
+    {
+        for (size_t i = 0; i < P.size(); ++i)
+            if (P[i] == ':') return false;
+        return true;
+    }
+};
+```
+
+The dispatch function is assembled by a fold expression over the route tuple — the compiler sees every pattern as a constant and generates an optimal if-else chain. No vtable, no hash map, no heap. This is Pi types in practice: the dispatch behavior depends on the route pattern value.
+
+### Parametricity: AtomicCache<T> and HotReloader Generics
+
+`AtomicCache<T>` is parametric in `T`:
+
+```cpp
+template<typename T>
+class AtomicCache
+{
+    std::atomic<std::shared_ptr<const T>> data_;
+public:
+    explicit AtomicCache(std::shared_ptr<const T> initial)
+        : data_(std::move(initial)) {}
+
+    std::shared_ptr<const T> load() const noexcept
+    {
+        return data_.load(std::memory_order_acquire);
+    }
+
+    void store(std::shared_ptr<const T> next) noexcept
+    {
+        data_.store(std::move(next), std::memory_order_release);
+    }
+};
+```
+
+The cache never inspects `T`. It atomically swaps `shared_ptr<const T>` pointers — that is all. The free theorem: the cache's behavior is identical regardless of what `T` is. It is a pure container, and parametricity guarantees it cannot corrupt or depend on the cached data.
+
+The `HotReloader` is parametric in `Cache` but ad-hoc polymorphic in `Source` and `Watcher` (constrained by concepts). The `RebuildFn` takes a source and a change set and produces a new cache value — the reloader treats the result as an opaque pointer. This separation of concerns — ad-hoc polymorphism for the operations that require specific interfaces, parametric polymorphism for the data that should remain abstract — is the practical application of the parametric/ad-hoc distinction.
+
+### Substructural Types: FileDescriptor as Affine Type
+
+`FileDescriptor` (`include/loom/core/fd.hpp`) is Loom's foundational affine type:
+
+```cpp
+class FileDescriptor
+{
+public:
+    explicit FileDescriptor(int fd) noexcept : fd_(fd) {}
+    ~FileDescriptor() { if (fd_ >= 0) ::close(fd_); }
+
+    FileDescriptor(const FileDescriptor&) = delete;            // no contraction
+    FileDescriptor& operator=(const FileDescriptor&) = delete; // no contraction
+    FileDescriptor(FileDescriptor&& other) noexcept            // ownership transfer
+        : fd_(other.fd_) { other.fd_ = -1; }
+
+    [[nodiscard]] int release() noexcept;
+};
+```
+
+Deleted copy = no contraction (no double-close). Destructor = weakening with cleanup (auto-close on discard). Move = linear implication (`A ⊸ A`). The `[[nodiscard]]` on `release()` is a relevance hint — the caller should not ignore the raw fd.
+
+Every `ServerSocket<State>` wraps a `FileDescriptor`. The socket typestate transitions move the inner fd from state to state — at no point does a second owner exist. The affine discipline propagates upward: because `FileDescriptor` is move-only, `ServerSocket` is move-only, and the entire server socket lifecycle is substructurally controlled.
+
+### Recursive Types: DOM Node Tree
+
+The DOM system (`include/loom/render/dom.hpp`) defines a recursive type:
+
+```cpp
+struct Node
+{
+    enum Kind { Element, Void, Text, Raw, Fragment } kind = Fragment;
+    std::string tag;
+    std::vector<Attr> attrs;
+    std::vector<Node> children;   // recursive: Node contains Nodes
+    std::string content;
+};
+```
+
+`Node` contains `std::vector<Node>` — children that are themselves nodes. This is `mu X. F(X)` where `F(X) = Tag * Attrs * List<X> + ... + List<X>`. The fixed point ties the knot: a `Node` tree can be arbitrarily deep.
+
+The `render_to()` method is a catamorphism that tears down the tree into an HTML string. The element factories (`elem`, `div`, `h1`, `article`, etc.) and the `each()` combinator are anamorphisms that build the tree from domain data. A typical page render is a hylomorphism: unfold posts into a `Node` tree, then immediately fold it into HTML.
+
+### The Synthesis
+
+These are not isolated techniques applied independently. They form an interconnected system:
+
+1. The **server socket typestate** wraps an **affine FileDescriptor**, ensuring the fd is never duplicated and always cleaned up.
+
+2. The **HttpServer** constructor gates on `ServerSocket<Listening>` — a **concept-like type constraint** ensuring the protocol was followed.
+
+3. Incoming data is parsed into a **sum type** (`ParseResult = HttpRequest + ParseError`), forcing exhaustive handling.
+
+4. The request is dispatched through a **compile-time route table** where patterns are NTTPs and the dispatch chain is a **fold expression** — Pi types and staged computation.
+
+5. Route handlers receive requests with **strongly-typed** parameters (`Slug`, `Title`) protected by **phantom tags** and **parametricity**.
+
+6. The response is a **sum type** (`DynamicResponse + PrebuiltResponse`). Prebuilt responses come from an **AtomicCache<T>** that is **parametric** in the cache type.
+
+7. The cache is maintained by a **HotReloader** constrained by **concepts** (`ContentSource`, `WatchPolicy`, `Reloadable`) — logical propositions proved by the source and watcher types.
+
+8. Response HTML is generated by a **recursive DOM type** (`Node` containing `Node`s) — a fixed point rendered by a **catamorphism**.
+
+9. The connection lifecycle is an **algebraic sum type** (`ReadPhase + WritePhase`), with transitions that consume and replace the phase — **linear implications** within the variant.
+
+10. Throughout, **affine discipline** prevents resource leaks: file descriptors auto-close, sockets cannot be duplicated, connections are owned by the event loop.
+
+The type system is not a bureaucratic overhead imposed on a working system. It is the system's skeleton. Remove the types and you have a bag of functions with implicit contracts documented in comments. Keep the types and the compiler verifies the contracts — every protocol step, every resource lifecycle, every state transition, every exhaustive match — at zero runtime cost.
+
+This is what type-theoretic C++ looks like in production: not an academic exercise, but a practical methodology where the compiler does the work that would otherwise require tests, assertions, documentation, and discipline. The theory from this series — algebraic types, phantom types, typestate, concepts, dependent types, parametricity, substructural logic, recursive types — is not abstract. It is the vocabulary for describing what Loom's code already does.
+
 ## The Journey
 
 We started with a provocation: *a program is a theory*. Over ten posts, we built that into a practical methodology grounded in real type theory:

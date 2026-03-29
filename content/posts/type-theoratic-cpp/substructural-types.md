@@ -325,6 +325,96 @@ Rust's ownership system is the most complete substructural type system in a main
 
 Rust pays for this with a more complex type system and a steeper learning curve. C++ offers the same *patterns* but relies on convention rather than enforcement. The substructural theory is the same — the enforcement level differs.
 
+## In Loom
+
+Loom's `FileDescriptor` class in `include/loom/core/fd.hpp` is a textbook affine type — and the code comments say so explicitly:
+
+```cpp
+class FileDescriptor
+{
+public:
+    FileDescriptor() = default;
+    explicit FileDescriptor(int fd) noexcept : fd_(fd) {}
+
+    ~FileDescriptor()
+    {
+        if (fd_ >= 0) ::close(fd_);   // weakening with cleanup
+    }
+
+    // Affine: no contraction (copying)
+    FileDescriptor(const FileDescriptor&) = delete;
+    FileDescriptor& operator=(const FileDescriptor&) = delete;
+
+    // Transfer of ownership (linear implication: A ⊸ A)
+    FileDescriptor(FileDescriptor&& other) noexcept
+        : fd_(other.fd_)
+    {
+        other.fd_ = -1;
+    }
+
+    FileDescriptor& operator=(FileDescriptor&& other) noexcept
+    {
+        if (this != &other)
+        {
+            if (fd_ >= 0) ::close(fd_);
+            fd_ = other.fd_;
+            other.fd_ = -1;
+        }
+        return *this;
+    }
+
+    [[nodiscard]] int release() noexcept
+    {
+        int fd = fd_;
+        fd_ = -1;
+        return fd;
+    }
+};
+```
+
+Map each line to the substructural rules:
+
+- **Deleted copy constructor** = no contraction. You cannot duplicate a file descriptor. Two handles to the same fd would mean double-close — undefined behavior. The type system prevents it.
+- **Destructor** = weakening with cleanup. You *can* discard a `FileDescriptor` without using it. But the destructor ensures the OS resource is released. This is affine, not linear — discarding is permitted, but not free (there is cleanup work).
+- **Move constructor** = ownership transfer. The linear implication `A ⊸ A`: consuming the source produces an equivalent value, and the source is invalidated (`other.fd_ = -1`). After the move, the source is in a sentinel state that the destructor recognizes as "already consumed."
+- **`release()`** = explicit consumption. The `[[nodiscard]]` annotation is a relevance hint — the caller should not ignore the returned fd. This is the escape hatch from RAII: the caller takes responsibility for the raw descriptor.
+
+The `FileDescriptor` is used throughout Loom as a building block. The `ServerSocket<State>` typestate chain (in `include/loom/http/server.hpp`) wraps a `FileDescriptor`:
+
+```cpp
+template<>
+class ServerSocket<Unbound>
+{
+    FileDescriptor fd_;
+public:
+    [[nodiscard]] auto bind(int port) && -> ServerSocket<Bound>;
+};
+```
+
+The `&&` qualifier on `bind()` means it can only be called on an rvalue — the `ServerSocket<Unbound>` is consumed by the transition, and a `ServerSocket<Bound>` is produced. The inner `FileDescriptor` moves along with it. At no point is the fd duplicated; at every point, exactly one owner exists.
+
+### Connection Phase Transitions
+
+Loom's `Connection` type uses a variant to encode its current phase:
+
+```cpp
+struct ReadPhase  { std::string buf; };
+struct OwnedWrite { std::string data; size_t offset = 0; };
+struct ViewWrite  { std::shared_ptr<const void> owner; const char* data;
+                    size_t len; size_t offset = 0; };
+using WritePhase = std::variant<OwnedWrite, ViewWrite>;
+
+struct Connection
+{
+    std::variant<ReadPhase, WritePhase> phase{ReadPhase{}};
+    // ...
+};
+```
+
+When the server finishes reading a request and begins writing a response, the `Connection`'s phase transitions from `ReadPhase` to `WritePhase`. The `ReadPhase` data (the read buffer) is consumed and replaced — it does not linger as a dead field. The transition is a destructive update: the old phase is overwritten, and only the new phase's data exists. This is the linear implication in the variant: `ReadPhase ⊸ WritePhase`, with the variant enforcing that exactly one phase is active at any time.
+
+The `WritePhase` itself is a sum of `OwnedWrite` (the server serialized the response and owns the string) and `ViewWrite` (the response is a zero-copy view into the cache, kept alive by a `shared_ptr`). The `shared_ptr` in `ViewWrite` is the `!` modality — it marks shared, freely-copyable ownership of the cached data, while the `Connection` itself remains move-only. Resources at different levels of the substructural hierarchy coexist in the same data structure.
+
 ## Closing: Resources Demand Discipline
 
 Classical logic assumes premises are free — use them, copy them, discard them. This assumption is fine for mathematical propositions. It is wrong for resources. Files, connections, locks, memory, transactions — these have real costs for duplication and real consequences for neglect.
