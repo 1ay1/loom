@@ -356,6 +356,27 @@ Pages are served at `/:slug` (e.g., `/about`).
 
 ---
 
+## Built-in UX Features
+
+The following features are always enabled and require no configuration. They use CSS variables from the active theme, so they work with all built-in and custom themes.
+
+| Feature | Description |
+|---|---|
+| Smart typography | Curly quotes, em/en dashes, ellipsis — applied during markdown rendering |
+| Code copy button | Appears on hover for all fenced code blocks |
+| Code filename tabs | Add `title="file.rs"` to fenced code blocks for a filename header |
+| Sidenotes | Footnotes display as margin notes on wide screens, toggle inline on mobile |
+| Command palette | `Ctrl+K` / `Cmd+K` to fuzzy-search and navigate posts |
+| Keyboard navigation | `j`/`k` to browse listings, `Enter` to open, `/` to search |
+| Image zoom | Click post images to view fullscreen, `Esc` to close |
+| Active TOC | Current section highlighted in the table of contents while scrolling |
+| Reading position | Scroll position saved per post; resume toast on revisit |
+| Post staleness | Subtle notice on posts older than 18 months |
+| View transitions | Smooth page crossfades via the browser-native View Transitions API |
+| Post connections | SVG graph on archives page showing tag-based relationships |
+
+---
+
 ## Full Example
 
 ```ini

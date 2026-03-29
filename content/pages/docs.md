@@ -219,6 +219,26 @@ Loom's hand-written markdown parser supports:
 
 **Inline elements:** bold, italic, bold italic, strikethrough, inline code, links, reference links, images, reference images, autolinks, footnote references, backslash escapes, line breaks (trailing spaces).
 
+**Smart typography:** Straight quotes become curly (`"hello"` renders as "hello"), apostrophes become smart (`it's` renders as it's), `--` becomes an en dash, `---` becomes an em dash, and `...` becomes an ellipsis. Applied automatically during rendering — no config needed, and code blocks are unaffected.
+
+**Code block titles:** Add a filename tab above any fenced code block with `title="..."`:
+
+````
+```rust title="main.rs"
+fn main() {}
+```
+````
+
+A **copy button** appears on hover for all code blocks. Both features work across all themes.
+
+**Sidenotes:** Footnotes render as Tufte-style margin notes on wide screens (>1100px). On narrower screens, they become toggleable inline notes — click the superscript number to expand. No JavaScript required for the toggle; it uses a CSS checkbox hack.
+
+```
+A claim[^1] that needs a source.
+
+[^1]: The source appears in the margin on desktop.
+```
+
 **New-tab links:** append `^` after the closing `)` or `]` to open a link in a new tab: `[text](url)^`. Works on all link forms. The `external_links_new_tab = true` config option applies this site-wide to all external URLs automatically.
 
 **Tables:**
@@ -229,13 +249,51 @@ Loom's hand-written markdown parser supports:
 | a    |   b    |     c |
 ```
 
-**Footnotes:**
+## UX Features
 
-```
-Something[^1] interesting.
+These features are built in and work across all themes. No configuration needed.
 
-[^1]: The footnote text.
-```
+### Command Palette
+
+Press `Ctrl+K` (or `Cmd+K` on Mac) to open a floating command palette. Type to fuzzy-search all posts by title, excerpt, and tags. Arrow keys to navigate, `Enter` to go, `Esc` to close. It uses the same `/search.json` index as the search page.
+
+### Keyboard Navigation
+
+On any page with post listings:
+
+| Key | Action |
+|-----|--------|
+| `j` | Move to next post |
+| `k` | Move to previous post |
+| `Enter` | Open the focused post |
+| `/` | Focus the search input |
+| `Esc` | Close command palette or image zoom |
+
+Only active when you're not in a text input.
+
+### Image Zoom
+
+Click any image in a post or page to expand it fullscreen with a dark backdrop. Click anywhere or press `Esc` to close. No lightbox library — uses native CSS transforms and a single event listener.
+
+### Active Table of Contents
+
+When a post or page has a table of contents (3+ headings), the current section is highlighted as you scroll. Uses `IntersectionObserver` for zero-jank tracking.
+
+### Reading Position Memory
+
+On long posts, Loom saves your scroll position to `localStorage`. When you revisit, a subtle toast appears: "Continue where you left off?" with a link that smooth-scrolls to your last position. The toast auto-dismisses after 6 seconds.
+
+### Post Staleness Notice
+
+Posts older than 18 months display a subtle banner below the reading progress bar: "This post was written over N years ago. Some information may be outdated." Styled with the theme's accent color.
+
+### View Transitions
+
+Pages use the browser-native View Transitions API for smooth crossfade navigation. No JavaScript required — a single `<meta>` tag enables it. Older browsers that don't support it simply fall back to normal navigation.
+
+### Post Connections Graph
+
+The Archives page includes an SVG graph showing how posts relate to each other through shared tags. Posts are nodes arranged in a circle; lines between them indicate shared tags (thicker lines = more shared tags). Each node links to its post. Generated at build time with zero JavaScript.
 
 ## Routes
 

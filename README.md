@@ -34,11 +34,22 @@ Every static site generator needs a build step, a deploy pipeline, and a runtime
 
 - **Epoll-based HTTP server** — non-blocking I/O, TCP_NODELAY, keep-alive, trie-based router
 - **Hand-written markdown parser** — headings, bold/italic, code blocks, tables, footnotes, task lists, strikethrough, images, reference links, raw HTML passthrough
+- **Smart typography** — curly quotes, em/en dashes, ellipsis — applied automatically during rendering
 - **Pre-rendered cache** — the entire site lives in memory, atomically swapped on content changes
 - **Gzip + ETag** — compressed responses with HTTP 304 support out of the box
 - **HTML minification** — automatic, zero config
 - **Hot reload** — inotify-based filesystem watching with 500ms debounce, or git polling for commit-driven updates
-- **6 built-in themes** — default, terminal, nord, gruvbox, rose — all with light/dark mode
+- **6 built-in themes** — default, terminal, nord, gruvbox, rose, hacker — all with light/dark mode
+- **View Transitions API** — smooth crossfade between pages (browser-native, progressive enhancement)
+- **Cmd+K command palette** — instant fuzzy search and navigation from any page
+- **Keyboard navigation** — `j`/`k` to browse posts, `/` to search, `Esc` to close
+- **Sidenotes** — Tufte-style margin notes on wide screens, toggleable inline on mobile
+- **Code blocks** — copy button, optional filename tabs (`title="main.rs"`), language hints
+- **Image zoom** — click any image to expand fullscreen, `Esc` to close
+- **Active TOC** — table of contents highlights the current section as you scroll
+- **Reading position memory** — remembers where you left off, offers to resume on revisit
+- **Post staleness notice** — subtle banner on posts older than 18 months
+- **Post connections graph** — SVG visualization of tag-based relationships on the archives page
 - **RSS, sitemap, robots.txt** — generated automatically
 - **Tags, series, archives** — first-class content organization with dedicated pages
 - **Sidebar widgets** — recent posts, tag cloud, about text
@@ -109,6 +120,42 @@ image: /images/epoll-cover.png
 ---
 
 Your markdown here.
+```
+
+### Smart typography
+
+Straight quotes become curly, dashes become proper typographic characters, and triple dots become ellipsis — all automatically:
+
+| You write | Rendered as |
+|-----------|-------------|
+| `"hello"` | "hello" |
+| `it's` | it's |
+| `--` | en dash |
+| `---` | em dash |
+| `...` | ellipsis |
+
+### Code blocks with titles
+
+Add a filename tab to any fenced code block:
+
+````markdown
+```rust title="main.rs"
+fn main() {
+    println!("Hello");
+}
+```
+````
+
+A copy button appears on hover for all code blocks.
+
+### Sidenotes
+
+Footnotes render as Tufte-style margin notes on wide screens and toggle inline on mobile:
+
+```markdown
+Something noteworthy[^1] in the text.
+
+[^1]: This appears in the margin on desktop.
 ```
 
 ### Series
@@ -184,6 +231,16 @@ footer_links = GitHub:https://github.com/jane, RSS:/feed.xml
 custom_css = body { letter-spacing: 0.02em; }
 custom_head_html = <link rel="icon" href="/favicon.ico">
 ```
+
+## Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+K` / `Cmd+K` | Open command palette (fuzzy search + navigate) |
+| `j` / `k` | Move between posts in listings |
+| `Enter` | Open focused post |
+| `/` | Focus search input |
+| `Esc` | Close palette / image zoom |
 
 ## Routes
 

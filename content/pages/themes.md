@@ -60,11 +60,19 @@ Same theme system, radically different UI.
 
 ### Palette-Driven Styling
 
-Code blocks, inline code, and blockquotes all derive their colors from the five palette tokens (`bg`, `text`, `muted`, `border`, `accent`). There are no separate light/dark color paths — define your palette once and everything works in both modes:
+Code blocks, inline code, blockquotes, and all interactive features derive their colors from the five palette tokens (`bg`, `text`, `muted`, `border`, `accent`). There are no separate light/dark color paths — define your palette once and everything works in both modes:
 
 - **Code blocks** use `color-mix(var(--text) 7%, var(--bg))` as background with `var(--text)` for text
 - **Inline code** uses `color-mix(var(--accent) 10%, var(--bg))` as background with `var(--accent)` for text — so inline code always matches your theme's accent color
 - **Blockquotes** use `var(--accent)` for the left border and `var(--muted)` for text
+- **Sidenotes** use `var(--muted)` for text and `var(--border)` for the margin line
+- **Command palette** uses `var(--bg)` for the dialog, `var(--border)` for dividers, and `var(--accent)` for the active item highlight
+- **Code copy button** uses `var(--accent)` on hover, fades in with `var(--muted)` text
+- **Staleness notice** uses a subtle `var(--accent)` left border and tinted background
+- **Image zoom** uses a dark overlay that works regardless of theme mode
+- **Reading toast** uses `var(--bg)` with `var(--border)` for the floating notification
+- **Post graph** uses `var(--accent)` for nodes and lines, `var(--muted)` for labels
+- **Active TOC** highlights the current heading link with `var(--accent)`
 
 Themes only need to add a border or adjust spacing — colors come from the palette automatically.
 
