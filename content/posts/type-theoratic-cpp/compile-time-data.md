@@ -1,22 +1,74 @@
 ---
 title: "Compile-Time Data — When Values Become Types"
-date: 2026-03-29
+date: 2026-04-03
 slug: compile-time-data
 tags: [c++20, type-theory, constexpr, nttp, compile-time, dependent-types]
-excerpt: "C++20 lets you pass values as template parameters — strings, structs, even user-defined literals. When data enters the type system, the boundary between types and values dissolves, and the compiler becomes a computation engine."
+excerpt: "C++20 lets values enter the type system. This is the gateway to dependent types — Pi types, Sigma types, and the calculus of constructions. The compiler becomes a staged computation engine."
 ---
 
 Throughout this series, we have treated types and values as belonging to different worlds. Types live at compile time. Values live at runtime. The compiler reasons about types; the CPU processes values.
 
-C++20 blurs that line. Non-type template parameters (NTTPs) let you put *values* into the type system. A string can be a template parameter. A struct can be a template parameter. A compile-time-computed configuration object can be a template parameter. When this happens, the compiler does not just check types — it *computes with data* before the program runs.
+C++20 blurs that line. Non-type template parameters (NTTPs) let you put *values* into the type system. A string can be a template parameter. A struct can be a template parameter. When this happens, the compiler does not just check types — it *computes with data* before the program runs.
 
-This is the closest C++ gets to **dependent types** — types that depend on values. And it unlocks patterns that are impossible in any other mainstream systems language.
+This is the closest C++ gets to **dependent types** — and understanding what dependent types actually are reveals both the power and the limits of C++'s approach.
 
-This post builds on [post #9 on constexpr and consteval](/post/constexpr-consteval-and-compile-time) and connects directly to the [compile-time router](/post/router) in Loom, which uses every technique described here.
+## Dependent Types: The Real Theory
+
+In Martin-Löf type theory (1972), there are two fundamental type constructors beyond functions and pairs:
+
+### Pi Types (Π): Dependent Functions
+
+A **Pi type** `Π(x:A). B(x)` is a function where the *return type depends on the input value*. Not just on the input's type — on the actual value.
+
+In mathematics: "for all x in A, there exists a B(x)." The function takes an x and produces something whose type depends on x.
+
+In C++, the closest approximation:
+
+```cpp
+template<int N>
+auto make_array() -> std::array<int, N> {
+    return {};
+}
+```
+
+The return type `std::array<int, N>` depends on the *value* N. `make_array<5>()` returns `std::array<int, 5>`. `make_array<10>()` returns `std::array<int, 10>`. Different values, different return types. This is a Pi type — restricted to compile-time constants.
+
+In a fully dependently typed language (Agda, Idris), you could write:
+
+```
+make_array : (n : Nat) → Array Int n
+```
+
+Where `n` is a *runtime* value, and the return type still depends on it. C++ cannot do this — the template parameter must be `constexpr`. But within that restriction, Pi types are exactly what NTTPs give you.
+
+### Sigma Types (Σ): Dependent Pairs
+
+A **Sigma type** `Σ(x:A). B(x)` is a pair where the *second component's type depends on the first component's value*.
+
+The existential quantifier: "there exists an x in A such that B(x) holds." The pair carries both the witness x and the evidence B(x).
+
+C++ has no direct Sigma type. But consider:
+
+```cpp
+struct ParsedRoute {
+    bool is_static;
+    // If is_static == true, this is a static route with an exact path
+    // If is_static == false, this is a dynamic route with parameter positions
+    // The "type" of the rest depends on the value of is_static
+};
+```
+
+In a dependent type system, you would write:
+
+```
+ParsedRoute = Σ(b : Bool). if b then StaticData else DynamicData
+```
+
+In C++, we approximate this with variants or with compile-time branching via `if constexpr`.
 
 ## Non-Type Template Parameters
 
-Since C++98, templates have accepted non-type parameters — but only of a few types: integers, enums, pointers. C++20 opens this to *any structural type*: a class type where all members are public and themselves structural.
+Since C++98, templates accepted integers and enums as parameters. C++20 opens this to *any structural type*:
 
 ```cpp
 template<int N>
@@ -28,13 +80,11 @@ FixedArray<10> a;  // type encodes the size
 FixedArray<20> b;  // different type — different size
 ```
 
-`FixedArray<10>` and `FixedArray<20>` are different types. The value `10` is part of the type. The compiler knows the array size at compile time and can optimize accordingly — bounds checks can be eliminated, loops can be unrolled, the stack allocation is exact.
-
-This is ordinary and familiar. What C++20 adds is the ability to do this with *arbitrary data*.
+`FixedArray<10>` and `FixedArray<20>` are different types. The value `10` is part of the type. This IS a dependent type — a type that depends on a value. The restriction: the value must be known at compile time.
 
 ## Compile-Time Strings
 
-The key enabler for many patterns is the ability to use strings as template parameters. C++ does not allow `const char*` NTTPs directly (pointer identity is not a compile-time concept), but you can wrap a string in a structural type:
+The key enabler for advanced patterns is strings as template parameters:
 
 ```cpp
 template<size_t N>
@@ -47,16 +97,14 @@ struct Lit {
     }
 
     constexpr auto sv() const -> std::string_view {
-        return {data, N - 1};  // N includes null terminator
+        return {data, N - 1};
     }
 
     constexpr auto size() const -> size_t { return N - 1; }
 };
 ```
 
-`Lit` copies the string literal into a fixed-size array. Because the array size is part of the template parameter `N`, and the array contents are `constexpr`, the entire string lives in the type system.
-
-Now you can write:
+Now:
 
 ```cpp
 template<Lit path>
@@ -66,11 +114,11 @@ handle<"/api/users">();   // path is part of the type
 handle<"/api/orders">();  // different type — different path
 ```
 
-These are two different *instantiations* of `handle`, each specialized for a specific string. The compiler knows the string at compile time and can generate optimal code for each one — pattern matching via `if constexpr`, compile-time length checks, even compile-time parsing of the string contents.
+These are different *instantiations*, each specialized for a specific string. The compiler knows the string at compile time and can generate optimal code.
 
 ## Compile-Time Pattern Analysis
 
-Once strings are in the type system, you can analyze them at compile time. Loom's [router](/post/router) does exactly this:
+Once strings are in the type system, you can analyze them at compile time:
 
 ```cpp
 template<Lit Pattern>
@@ -86,15 +134,15 @@ struct Traits {
 };
 ```
 
-Given the pattern `"/post/:slug"`, the compiler evaluates at compile time: `is_static` is `false` (the pattern contains `:`), and `prefix_len` is 6 (the length of `"/post/"`). These are not runtime computations. They happen during compilation. The binary never contains the analysis code — only its results.
+Given `"/post/:slug"`, the compiler evaluates at compile time: `is_static` is `false`, `prefix_len` is 6. These are not runtime computations — they happen during compilation. The binary never contains the analysis code, only its results.
 
-This means routing dispatch can use `if constexpr`:
+Routing dispatch uses `if constexpr`:
 
 ```cpp
 template<Lit Pattern>
 auto match(std::string_view path) -> bool {
     if constexpr (Traits<Pattern>::is_static) {
-        return path == Pattern.sv();  // exact comparison
+        return path == Pattern.sv();
     } else {
         constexpr auto prefix = Pattern.sv().substr(0, Traits<Pattern>::prefix_len);
         return path.starts_with(prefix) && path.size() > prefix.size();
@@ -102,13 +150,19 @@ auto match(std::string_view path) -> bool {
 }
 ```
 
-The `if constexpr` selects the matching strategy *at compile time*. Static routes get exact string comparison. Dynamic routes get prefix matching. The dead branch is not compiled. At `-O2`, each route's matcher becomes a single comparison instruction or a short prefix check. No hash map, no trie, no runtime pattern analysis.
+The `if constexpr` selects the strategy *at compile time*. Static routes get exact comparison. Dynamic routes get prefix matching. The dead branch is not compiled.
 
-## Dependent Types (Almost)
+## The Lambda Cube Revisited
 
-In type theory, a **dependent type** is a type that depends on a value. The canonical example is a vector whose type includes its length: `Vec<int, 5>` is a different type than `Vec<int, 3>`, and a function that concatenates them returns `Vec<int, 8>`.
+In [part 1](/post/type-theoretic-foundations) we introduced the lambda cube. NTTPs push C++ further along the "types depending on terms" axis:
 
-C++ gets surprisingly close:
+| Axis | Lambda Cube | C++ Feature |
+|---|---|---|
+| Terms → Types | λ2 (System F) | `template<typename T>` |
+| Types → Types | λω (Higher-order) | `template<template<typename> typename F>` |
+| Terms → Types | λP (Dependent) | `template<int N>`, `template<Lit S>` |
+
+With NTTPs:
 
 ```cpp
 template<typename T, size_t N>
@@ -117,7 +171,7 @@ struct Vec {
 
     template<size_t M>
     constexpr auto concat(const Vec<T, M>& other) const -> Vec<T, N + M> {
-        Vec<T, N + M> result;
+        Vec<T, N + M> result{};
         for (size_t i = 0; i < N; ++i) result.data[i] = data[i];
         for (size_t i = 0; i < M; ++i) result.data[N + i] = other.data[i];
         return result;
@@ -129,13 +183,49 @@ struct Vec {
 };
 ```
 
-`Vec<int, 5>` and `Vec<int, 3>` are different types. `concat` returns `Vec<int, 8>` — the compiler computes `5 + 3` and encodes the result in the return type. The `head()` method has a `requires (N > 0)` constraint — calling it on an empty vector is a *compile error*, not a runtime error.
+`Vec<int, 5>` and `Vec<int, 3>` are different types. `concat` returns `Vec<int, 8>` — the compiler computes `5 + 3` in the *type*. The `head()` constraint `requires (N > 0)` makes calling it on an empty vector a compile error. This is a dependent type in action.
 
-This is not full dependent types (the sizes must be compile-time constants, not runtime values), but it is a remarkable approximation. The compiler tracks the length through operations and verifies constraints at every step.
+## The Calculus of Constructions
+
+The full **Calculus of Constructions** (Coquand and Huet, 1988) is the corner of the lambda cube where all three axes are present: terms depend on types, types depend on types, AND types depend on terms. It is the foundation of proof assistants like Coq.
+
+C++ has fragments of all three axes but none completely:
+
+- **Polymorphism**: full (templates can abstract over any type)
+- **Type constructors**: full (`template<template<typename> typename>`)
+- **Dependent types**: restricted (NTTPs must be `constexpr`)
+
+The restriction to compile-time constants is why C++ is not a dependently typed language. In the Calculus of Constructions, you can write `(n : Nat) → Vec n` where `n` is runtime. In C++, `N` in `Vec<T, N>` must be known at compilation. This keeps type checking decidable — in full dependent types, type checking can be undecidable (equivalent to the halting problem in the worst case).
+
+## Universes and Type-of-Types
+
+In type theory, types themselves have types. The type of `int` is `Type` (or `Set` or `*`). What is the type of `Type`? If `Type : Type`, you get Russell's paradox. The solution is a hierarchy:
+
+```
+int : Type₀
+Type₀ : Type₁
+Type₁ : Type₂
+...
+```
+
+C++ does not have explicit universes, but template-template parameters hint at the hierarchy:
+
+```cpp
+template<typename T>                          // T lives at level 0
+void f();
+
+template<template<typename> typename F>       // F lives at level 1 (takes types, returns types)
+void g();
+
+template<template<template<typename> typename> typename H>  // H lives at level 2
+void h();
+```
+
+Each nesting level is a step up the universe hierarchy. C++ does not enforce consistency between levels (no universe polymorphism), but the structure is there.
 
 ## Compile-Time Configuration
 
-NTTPs of struct type let you encode entire configuration objects in the type system:
+NTTPs of struct type encode entire configuration objects in the type system:
 
 ```cpp
 struct ServerConfig {
@@ -152,7 +242,6 @@ class Server {
 
 public:
     void run() {
-        // Config.port, Config.enable_tls, etc. are all constexpr
         if constexpr (Config.enable_tls) {
             init_tls();
         }
@@ -160,35 +249,41 @@ public:
     }
 };
 
-// Two completely different server types, optimized for their config
 using ProdServer = Server<ServerConfig{443, 10000, true, 8192}>;
 using DevServer = Server<ServerConfig{8080, 10, false, 1024}>;
 ```
 
-`ProdServer` and `DevServer` are different types. The TLS initialization code is only compiled into `ProdServer` — the `if constexpr` eliminates it entirely from `DevServer`. The buffer sizes are known at compile time, enabling stack allocation with exact sizes. The configuration is not read from a file at startup — it is embedded in the type and optimized by the compiler.
+`ProdServer` and `DevServer` are different types. TLS code is only compiled into `ProdServer`. Buffer sizes are compile-time constants enabling stack allocation.
 
-## Literal Operators and User-Defined Literals
+## Staging and Multi-Stage Programming
 
-C++ lets you define custom literal suffixes, enabling a syntax where values enter the type system through natural notation:
+`constexpr`/`consteval` is a form of **multi-stage programming**: code that generates code. Stage 0 (compile time) computes values. Stage 1 (runtime) uses them.
 
 ```cpp
-template<Lit S>
-constexpr auto operator""_path() {
-    // Compile-time validation: path must start with /
-    static_assert(S.sv().starts_with('/'), "paths must start with /");
-    return S;
+consteval auto checked_port(int port) -> int {
+    if (port < 1 || port > 65535)
+        throw "port out of range";  // compile error if triggered
+    return port;
 }
 
-// These are compile-time validated:
-constexpr auto api = "/api/users"_path;    // OK
-// constexpr auto bad = "api/users"_path;  // ERROR: paths must start with /
+constexpr auto PORT = checked_port(8080);   // validated at compile time
 ```
 
-The `static_assert` runs at compile time. An invalid path is not a runtime error — it is a compilation failure. The error message is clear and immediate.
+The `throw` in `consteval` causes a compilation failure, not a runtime exception. This is *staged validation*: the check runs in an earlier stage, and only valid results survive to the next stage.
+
+This connects to the theory of **MetaML** and **MetaOCaml** — languages designed around staged computation. C++ is arguably the most widely used staged programming language in the world. The stages are:
+
+1. **Template metaprogramming** — types computing with types
+2. **constexpr/consteval evaluation** — values computed at compile time
+3. **Template instantiation** — generic code specialized for specific types/values
+4. **Optimization** — dead code elimination, inlining, constant propagation
+5. **Runtime execution** — the actual program runs
+
+Steps 1-4 are all "compile time" from the programmer's perspective, but they are distinct computation stages. Type-theoretic C++ front-loads work into stages 1 and 2.
 
 ## Compile-Time Parsing
 
-When you combine `constexpr` functions with NTTPs, you can *parse* strings at compile time and encode the parse result in the type system:
+When you combine `constexpr` functions with NTTPs, you can parse strings at compile time:
 
 ```cpp
 struct Route {
@@ -213,76 +308,45 @@ struct CompiledRoute {
     static constexpr bool is_parameterized = info.has_param;
 };
 
-// The string "GET /post/:slug" is parsed at compile time:
 using PostRoute = CompiledRoute<"GET /post/:slug">;
 static_assert(PostRoute::method == "GET");
 static_assert(PostRoute::pattern == "/post/:slug");
 static_assert(PostRoute::is_parameterized == true);
 ```
 
-The parsing function `parse_route` is ordinary C++ — loops, string operations, conditionals. But because it is `constexpr` and its input is a compile-time string, the entire computation happens during compilation. The binary contains only the pre-parsed results. The parsing code is gone.
+The parsing is ordinary C++ — but it runs during compilation. The binary contains only the pre-parsed results. This is Loom's [router](/post/router) in action.
 
-This is what makes Loom's router possible. The route patterns are parsed, analyzed, and compiled into an optimal dispatch chain — all before the program runs.
+## The Phase Distinction: A Formal View
 
-## consteval: Forcing Compile Time
+In type theory, the **phase distinction** separates compile time from runtime. In a dependently typed language, this distinction blurs because types can depend on runtime values. C++ maintains a *strict* phase distinction: NTTPs must be `constexpr`.
 
-`constexpr` functions *can* run at compile time but are also valid at runtime. `consteval` functions *must* run at compile time — calling them with runtime arguments is an error:
+This is a deliberate tradeoff:
 
-```cpp
-consteval auto checked_port(int port) -> int {
-    if (port < 1 || port > 65535)
-        throw "port out of range";  // compile error if triggered
-    return port;
-}
+- **Strict phase distinction** (C++): type checking is decidable, compilation always terminates, runtime values cannot influence types
+- **No phase distinction** (Agda, Idris): types can depend on runtime values, but type checking may not terminate, and you need a totality checker
 
-constexpr auto PORT = checked_port(8080);   // OK — evaluated at compile time
-// constexpr auto BAD = checked_port(99999); // ERROR: "port out of range"
-```
+C++ chose decidability. The price is that `Vec<int, n>` where `n` is a runtime variable is impossible — you use `std::vector` instead. But within the compile-time boundary, you get genuine dependent typing.
 
-The `throw` in a `consteval` function does not throw at runtime — it causes a compilation failure with the error message. This turns `consteval` into a compile-time assertion mechanism with custom error messages.
+## The Limits
 
-This is the compile-time equivalent of the "parse, don't validate" pattern from [part 1](/post/type-theoretic-foundations). Instead of validating at runtime, you validate at compile time. The `checked_port` function is a proof that the port is in range. If it returns, the value is valid. If it does not, the program does not compile.
+C++ compile-time data works for:
 
-## The Computation Phase
-
-When you combine everything — `constexpr` functions, compile-time strings, NTTPs of struct type, `consteval`, `if constexpr` — the compiler becomes a computation engine that runs a program before the program runs.
-
-The phases of a C++20 program:
-
-1. **Compile-time computation** — `constexpr`/`consteval` functions evaluate, NTTPs are instantiated, `if constexpr` selects branches, `static_assert` checks invariants
-2. **Template instantiation** — generic code is specialized for specific types and values
-3. **Optimization** — the compiler eliminates dead code, inlines functions, propagates constants
-4. **Code generation** — machine code is emitted for what remains
-5. **Runtime execution** — the actual program runs
-
-Steps 1-4 are all "compile time" from the programmer's perspective, but they are distinct phases. Type-theoretic C++ front-loads as much work as possible into steps 1 and 2, so that by step 5, the program is a lean, pre-computed artifact with no unnecessary generality.
-
-## The Limit of the Approach
-
-C++ is not a dependently-typed language. The values that enter the type system must be compile-time constants. You cannot write `Vec<int, n>` where `n` is a runtime variable (that would be `std::vector`). You cannot parse a user-provided string at compile time (the string must be a literal).
-
-This is a real limitation. It means compile-time data techniques work for:
-
-- Configuration that is known at build time
+- Configuration known at build time
 - Protocol definitions, route tables, schema descriptions
-- Literal constants (port numbers, regex patterns, format strings)
+- Literal constants (ports, regex patterns, format strings)
 - Code generation based on fixed structure
 
 But not for:
 
-- User input
-- Network data
-- File contents (unless embedded at build time)
+- User input, network data, file contents
 - Anything determined at runtime
 
-The art is knowing where the boundary falls and designing your system so that as much structure as possible lives on the compile-time side.
+The art is knowing where the boundary falls and designing so that as much structure as possible lives on the compile-time side. Everything decided at compile time is a decision that never costs a cycle at runtime, never fails in production, never depends on external state.
 
 ## Closing: The Compiler as an Interpreter
 
-The traditional view: the compiler translates source code into machine code. The type-theoretic view: the compiler *runs a program* (the type-level program) and then emits the result.
+The traditional view: the compiler translates source to machine code. The type-theoretic view: the compiler *executes a program* (the type-level program) and emits the result.
 
-When you write `constexpr auto x = parse_route("GET /post/:slug")`, you are not asking the compiler to "optimize" a runtime computation. You are asking it to execute a program and embed the result in the binary. The compilation process *is* execution — just in a different phase.
+When you write `constexpr auto x = parse_route("GET /post/:slug")`, you are asking the compiler to run a program and embed the result in the binary. Compilation IS execution — in an earlier stage. This is dependent types in practice: values computed at one stage become type-level data at the next.
 
-This changes how you think about program structure. Instead of "write code that runs fast," you think: "what can I compute *before* the program starts?" Every decision made at compile time is a decision that never costs a cycle at runtime, never fails in production, never depends on external state.
-
-In the [final post](/post/type-safe-protocol) of this series, we put every technique together — phantom types, typestate, concepts, compile-time data — to build a real, type-safe protocol stack where the compiler verifies the entire interaction sequence before a single byte crosses the wire.
+In the [next post](/post/parametricity), we explore one of the most beautiful results in type theory — parametricity and free theorems: what you can prove about a function from nothing but its type signature.

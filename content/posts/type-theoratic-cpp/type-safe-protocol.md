@@ -1,36 +1,41 @@
 ---
-title: "Building a Type-Safe Protocol — Putting It All Together"
-date: 2026-03-29
+title: "Building a Type-Safe Protocol — The Grand Synthesis"
+date: 2026-04-07
 slug: type-safe-protocol
 tags: [c++20, type-theory, typestate, protocols, compile-time, capstone]
-excerpt: "We combine every technique from this series — phantom types, typestate, concepts, compile-time data — to build a compile-time verified protocol where misordering, missing steps, and invalid transitions are type errors, not runtime surprises."
+excerpt: "We combine every technique from this series — algebraic types, phantom types, typestate, concepts, compile-time data, parametricity, linear logic, F-algebras — to build a compile-time verified protocol where violations are type errors, not runtime surprises."
 ---
 
-This is the final post in the series. We have built up a vocabulary: [algebraic types](/post/algebraic-data-types) to model domain data, [phantom types](/post/phantom-types) to distinguish semantically different values, [typestate](/post/typestate-programming) to encode state machines, [concepts](/post/concepts-as-logic) to express logical predicates, and [compile-time data](/post/compile-time-data) to push computation before runtime.
+This is the final post in the series. Over nine posts, we have built a vocabulary:
 
-Now we put them all together. We will build a type-safe HTTP client where the compiler verifies the entire request lifecycle: you must connect before sending, send before receiving, provide required headers, and close when done. Violating any of these rules is not a runtime error — it is a type error that prevents compilation.
+- [Algebraic types](/post/algebraic-data-types) to model domain data with semiring arithmetic
+- [Phantom types](/post/phantom-types) to create zero-cost distinctions via parametricity
+- [Typestate](/post/typestate-programming) to encode state machines grounded in linear logic
+- [Concepts](/post/concepts-as-logic) as propositions in intuitionistic natural deduction
+- [Compile-time data](/post/compile-time-data) for dependent types and staged computation
+- [Parametricity](/post/parametricity) for free theorems and reasoning from type signatures
+- [Substructural types](/post/substructural-types) for resource management via affine logic
+- [Recursive types](/post/recursive-types-and-fixed-points) as fixed points with catamorphisms
 
-This is not a toy example. The patterns here are the same ones used in Loom's internal architecture, and they scale to real protocol implementations.
+Now we put them all together. We will build a type-safe HTTP client where the compiler verifies the entire request lifecycle. Violating any rule is a type error, not a runtime exception.
 
 ## The Protocol
-
-Our HTTP client has this lifecycle:
 
 ```
 Idle → Connected → HeadersSent → BodySent → ResponseReceived → Done
 ```
 
-With constraints:
-- You must set `Host` and `Content-Type` headers before sending
+Constraints:
+- You must set `Host` and `Content-Type` before sending
 - You can only read the response after the full request is sent
-- After reading the response, the connection must be closed
-- Connections cannot be reused (HTTP/1.0 style, for simplicity)
+- After reading, the connection must be closed
+- Connections cannot be reused
 
-In a traditional implementation, each of these constraints is a runtime check. In our implementation, each is a compile-time guarantee.
+In a traditional implementation, each constraint is a runtime check. In ours, each is a compile-time guarantee.
 
-## Step 1: State Types (Typestate)
+## Step 1: State Types (Typestate + Algebraic Types)
 
-We define a type for each protocol state. Each type carries exactly the data relevant to that state — nothing more:
+Each state is a type carrying exactly the data relevant to that state — a product type ([part 2](/post/algebraic-data-types)) whose fields are faithful to the domain:
 
 ```cpp
 struct Idle {};
@@ -56,11 +61,13 @@ struct ResponseReceived {
 };
 ```
 
-`Idle` has no socket — you have not connected yet. `Connected` has a socket but no header state. `HeadersSent` tracks which required headers have been set. `BodySent` has sent everything and is waiting. `ResponseReceived` has the response data. Each state is a faithful representation of what exists at that point in the protocol.
+`Idle` has no socket — you have not connected. `Connected` has a socket but no header state. `ResponseReceived` has the full response. No dead fields. The cardinality of each type matches the domain.
 
-## Step 2: Phantom Tags for Header Requirements (Phantom Types)
+Through the substructural lens ([part 8](/post/substructural-types)): each state value is *affine* — it can be consumed (moved into a transition) or discarded (destructor cleanup), but not copied. This prevents two parts of the code from holding the same connection in different states.
 
-We need the compiler to track which headers have been set. We use phantom types:
+## Step 2: Phantom Tags for Header Requirements (Phantom Types + Parametricity)
+
+We need the compiler to track which headers have been set. Two independent boolean axes — perfect for phantom types:
 
 ```cpp
 struct NoHost {};
@@ -75,11 +82,13 @@ struct Headers {
 };
 ```
 
-`Headers<NoHost, NoCT>` means no required headers are set. `Headers<HasHost, NoCT>` means Host is set but Content-Type is not. `Headers<HasHost, HasCT>` means both are set. These are four different types, and only the last one can proceed to sending the body.
+`Headers<NoHost, NoCT>` means no required headers set. `Headers<HasHost, HasCT>` means both set. Four distinct types, same runtime layout.
 
-## Step 3: Transition Functions (Typestate + Move Semantics)
+Through parametricity ([part 7](/post/parametricity)): functions generic in `HostState` and `CTState` cannot inspect the phantom tags. They must propagate them faithfully. `set_header<HS, CS>` (for optional headers) preserves whatever state the phantoms encode — parametricity *guarantees* it cannot corrupt the tags.
 
-Each protocol step is a function that consumes the current state and produces the next:
+## Step 3: Transition Functions (Linear Logic)
+
+Each transition consumes the current state and produces the next — the linear implication A ⊸ B from [part 4](/post/typestate-programming):
 
 ```cpp
 auto connect(Idle, std::string_view host, int port) -> Headers<NoHost, NoCT> {
@@ -104,7 +113,6 @@ auto set_content_type(Headers<HostState, NoCT> h, std::string_view ct)
     return Headers<HostState, HasCT>{h.socket_fd, std::move(h.entries)};
 }
 
-// Optional headers — don't change the phantom state
 template<typename HS, typename CS>
 auto set_header(Headers<HS, CS> h, std::string key, std::string value)
     -> Headers<HS, CS>
@@ -114,24 +122,18 @@ auto set_header(Headers<HS, CS> h, std::string key, std::string value)
 }
 ```
 
-Notice how the phantom types flow through the transitions. `set_host` changes `NoHost` to `HasHost` but preserves `CTState` — whatever the Content-Type state was before, it remains the same. `set_content_type` changes `NoCT` to `HasCT` but preserves `HostState`. These are independent axes of the type, and each function affects only the axis it is responsible for.
+Notice the phantom type flow: `set_host` changes `NoHost → HasHost` but preserves `CTState`. `set_content_type` changes `NoCT → HasCT` but preserves `HostState`. Independent axes, independently tracked. And `set_host` only accepts `Headers<NoHost, _>` — setting Host twice is a type error.
 
-Also notice: `set_host` only accepts `Headers<NoHost, _>`. You cannot set Host twice — the type changes after the first call, and the function does not match `Headers<HasHost, _>`. Double-setting is a compile error.
+Each function takes its input by value: `Idle` consumed by `connect`, `Headers<NoHost, _>` consumed by `set_host`. These are linear implications. The `std::move` makes the consumption explicit.
 
-## Step 4: The Gate (Concepts)
+## Step 4: The Gate (Concepts as Logic)
 
-Sending the body requires both headers to be set. We express this with a concept:
+Sending the body requires both headers. This is a concept — a proposition in intuitionistic logic ([part 5](/post/concepts-as-logic)):
 
 ```cpp
-template<typename T>
-concept ReadyToSend = requires {
-    requires std::same_as<T, Headers<HasHost, HasCT>>;
-};
-
 auto send_body(Headers<HasHost, HasCT> h, std::string_view method,
                std::string_view path, std::string_view body) -> BodySent
 {
-    // Serialize and send the HTTP request
     std::string request;
     request += method; request += " "; request += path; request += " HTTP/1.0\r\n";
     for (const auto& [key, value] : h.entries) {
@@ -147,7 +149,7 @@ auto send_body(Headers<HasHost, HasCT> h, std::string_view method,
 }
 ```
 
-The function signature *is* the constraint: it only accepts `Headers<HasHost, HasCT>`. If you pass `Headers<HasHost, NoCT>`, the template deduction fails. The error message will say something like "no matching function for call to `send_body`" — and the types in the error tell you exactly what is missing.
+The function signature IS the constraint: `Headers<HasHost, HasCT>`. This is conjunction in natural deduction — both `HasHost` AND `HasCT` must be proven (established by the respective set functions). The compiler checks the proof at the call site.
 
 ## Step 5: Response and Cleanup
 
@@ -162,7 +164,7 @@ auto close(ResponseReceived r) -> void {
 }
 ```
 
-Each function consumes its input by value. After `receive(std::move(sent))`, the `BodySent` value is gone. You cannot receive twice. After `close(std::move(resp))`, the `ResponseReceived` value is gone. You cannot close twice. The protocol is linear.
+Each function consumes its input by value. The protocol is linear — each state value is used exactly once.
 
 ## The Complete Usage
 
@@ -178,12 +180,12 @@ std::cout << "Status: " << resp.status_code << "\n" << resp.body << "\n";
 close(std::move(resp));
 ```
 
-Each line advances the protocol by one step. The types change at each step. The compiler verifies the entire sequence.
+Each line advances the protocol by one step. The types change at each step.
 
-Now watch what happens when you violate the protocol:
+## Protocol Violations Are Type Errors
 
 ```cpp
-// Forgot to set Content-Type:
+// Forgot Content-Type:
 auto hdrs = connect(Idle{}, "example.com", 80);
 hdrs = set_host(std::move(hdrs), "example.com");
 send_body(std::move(hdrs), "GET", "/", "");
@@ -198,18 +200,16 @@ receive(std::move(hdrs));
 ```
 
 ```cpp
-// Tried to set Host twice:
+// Set Host twice:
 auto hdrs = connect(Idle{}, "example.com", 80);
 hdrs = set_host(std::move(hdrs), "example.com");
 hdrs = set_host(std::move(hdrs), "other.com");
 // ERROR: set_host() takes Headers<NoHost, _>, but hdrs is Headers<HasHost, _>
 ```
 
-Every violation is a type error. The error messages are not cryptic template vomit — they name the specific state types involved, making the problem clear.
+Every violation is a type error. The error messages name the specific state types.
 
-## Making It Ergonomic: The Fluent Interface
-
-Free functions work but are verbose. We can wrap the protocol in a fluent builder:
+## The Fluent Interface
 
 ```cpp
 template<typename State>
@@ -218,17 +218,19 @@ class HttpClient {
 public:
     explicit HttpClient(State s) : state_(std::move(s)) {}
 
-    auto set_host(std::string_view host) -> HttpClient<Headers<HasHost, /* CT preserved */>>
-        requires /* State is Headers<NoHost, _> */;
+    auto set_host(std::string_view host) &&
+        -> HttpClient<Headers<HasHost, typename deduce_ct<State>::type>>
+        requires is_headers_no_host<State>;
 
-    auto set_content_type(std::string_view ct) -> HttpClient<Headers</* Host preserved */, HasCT>>
-        requires /* State is Headers<_, NoCT> */;
+    auto set_content_type(std::string_view ct) &&
+        -> HttpClient<Headers<typename deduce_host<State>::type, HasCT>>
+        requires is_headers_no_ct<State>;
 
-    auto send(std::string_view method, std::string_view path, std::string_view body)
+    auto send(std::string_view method, std::string_view path, std::string_view body) &&
         -> HttpClient<BodySent>
         requires std::same_as<State, Headers<HasHost, HasCT>>;
 
-    auto receive() -> HttpClient<ResponseReceived>
+    auto receive() && -> HttpClient<ResponseReceived>
         requires std::same_as<State, BodySent>;
 
     auto response() const -> const ResponseReceived&
@@ -236,7 +238,7 @@ public:
 };
 ```
 
-Usage becomes:
+Usage:
 
 ```cpp
 auto resp = HttpClient(connect(Idle{}, "example.com", 80))
@@ -247,11 +249,11 @@ auto resp = HttpClient(connect(Idle{}, "example.com", 80))
     .response();
 ```
 
-Each method returns a new `HttpClient` with a different state parameter. The chain reads like prose: connect, set headers, send, receive. And any misordering is caught at the exact point of misuse.
+The `&&` qualifier on methods means they consume the client — each call produces a new `HttpClient` with a different state type.
 
-## Adding Compile-Time Route Definitions
+## Adding Compile-Time Routes (Dependent Types)
 
-We can go further and define the API schema at compile time using the techniques from [part 6](/post/compile-time-data):
+Using the techniques from [part 6](/post/compile-time-data):
 
 ```cpp
 template<Lit Method, Lit Path>
@@ -262,7 +264,6 @@ struct Endpoint {
 
 using GetUsers = Endpoint<"GET", "/api/users">;
 using CreateUser = Endpoint<"POST", "/api/users">;
-using GetUser = Endpoint<"GET", "/api/users/:id">;
 
 template<typename E>
 concept HasBody = (E::method == "POST" || E::method == "PUT" || E::method == "PATCH");
@@ -282,73 +283,85 @@ auto request(Headers<HasHost, HasCT> h) -> BodySent
 }
 ```
 
-Now you define endpoints once and the compiler ensures you only send a body with POST/PUT/PATCH. A `request<GetUsers>(headers, "some body")` would fail to compile because GET endpoints do not have a body concept.
+Endpoints are compile-time values (Pi types — types depending on values). The `HasBody` concept is a proposition evaluated at compile time on the endpoint's method string. A `request<GetUsers>(headers, "body")` fails — GET does not have a body.
 
-## The Cost
+## The Cost: Zero
 
-What does all of this cost at runtime? Nothing. Every phantom type is an empty struct. Every state type compiles to its data fields only. The template instantiation produces the same machine code as a hand-written version without types. The `std::move` calls compile away. The concept checks are compile-time only.
+Every phantom type is an empty struct. Every state type compiles to its data fields. Template instantiation produces the same machine code as hand-written C. The `std::move` calls compile away. Concept checks are compile-time only.
 
-At `-O2`, the entire protocol sequence — connect, set headers, serialize request, send, receive, close — compiles to the same instructions as a hand-written C implementation that does the same steps in order. The type machinery is a compile-time scaffold that vanishes in the binary.
+At `-O2`, the entire protocol compiles to the same instructions as a hand-written implementation with no type safety. The type machinery is scaffolding that vanishes in the binary.
 
-## Comparison: What We Gained
+## Comparison
 
 | Property | Runtime Checks | Type-Safe Protocol |
 |---|---|---|
 | Missing required header | Runtime exception | Compile error |
 | Wrong method order | Runtime exception | Compile error |
-| Double close | Runtime guard clause | Type error (moved-from) |
+| Double close | Runtime guard | Type error (moved-from) |
 | Receive before send | Runtime assertion | Type error |
-| Error discoverability | Requires test coverage | Immediate at compile time |
+| Discoverability | Requires tests | Immediate at compile time |
 | Runtime cost | Check on every call | Zero |
-| Documentation | External (comments, docs) | The types *are* the docs |
-
-The type-safe version catches every protocol violation at compile time, has zero runtime overhead, and is self-documenting — the function signatures tell you exactly what state is required and what state is produced.
+| Documentation | Comments, docs | The types ARE the docs |
 
 ## The Design Recipe
 
-We can now formalize the approach used throughout this series into a recipe for type-safe protocol design:
+1. **Enumerate the states.** Each state becomes a type with exactly the data relevant to that state. (Algebraic types — [part 2](/post/algebraic-data-types))
 
-1. **Enumerate the states.** Draw the state machine. Each state becomes a type. Each type carries the data relevant to that state and nothing more.
+2. **Identify independent axes.** Use phantom types for boolean requirements that can be set independently. (Phantom types — [part 3](/post/phantom-types))
 
-2. **Define transitions as functions.** Each transition consumes the source state (by value/move) and produces the target state. The function signature *is* the transition specification.
+3. **Define transitions as consuming functions.** Each transition takes the source state by value (move) and returns the target state. (Typestate + linear logic — [part 4](/post/typestate-programming), [part 8](/post/substructural-types))
 
-3. **Use phantom types for independent axes.** If there are multiple independent requirements (like "has Host" and "has Content-Type"), use phantom parameters so each axis can be set independently.
+4. **Gate critical transitions with concepts.** Entry to irreversible operations requires a concept that encodes all prerequisites. (Concepts as logic — [part 5](/post/concepts-as-logic))
 
-4. **Gate critical transitions with concepts.** The entry to dangerous or irreversible operations (sending data, committing a transaction) should require a concept that encodes all prerequisites.
+5. **Use compile-time data for static structure.** Route patterns, endpoint definitions, configuration known at build time. (Compile-time data — [part 6](/post/compile-time-data))
 
-5. **Use compile-time data for static structure.** Route patterns, endpoint definitions, configuration — anything known at build time should be a template parameter, not a runtime value.
+6. **Keep tag-generic code parametric.** Functions that do not need to inspect phantom tags should be generic in them — parametricity guarantees safety. (Parametricity — [part 7](/post/parametricity))
 
-6. **Move to enforce linearity.** Pass state by value and use `std::move` so that each state value is used exactly once. This prevents aliasing and ensures the protocol advances monotonically.
+7. **Use the substructural hierarchy.** Move-only types for affine resources, `[[nodiscard]]` for must-use return values, deleted copy constructors to prevent aliasing. (Substructural types — [part 8](/post/substructural-types))
 
-## Beyond HTTP: Where This Applies
+## Beyond HTTP
 
 The patterns generalize to any sequential protocol:
 
 - **Database transactions**: Begin → Execute* → Commit/Rollback
 - **File I/O**: Open → Read/Write* → Close
-- **Authentication flows**: Unauthenticated → Challenged → Authenticated/Denied
+- **Authentication**: Unauthenticated → Challenged → Authenticated/Denied
 - **Build systems**: Configure → Compile → Link → Package
 - **Payment processing**: Cart → Checkout → Payment → Confirmed/Failed
 - **TLS handshake**: ClientHello → ServerHello → KeyExchange → Established
 
-Any protocol with ordered steps and preconditions can be encoded this way. The types are the states. The functions are the transitions. The compiler is the verifier.
+Any protocol with ordered steps and preconditions can be encoded this way.
 
-## Closing: The World the Compiler Sees
+## The Journey
 
-We started this series with a provocation: *a program is a theory*. Over six posts, we built that idea into a practical methodology:
+We started with a provocation: *a program is a theory*. Over ten posts, we built that into a practical methodology grounded in real type theory:
 
-- Types are not just data containers — they are **propositions** about the domain ([part 1](/post/type-theoretic-foundations))
-- Products and sums give types an **algebra** that matches the structure of the domain ([part 2](/post/algebraic-data-types))
-- Phantom types create **zero-cost distinctions** the compiler can enforce ([part 3](/post/phantom-types))
-- Typestate turns state machines into **type-level protocols** where violations are compile errors ([part 4](/post/typestate-programming))
-- Concepts are **logical predicates** that compose according to propositional logic ([part 5](/post/concepts-as-logic))
-- Compile-time data blurs the boundary between types and values, letting the compiler **compute** before the program runs ([part 6](/post/compile-time-data))
-- And in this post, we combined them all into a **self-verifying protocol** with zero runtime cost
+1. **Types are propositions.** Values are proofs. The compiler is a theorem prover. ([Part 1](/post/type-theoretic-foundations) — type judgments, Curry-Howard, formation/introduction/elimination rules)
 
-The compiler is not your enemy. It is not a gatekeeping bureaucrat that exists to reject your code. It is a collaborator — one that is perfectly precise, infinitely patient, and incapable of forgetting a rule. The more information you give it through your types, the more work it can do for you.
+2. **Types have algebra.** Products multiply, sums add, the distributive law lets you factor. Recursive types are fixed points. Folds are catamorphisms. ([Part 2](/post/algebraic-data-types), [Part 9](/post/recursive-types-and-fixed-points) — semirings, initial algebras, F-algebras)
+
+3. **Phantoms encode invisible truths.** Zero-cost type distinctions, safe because parametricity prevents tag inspection. ([Part 3](/post/phantom-types) — representation independence, proof witnesses)
+
+4. **State lives in types.** Transitions consume and produce. Linear logic ensures resources are tracked. ([Part 4](/post/typestate-programming) — linear implication, session types)
+
+5. **Concepts are logic.** Natural deduction with introduction and elimination rules. Intuitionistic: constructive proofs only. ([Part 5](/post/concepts-as-logic) — BHK interpretation, modus ponens via subsumption)
+
+6. **Values enter types.** Dependent typing through NTTPs. The compiler is a staged computation engine. ([Part 6](/post/compile-time-data) — Pi types, Sigma types, the lambda cube, multi-stage programming)
+
+7. **Types constrain behavior.** Parametricity gives theorems from signatures alone. The less a function can do, the more you know. ([Part 7](/post/parametricity) — Reynolds, free theorems, naturality)
+
+8. **Resources demand discipline.** Affine types prevent duplication. Linear types ensure consumption. RAII is substructural logic in practice. ([Part 8](/post/substructural-types) — Girard's linear logic, structural rules)
+
+9. **Data is algebra.** Recursive types are fixed points. Every fold is a catamorphism. Every unfold is an anamorphism. ([Part 9](/post/recursive-types-and-fixed-points) — mu types, F-algebras, hylomorphisms)
+
+## Closing: Does It Compile?
+
+The compiler is not your enemy. It is not a gatekeeping bureaucrat that exists to reject your code. It is a collaborator — perfectly precise, infinitely patient, incapable of forgetting a rule. The more information you give it through your types, the more work it does for you.
 
 The question is no longer "will this code work?" The question is: **does it compile?**
 
-If it compiles, the protocol is followed. The states are consistent. The transitions are valid. The invariants hold. And the runtime is free to focus on the one thing that genuinely requires execution: interacting with the real world.
+If it compiles, the protocol is followed. The states are consistent. The transitions are valid. The invariants hold. The resources are tracked. The phantoms are propagated. The proofs are checked. And the runtime is free to focus on the one thing that genuinely requires execution: interacting with the real world.
+
+A program is a theory. The types are its axioms. The functions are its theorems. The compiler is its proof checker. And when the proof checks out — when the types align, the states match, the concepts are satisfied — you have not just written code that works. You have built a system that *cannot work any other way*.
 
 That is the beauty of type-theoretic C++.

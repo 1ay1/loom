@@ -1,20 +1,29 @@
 ---
 title: "Concepts as Logic — Propositions, Proofs, and Predicates"
-date: 2026-03-29
+date: 2026-04-02
 slug: concepts-as-logic
-tags: [c++20, type-theory, concepts, logic, curry-howard]
-excerpt: "C++20 concepts are more than template constraints. They are propositions about types. A requires-expression is a proof sketch. Concept composition follows the rules of propositional logic. This is the Curry-Howard correspondence, hiding in plain sight."
+tags: [c++20, type-theory, concepts, logic, curry-howard, natural-deduction]
+excerpt: "C++20 concepts are propositions in intuitionistic logic. Requires-expressions are constructive proofs. Subsumption is modus ponens. This is natural deduction, hiding in your compiler."
 ---
 
-So far in this series we have used the type system to encode *values* (algebraic types), *identity* (phantom types), and *state* (typestate). Now we turn to a different question: what can we say *about* types themselves?
+So far in this series we have used the type system to encode *values* ([algebraic types](/post/algebraic-data-types)), *identity* ([phantom types](/post/phantom-types)), and *state* ([typestate](/post/typestate-programming)). Now we turn to a different question: what can we say *about* types themselves?
 
-C++20 concepts let you name predicates over types. `Sortable`, `Hashable`, `Serializable` — these are statements about what a type can do. But viewed through a type-theoretic lens, concepts are something deeper. They are **propositions**. A concept is a statement. A type that satisfies a concept is a **witness** — evidence that the statement holds. And the rules for combining concepts — conjunction, disjunction, subsumption — follow the rules of propositional logic.
+C++20 concepts let you name predicates over types. But viewed through a type-theoretic lens, concepts are something deeper. They are **propositions** in a formal logic — specifically, in **intuitionistic logic**. A type that satisfies a concept is a **witness**. The rules for combining concepts follow **natural deduction**. And the compiler's overload resolution implements **modus ponens**.
 
-This post builds directly on [post #10 on concepts and constraints](/post/concepts-and-constraints) from the C++ series. We will use the same syntax but examine it through a different frame.
+This post builds on [post #10 on concepts and constraints](/post/concepts-and-constraints) from the C++ series. Same syntax, different frame.
 
-## A Concept Is a Predicate
+## Natural Deduction: The Framework
 
-At the simplest level, a concept is a compile-time predicate: a question you ask about a type that has a yes-or-no answer.
+To understand concepts as logic, we need the framework of **natural deduction**, introduced by Gerhard Gentzen in 1935. Natural deduction has two kinds of rules for each logical connective:
+
+- **Introduction rules**: how to *prove* a proposition
+- **Elimination rules**: how to *use* a proof
+
+This mirrors exactly the formation/introduction/elimination pattern from [part 1](/post/type-theoretic-foundations). Logic and type theory share the same structure — that is the Curry-Howard correspondence.
+
+## A Concept Is a Proposition
+
+At the simplest level, a concept is a compile-time predicate:
 
 ```cpp
 template<typename T>
@@ -23,13 +32,11 @@ concept Printable = requires(T a, std::ostream& os) {
 };
 ```
 
-This is the proposition: "For type T, there exists a way to stream a T value to an ostream." For `int`, this is true — the standard library defines `operator<<(ostream&, int)`. For a random user-defined struct with no streaming operator, it is false.
+This is the proposition: "For type T, there exists a way to stream T to an ostream." For `int`, this is true. For a random struct with no `operator<<`, it is false.
 
-In logic, we might write: `Printable(T) ≡ ∃ (os << a)` for values of type T. The `requires` expression is the evidence — it shows *how* the predicate is satisfied.
+### Requires-Expressions as Constructive Proofs
 
-## Requires-Expressions as Proof Sketches
-
-A requires-expression does not execute code. It asks: "would this code compile?" The compiler checks the expression's well-formedness without running it.
+A requires-expression does not execute code. It asks: "would this code compile?" The compiler checks well-formedness without running anything.
 
 ```cpp
 template<typename T>
@@ -41,24 +48,72 @@ concept Container = requires(T c) {
 };
 ```
 
-Each line in the requires-expression is a *proof obligation*: the type must provide `begin()` returning an iterator, `end()` returning a compatible sentinel, `size()` returning something convertible to `size_t`, and a nested `value_type` alias. If any line fails, the concept is not satisfied and any function constrained by it becomes invisible to overload resolution.
+Each line is a **proof obligation**: the type must provide `begin()` returning an iterator, `end()` returning a compatible sentinel, `size()` returning something convertible to `size_t`, and a nested `value_type`.
 
-This is remarkably close to a formal proof in constructive logic. You don't prove a proposition by arguing abstractly — you prove it by *constructing* a witness. The requires-expression says: "here are the things that must be constructible," and the compiler checks each one.
+This is remarkably close to a proof in constructive logic. You do not prove a proposition by arguing abstractly — you prove it by *constructing* a witness. The requires-expression says: "here are the things that must be constructible." The compiler checks each one.
 
-## Logical Connectives
+## Intuitionistic Logic: Why It Matters
 
-Concepts compose according to the rules of propositional logic:
+C++ concepts live in **intuitionistic logic**, not classical logic. This is a crucial distinction.
 
-### Conjunction (AND)
+In **classical logic**, the law of excluded middle holds: `A ∨ ¬A` is always true. Either a proposition is true or its negation is true. Double negation elimination holds: `¬¬A → A`.
+
+In **intuitionistic logic**, these do not hold. To prove `A ∨ B`, you must *construct* a proof of A or a proof of B — you cannot just say "one of them must be true." To prove A, you must construct it directly — knowing that `¬A` leads to contradiction is not enough.
+
+Why does this matter for C++? Because concept satisfaction is *constructive*. The compiler does not reason "either T satisfies Container or it doesn't" — it *checks*. It attempts to construct the proof (verify each requires-clause). If construction succeeds, the concept is satisfied. If it fails, the concept is not satisfied. There is no middle ground.
+
+The practical consequence: **concept negation is limited**. You can write:
+
+```cpp
+template<typename T>
+concept NotPointer = !std::is_pointer_v<T>;
+```
+
+But `!(!Concept<T>)` is NOT the same as `Concept<T>` in the compiler's subsumption logic. Double negation elimination fails. This is not a compiler bug — it is a faithful implementation of intuitionistic logic.
+
+## The BHK Interpretation
+
+The **Brouwer-Heyting-Kolmogorov interpretation** gives constructive meaning to each logical connective:
+
+- A proof of **A ∧ B** is a pair: (proof of A, proof of B)
+- A proof of **A ∨ B** is a tagged value: either (left, proof of A) or (right, proof of B)
+- A proof of **A → B** is a function: given a proof of A, produce a proof of B
+- There is **no proof of ⊥** (falsity)
+- A proof of **¬A** is a function from A to ⊥ (a proof that A leads to contradiction)
+
+This IS the Curry-Howard correspondence:
+
+| BHK (Logic) | Type Theory | C++ |
+|---|---|---|
+| Proof of A ∧ B | Pair (A, B) | `std::pair<A, B>`, struct |
+| Proof of A ∨ B | Tagged union | `std::variant<A, B>` |
+| Proof of A → B | Function A → B | `auto f(A) -> B` |
+| Proof of ⊤ (truth) | Unit value | `std::monostate{}` |
+| Proof of ⊥ (falsity) | — (impossible) | `std::variant<>` (uninhabitable) |
+| Proof of ¬A | Function A → ⊥ | `auto f(A) -> void` (approximation) |
+| Proof of ∀x. P(x) | Generic function | `template<Concept T> auto f(T)` |
+| Proof of ∃x. P(x) | Existential package | Type erasure |
+
+## Logical Connectives in Concepts
+
+### Conjunction (AND) — Introduction and Elimination
 
 ```cpp
 template<typename T>
 concept PrintableContainer = Container<T> && Printable<T>;
 ```
 
-`PrintableContainer(T)` holds if and only if both `Container(T)` and `Printable(T)` hold. This is logical conjunction. A type must satisfy both predicates.
+**Introduction**: to prove `PrintableContainer<T>`, you need proofs of both `Container<T>` and `Printable<T>`. In natural deduction:
 
-### Disjunction (OR)
+```
+  Container<T>    Printable<T>
+  ─────────────────────────────  (∧-intro)
+    PrintableContainer<T>
+```
+
+**Elimination**: from `PrintableContainer<T>`, you can derive either conjunct. A function constrained by `PrintableContainer<T>` can use T as both a container and a printable type.
+
+### Disjunction (OR) — Introduction and Elimination
 
 ```cpp
 template<typename T>
@@ -67,36 +122,13 @@ concept StringLike = std::same_as<T, std::string>
                   || std::convertible_to<T, std::string_view>;
 ```
 
-`StringLike(T)` holds if any of the three sub-propositions hold. A type need only satisfy one.
+**Introduction**: proving any disjunct proves the disjunction. `std::string` satisfies `StringLike` because it satisfies the first alternative.
 
-### Negation (NOT)
+**Elimination**: you must handle all cases. In practice, concept disjunction is used for overload sets where any matching branch suffices.
 
-C++ does not have a built-in concept negation operator. You can write:
+### Implication — Subsumption
 
-```cpp
-template<typename T>
-concept NotPointer = !std::is_pointer_v<T>;
-```
-
-But negation in concept subsumption is limited — the compiler does not fully reason about negated constraints. This is a deliberate design choice: negation introduces complexity in overload resolution.
-
-### Implication
-
-Concept subsumption gives us a form of implication. If concept `A` is defined in terms of concept `B`:
-
-```cpp
-template<typename T>
-concept RandomAccessible = requires(T c, size_t i) {
-    requires Container<T>;
-    { c[i] } -> std::same_as<typename T::value_type&>;
-};
-```
-
-Then `RandomAccessible(T) → Container(T)` — anything that is random-accessible is necessarily a container. The compiler uses this for overload resolution: a function constrained by `RandomAccessible` is *more specific* than one constrained by `Container`, so it wins when both match.
-
-## Subsumption: The Compiler's Logic Engine
-
-Concept subsumption is where the logic gets interesting. The compiler maintains a partial order on constraints and uses it to select the most specific matching overload:
+Concept subsumption gives us implication:
 
 ```cpp
 template<typename T>
@@ -104,25 +136,27 @@ concept Integral = std::is_integral_v<T>;
 
 template<typename T>
 concept SignedIntegral = Integral<T> && std::is_signed_v<T>;
-
-template<Integral T>
-auto absolute(T value) -> T {
-    return value < 0 ? -value : value;
-}
-
-template<SignedIntegral T>
-auto absolute(T value) -> T {
-    return value < 0 ? -value : value;
-}
 ```
 
-For `unsigned int`: only the first overload matches (it satisfies `Integral` but not `SignedIntegral`). For `int`: both match, but the compiler selects the second because `SignedIntegral` *subsumes* `Integral` — it is a strictly stronger proposition.
+`SignedIntegral<T> → Integral<T>` — anything signed-integral is integral. The compiler uses this for overload resolution:
 
-This is modus ponens in action. The compiler reasons: `SignedIntegral(T) → Integral(T)`, and since both are satisfied, the more specific (stronger) constraint wins. No ambiguity, no `enable_if` trickery, no SFINAE. The logic is structural.
+```cpp
+template<Integral T>
+auto absolute(T value) -> T { return value < 0 ? -value : value; }
+
+template<SignedIntegral T>
+auto absolute(T value) -> T { return value < 0 ? -value : value; }
+```
+
+For `int`: both match, but `SignedIntegral` *subsumes* `Integral` — it is a strictly stronger proposition. The compiler selects the more specific overload.
+
+This is **modus ponens**: given `SignedIntegral<T> → Integral<T>` and a proof that T is `SignedIntegral`, the compiler derives that T is `Integral`. Since the specific overload is more constraining, it wins. No ambiguity, no SFINAE. The logic is structural.
 
 ## Universal and Existential Quantification
 
-Templates give us universal quantification. A function template:
+### Universal (∀): Templates
+
+A constrained template is universal quantification:
 
 ```cpp
 template<Container T>
@@ -131,12 +165,13 @@ auto count(const T& c) -> size_t {
 }
 ```
 
-says: "for all types T that satisfy `Container`, this function exists." This is ∀T. Container(T) → (count : T → size_t). The concept is the premise, the function is the conclusion. The template instantiation is the proof: at each call site, the compiler verifies the premise and constructs the function.
+This says: ∀T. Container(T) → (count : T → size_t). "For all types T satisfying Container, this function exists." The template instantiation is the proof: at each call site, the compiler verifies the premise and constructs the function.
 
-Existential quantification — "there exists a T such that..." — is trickier in C++. The closest approximation is type erasure:
+### Existential (∃): Type Erasure
+
+Existential quantification — "there exists a T such that..." — uses type erasure:
 
 ```cpp
-// "There exists some type that satisfies Container"
 class AnyContainer {
     struct Concept {
         virtual auto size() const -> size_t = 0;
@@ -155,31 +190,25 @@ public:
 };
 ```
 
-`AnyContainer` says: "I hold *some* type that satisfies `Container`, but I'm not telling you which one." This is existential: ∃T. Container(T). The concrete type is hidden behind the virtual dispatch — it exists, it satisfies the concept, but it has been *forgotten* (erased).
+`AnyContainer` says: ∃T. Container(T) ∧ (I hold a T). The concrete type is hidden behind virtual dispatch. It exists, it satisfies the concept, but it has been *erased*. This is the existential package from type theory.
 
-## Concepts as Interfaces Without Inheritance
+## Proof Irrelevance
 
-Inheritance in C++ creates *nominal* subtyping: `class Dog : public Animal` explicitly declares the relationship. Concepts create *structural* subtyping: any type that provides the right operations satisfies the concept, without declaring anything.
+In C++, concept satisfaction is **proof-irrelevant**: it does not matter *how* a type satisfies a concept, only *that* it does. If `int` supports `operator<` through implicit conversion and also through a direct overload, `std::totally_ordered<int>` is just `true` — the specific mechanism is invisible to the concept.
 
-```cpp
-template<typename T>
-concept Drawable = requires(T d, Canvas& c) {
-    { d.draw(c) } -> std::same_as<void>;
-    { d.bounds() } -> std::same_as<Rect>;
-};
-```
+This is a design choice. In dependently typed languages (Agda, Coq), proofs can be *relevant* — different proofs of the same proposition are distinguishable and carry different computational content. Proof irrelevance simplifies concept checking (it is just a boolean) but prevents concepts from carrying information about *how* a type satisfies them.
 
-Any type with `draw(Canvas&)` and `bounds()` methods satisfies `Drawable` — whether it is a `Circle`, a `TextBox`, a third-party `Widget`, or a `MockShape` in a test. No base class needed. No vtable. No modification of the satisfying type.
+## Open vs Closed World
 
-This is the **open world assumption** from logic: new types can satisfy the concept at any time, even types that were written before the concept existed. Inheritance is the closed world — you must modify the class to make it derive from the base. Concepts leave the world open.
+**Concepts** assume an **open world**: new types can satisfy existing concepts at any time. You can define a concept `Drawable`, and a year later someone writes a type that satisfies it, without modifying any existing code.
+
+**Inheritance** assumes a **closed world**: to make a type satisfy an interface, you must modify the type definition to derive from the base class.
+
+In logical terms: the open world allows new axioms to be added. The closed world fixes the axioms upfront. Concepts are more flexible — they support retroactive conformance (a type satisfies a concept without declaring it). The trade-off: you cannot enumerate all types that satisfy a concept (the set is open), while you *can* enumerate all subclasses of a base class (the set is closed in the translation unit).
 
 ## Concept Composition Patterns
 
-Several compositional patterns emerge from treating concepts as logic:
-
 ### Refined Concepts (Specialization)
-
-Build stronger concepts from weaker ones, each adding new requirements:
 
 ```cpp
 template<typename T>
@@ -192,19 +221,11 @@ concept Seekable = Readable<T> && requires(T r, size_t pos) {
     { r.seek(pos) };
     { r.position() } -> std::convertible_to<size_t>;
 };
-
-template<typename T>
-concept BufferedReadable = Readable<T> && requires(T r, size_t n) {
-    { r.peek(n) } -> std::convertible_to<std::span<const char>>;
-    { r.buffer_size() } -> std::convertible_to<size_t>;
-};
 ```
 
-Each concept adds requirements. `Seekable` is a `Readable` that can also seek. `BufferedReadable` is a `Readable` with a look-ahead buffer. Functions constrained by `Seekable` automatically know their argument is `Readable`.
+Each concept adds requirements. `Seekable` subsumes `Readable`. This forms a partial order — a lattice of concepts from weakest to strongest.
 
 ### Orthogonal Concepts (Intersection)
-
-Combine independent capabilities:
 
 ```cpp
 template<typename T>
@@ -213,30 +234,22 @@ concept Serializable = requires(T a) {
 };
 
 template<typename T>
-concept Loggable = Printable<T> && requires(T a) {
-    { a.log_level() } -> std::same_as<LogLevel>;
-};
-
-// A function that needs both:
-template<typename T>
-    requires Serializable<T> && Loggable<T>
+    requires Serializable<T> && Printable<T>
 void persist_and_log(const T& value);
 ```
 
-The concepts are orthogonal — neither implies the other. A type can be serializable without being loggable, or vice versa. The function requires both, and the constraint is the conjunction.
+Independent capabilities combined by conjunction.
 
 ### Concept Maps (Adapters)
 
-Sometimes a type almost satisfies a concept but uses different names. You can write an adapter:
+When a type almost satisfies a concept but uses different names:
 
 ```cpp
-// Third-party type uses 'length()' instead of 'size()'
 struct ExternalBuffer {
-    auto length() const -> size_t;
+    auto length() const -> size_t;  // not 'size()'
     auto data() const -> const char*;
 };
 
-// Adapter satisfies Container-like concepts
 struct BufferAdapter {
     ExternalBuffer& buf;
     auto size() const -> size_t { return buf.length(); }
@@ -244,28 +257,30 @@ struct BufferAdapter {
 };
 ```
 
-This is not as elegant as Haskell's type class instances, but it serves the same purpose: making a type conform to a concept without modifying the type.
+Not as elegant as Haskell's type class instances, but serves the same purpose: retroactive conformance via wrapping.
 
-## The Curry-Howard Bridge
+## The Full Curry-Howard Bridge
 
-We can now state the correspondence explicitly:
+| Logic | Type Theory | C++ |
+|---|---|---|
+| Proposition | Type / Concept | `concept C = ...` |
+| Proof | Value / Satisfying type | `int` satisfies `Integral` |
+| Conjunction (A ∧ B) | Product type | `C1<T> && C2<T>` |
+| Disjunction (A ∨ B) | Sum type | `C1<T> \|\| C2<T>` |
+| Implication (A → B) | Function type | Concept subsumption |
+| Universal (∀T. P(T)) | Parametric type | `template<Concept T>` |
+| Existential (∃T. P(T)) | Existential type | Type erasure |
+| Modus ponens | Function application | Overload resolution |
+| ∧-introduction | Pair construction | Satisfying both concepts |
+| ∧-elimination | Projection | Using either capability |
+| ∨-introduction | Injection | Satisfying one alternative |
+| ∨-elimination | Pattern matching | `std::visit` / overload selection |
 
-| Logic | C++ |
-|---|---|
-| Proposition | Concept (or type) |
-| Proof | Satisfying type (or value) |
-| Conjunction (A ∧ B) | `Concept1<T> && Concept2<T>` |
-| Disjunction (A ∨ B) | `Concept1<T> \|\| Concept2<T>` |
-| Implication (A → B) | Concept subsumption |
-| Universal (∀T. P(T)) | Template with concept constraint |
-| Existential (∃T. P(T)) | Type erasure |
-| Modus ponens | Overload resolution via subsumption |
-
-C++ is not a proof assistant. The correspondence is imperfect — there is no way to prove arbitrary theorems, no termination checking, no universe hierarchy. But the fragment that C++ does support is exactly the fragment that matters for practical software engineering: stating requirements, checking them at compile time, and selecting the most specific implementation.
+C++ is not a proof assistant. The correspondence is imperfect — there is no termination checking, no universe hierarchy, no proof terms. But the fragment C++ supports is exactly the fragment that matters for practical engineering: stating requirements, checking them at compile time, and selecting the most specific implementation.
 
 ## Concepts in Loom
 
-Loom uses concepts sparingly but precisely. The [strong types](/post/strong-types) system uses concepts to conditionally enable operations:
+Loom uses concepts for conditional operations:
 
 ```cpp
 template<typename Tag, typename T>
@@ -282,21 +297,12 @@ struct StrongType {
 };
 ```
 
-The `requires` clause is a proposition: "this method exists *if and only if* the underlying type satisfies this property." For `StrongType<SlugTag, std::string>`, `str()` exists because strings are strings. For a hypothetical `StrongType<CountTag, int>`, `str()` does not exist — calling it would be a compile error.
+The `requires` clause is a proposition: "this method exists if and only if the underlying type satisfies this predicate." This is conditional formation — the method's formation rule depends on the type parameter.
 
-The [compile-time router](/post/router) uses concepts for pattern analysis:
+## Closing: Logic You Already Use
 
-```cpp
-template<typename T>
-concept StaticRoute = (T::pattern.find(':') == std::string_view::npos);
-```
+You have been doing logic every time you write a concept, constrain a template, or select between overloads. The vocabulary of natural deduction — introduction, elimination, conjunction, implication, modus ponens — is already embedded in the language. Naming it makes it deliberate.
 
-This is a proposition about a route's compile-time string: "the pattern contains no parameter markers." The compiler evaluates this at template instantiation and selects the appropriate matching strategy — exact string comparison for static routes, prefix+parameter extraction for dynamic routes.
+The practical consequence: treat concept design like proof design. A concept is minimal (only the needed obligations), composable (combines with other concepts via logical connectives), and subsumable (fits into a refinement hierarchy from weak to strong). The compiler is your proof checker. Let it work.
 
-## Closing: A Logic You Already Use
-
-You have been doing logic every time you write a concept, constrain a template, or select between overloads. The vocabulary of propositions, proofs, and connectives is not foreign to C++ — it is already embedded in the language. Naming it makes it deliberate.
-
-The practical consequence: treat concept design like API design. Concepts are the contract between generic code and its users. A well-designed concept is minimal (requires only what is needed), composable (can be combined with other concepts), and subsumable (fits into a refinement hierarchy). A poorly-designed concept is either too broad (admits types that should not qualify) or too narrow (excludes types that should).
-
-In the [next post](/post/compile-time-data), we explore what happens when *values* enter the type system — when non-type template parameters blur the line between data and types, and the compiler starts computing with values at compile time.
+In the [next post](/post/compile-time-data), we explore what happens when *values* enter the type system — dependent types, Pi types, Sigma types, and the compiler as a staged computation engine.

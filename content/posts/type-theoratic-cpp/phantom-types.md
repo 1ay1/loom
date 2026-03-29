@@ -1,9 +1,9 @@
 ---
 title: "Phantom Types — Making the Compiler See What Isn't There"
-date: 2026-03-29
+date: 2026-03-31
 slug: phantom-types
-tags: [c++20, type-theory, phantom-types, templates, zero-cost]
-excerpt: "A phantom type parameter exists only in the type system — it carries no data, occupies no memory, and vanishes in the binary. But it can prevent entire classes of bugs."
+tags: [c++20, type-theory, phantom-types, templates, zero-cost, parametricity]
+excerpt: "A phantom type parameter exists only in the type system — it carries no data, occupies no memory, and vanishes in the binary. Parametricity guarantees it works. Representation independence makes it free."
 ---
 
 In the [last post](/post/algebraic-data-types), we saw how product and sum types shape the space of possible values. But sometimes the distinction you need to enforce is not between different *data* — it is between different *meanings* of the same data.
@@ -12,7 +12,7 @@ A user ID and an order ID are both integers. A meters value and a feet value are
 
 We need the compiler to see a difference that does not exist in the data. The technique is called **phantom types** — type parameters that appear in the type signature but are never stored, never accessed, and never present at runtime. They are ghosts in the type system. And they are one of the most powerful tools in type-theoretic C++.
 
-This post builds on [post #7 on templates](/post/templates-and-generic-programming) and [post #10 on concepts](/post/concepts-and-constraints) from the C++ series, and directly connects to the `StrongType` pattern described in the [strong types internals post](/post/strong-types).
+The deep reason phantom types work — the reason they are safe and zero-cost — comes from a property called **parametricity**. We will introduce it here and explore it fully in [part 7](/post/parametricity).
 
 ## The Problem: Structural Equality
 
@@ -22,11 +22,9 @@ The C++ type system is *structural* by default for built-in types. Two `int`s ar
 void book_flight(int passenger_id, int flight_id, int seat_number);
 ```
 
-The compiler sees three `int` parameters. It cannot tell them apart. If you pass the arguments in the wrong order, the code compiles, runs, and silently does the wrong thing. The bug is not in your logic — it is in your *types*. The type `int` is too broad. It admits values from unrelated domains and lets them mingle freely.
+Three `int`s. The compiler sees three identical types. If you pass the arguments in the wrong order, the code compiles and silently does the wrong thing.
 
 ## The Phantom: A Tag That Vanishes
-
-The solution is a wrapper parameterized by a *tag type* that exists only at compile time:
 
 ```cpp
 template<typename Tag, typename T = int>
@@ -40,9 +38,7 @@ struct Strong {
 };
 ```
 
-The `Tag` parameter is the phantom. It appears in the type `Strong<Tag, T>` but is never stored as a field, never accessed in any method, never present in the object's memory layout. `sizeof(Strong<Tag, T>) == sizeof(T)` — the tag is purely a compile-time artifact.
-
-Now we define distinct types:
+The `Tag` parameter is the phantom. It appears in the type `Strong<Tag, T>` but is never stored, never accessed, never present in the object's memory layout. `sizeof(Strong<Tag, T>) == sizeof(T)`.
 
 ```cpp
 struct PassengerTag {};
@@ -56,23 +52,40 @@ using SeatNumber = Strong<SeatTag>;
 void book_flight(PassengerId passenger, FlightId flight, SeatNumber seat);
 ```
 
-Each ID type wraps an `int`. All three have the same size, the same memory layout, the same runtime representation. But the compiler treats them as completely different types. Passing a `FlightId` where a `PassengerId` is expected is a compile error. Passing a bare `int` is also an error — the `explicit` constructor requires conscious conversion.
+The phantom tag contributes zero bytes but creates entirely distinct types. Passing a `FlightId` where a `PassengerId` is expected is a compile error.
 
-The phantom tag is the key. It contributes zero bytes to the struct but creates an entirely distinct type. This is the essence of phantom typing: **information that exists only in the type system, invisible at runtime, but enforced at every usage site.**
+## Why Phantom Types Work: Parametricity
 
-## Why Not Just Use Separate Structs?
+The theoretical foundation of phantom types is **parametric polymorphism** — the property that a function generic in a type parameter T must behave uniformly regardless of what T is. This was formalized by John Reynolds in 1983 and leads to one of the most beautiful results in type theory.
 
-You could define each type independently:
+Consider a function operating on `Strong<Tag, int>`:
 
 ```cpp
-struct PassengerId { int value; };
-struct FlightId { int value; };
-struct SeatNumber { int value; };
+template<typename Tag>
+auto increment(Strong<Tag, int> s) -> Strong<Tag, int> {
+    return Strong<Tag, int>{s.value + 1};
+}
 ```
 
-This works and is sometimes the right choice. But the template approach has advantages:
+This function is *parametric* in `Tag`. It receives a `Tag` parameter but never inspects it — it cannot, because `Tag` is just a type with no values accessible to the function body. Parametricity guarantees that `increment` behaves identically for `PassengerTag`, `FlightTag`, or any other tag.
 
-**Shared behavior.** If all your ID types need comparison, hashing, serialization, and formatting, you write those once in the template:
+The crucial consequence: **the function cannot break tag safety**. It cannot convert a `Strong<PassengerTag>` into a `Strong<FlightTag>`. It cannot branch on what the tag is. It can only operate on the `int` inside and faithfully propagate the tag through. The tag flows through the type system like a watermark — visible in the types, invisible in the computation.
+
+This is why phantom types are *safe*: the code cannot observe the tag, so it cannot violate the abstraction. And it is why they are *zero-cost*: there is nothing to observe at runtime.
+
+We will formalize this as "free theorems" in [part 7](/post/parametricity): from the type signature alone, without reading the function body, you can prove that `increment` preserves the tag.
+
+## Representation Independence
+
+Because phantom-tagged types have identical runtime representation, you get a property from abstract type theory called **representation independence**: the observable behavior of phantom-typed code depends only on the underlying data, not on the phantom tag.
+
+This connects to a deep idea from ML module systems. When a module exports a type abstractly — hiding its implementation — clients can only interact with it through the module's interface. Different implementations of the module produce different abstract types, but the behavior is consistent. Phantom types achieve the same effect without modules: `Strong<PassengerTag, int>` and `Strong<FlightTag, int>` are "different abstract types" with the same underlying representation.
+
+The practical consequence: you can freely add new phantom-tagged types without any runtime cost or binary size increase. `using InvoiceId = Strong<struct InvoiceTag>` is one line, creates a fully distinct type, and compiles to the same machine code as a bare `int`.
+
+## Shared Behavior via Templates
+
+The template approach lets you write common operations once:
 
 ```cpp
 template<typename Tag, typename T>
@@ -87,7 +100,6 @@ struct Strong {
     }
 };
 
-// Hashing
 template<typename Tag, typename T>
 struct std::hash<Strong<Tag, T>> {
     auto operator()(const Strong<Tag, T>& s) const -> size_t {
@@ -96,22 +108,23 @@ struct std::hash<Strong<Tag, T>> {
 };
 ```
 
-Every strong type gets comparison, ordering, streaming, and hashing for free. No code duplication. If you add a new ID type, it is one line:
+Every strong type gets comparison, ordering, streaming, and hashing for free. New types are one line:
 
 ```cpp
 using InvoiceId = Strong<struct InvoiceTag>;
 ```
 
-The `struct InvoiceTag` is defined inline — a forward declaration used only as a phantom parameter. It never needs a body.
+The `struct InvoiceTag` is defined inline — a forward declaration used only as a phantom. It never needs a body.
 
-**Conditional interfaces.** With concepts, the template can expose different operations depending on the underlying type:
+### Conditional Interfaces
+
+With concepts, the template can expose different operations depending on the underlying type:
 
 ```cpp
 template<typename Tag, typename T>
 struct Strong {
     T value;
 
-    // Arithmetic only when T supports it
     auto operator+(const Strong& other) const -> Strong
         requires requires(T a, T b) { a + b; }
     {
@@ -120,11 +133,11 @@ struct Strong {
 };
 ```
 
-ID types (tagged `int`) do not get arithmetic — you cannot "add" two user IDs. Measurement types (tagged `double`) do. Same template, different capabilities, driven by the tag and the underlying type.
+ID types (tagged `int`) do not get arithmetic — you cannot "add" two user IDs. Measurement types (tagged `double`) do. Same template, different capabilities, driven by the tag and the underlying type. The `requires` clause is a formation rule on the method: it exists only when the underlying type supports the operation.
 
-## Phantom Types for State
+## Phantom Types as Proof Witnesses
 
-Phantoms are not limited to distinguishing values. They can encode *states*. This bridges to typestate programming (covered fully in [part 4](/post/typestate-programming)), but the mechanism is worth seeing here.
+A phantom tag can serve as a *witness* — a compile-time proof that a property holds:
 
 ```cpp
 struct Unvalidated {};
@@ -144,19 +157,25 @@ auto validate(EmailAddress<Unvalidated> raw) -> std::optional<EmailAddress<Valid
 void send(EmailAddress<Validated> to);  // only accepts validated emails
 ```
 
-`EmailAddress<Unvalidated>` and `EmailAddress<Validated>` are different types. They have the same layout (a single `std::string`), but you cannot pass one where the other is expected. The phantom parameter is a compile-time proof of validation state.
+Through the Curry-Howard correspondence ([part 1](/post/type-theoretic-foundations)):
 
-The `send` function does not need to check validity. The type proves it. The validation boundary is the `validate` function, and the proof propagates through the type system from that point forward.
+- `EmailAddress<Validated>` is a *proposition*: "this email address has been validated"
+- A value of type `EmailAddress<Validated>` is a *proof* of that proposition
+- The `validate` function is the *proof procedure*: it either produces evidence or fails
+- The `send` function requires the proof as a precondition
+
+The proof is erased at runtime — zero cost. But the type checker propagates it. You cannot construct an `EmailAddress<Validated>` without going through `validate`. And once you have one, every function downstream can trust it without re-checking.
+
+This is a lightweight form of **refinement types** — types that carry proofs of properties. Full refinement types (as in Liquid Haskell or F*) can express arbitrary predicates. Phantom types give you a restricted but practical subset: boolean properties (validated/not, encrypted/not, sanitized/not) at zero cost.
 
 ## Units of Measurement
 
-Phantom types shine in dimensional analysis. Mixing meters and feet is not a type error in most C++ code — it is a runtime surprise (and occasionally a [$125 million Mars orbiter](https://en.wikipedia.org/wiki/Mars_Climate_Orbiter)).
+Phantom types shine in dimensional analysis:
 
 ```cpp
 struct Meters {};
 struct Feet {};
 struct Seconds {};
-struct Kilograms {};
 
 template<typename Unit>
 struct Quantity {
@@ -173,19 +192,35 @@ auto duration = Quantity<Seconds>{9.58};
 // This does not compile:
 // auto nonsense = distance + duration;  // Meters + Seconds = type error
 
-// Explicit conversion must be deliberate:
 auto to_feet(Quantity<Meters> m) -> Quantity<Feet> {
     return {m.value * 3.28084};
 }
 ```
 
-Addition of same-unit quantities works. Addition of different-unit quantities is a compile error — the phantom types mismatch. Unit conversion is an explicit function with a clear name. You cannot accidentally mix meters and feet because the type system will not let you.
+The phantom types encode the unit. Addition of same-unit quantities works. Cross-unit addition is a type error. Unit conversion is explicit.
 
-For more sophisticated dimensional analysis — where multiplying meters × meters gives square meters, or dividing meters by seconds gives velocity — you need more machinery (ratio types, template parameter packs for dimension exponents). But the core technique is the same: phantom parameters encode the unit, and the compiler enforces consistency.
+The [$125 million Mars Climate Orbiter](https://en.wikipedia.org/wiki/Mars_Climate_Orbiter) was lost because Lockheed Martin used pound-force seconds while NASA expected newton seconds. Phantom types make this class of bug a compile error.
+
+## The Newtype Pattern Formally
+
+In type theory, a newtype is an **isomorphism** `A ≅ B` witnessed by explicit wrap/unwrap functions:
+
+```
+wrap   : Underlying → NewType
+unwrap : NewType → Underlying
+unwrap(wrap(x)) = x  ∀x
+wrap(unwrap(y)) = y  ∀y
+```
+
+The key property: the isomorphism is *not implicit*. You must explicitly wrap and unwrap. This friction is the feature — it prevents accidental mixing while allowing deliberate conversion.
+
+In Haskell, `newtype` is a language keyword that guarantees zero-cost wrapping. In Rust, tuple structs (`struct Meters(f64)`) serve the same purpose. In C++, we build it with templates and phantom tags. The mechanism differs but the type-theoretic idea is the same: **semantic distinctions encoded as type distinctions, at zero runtime cost**.
+
+The isomorphism property matters: you must be able to get the underlying value back. `Strong<Tag, T>` exposes `.value`, completing the isomorphism. A phantom-typed wrapper that hid the underlying value entirely would be an *abstract type* (even stronger than a newtype), which is sometimes what you want but is a different pattern.
 
 ## Zero-Cost Proof
 
-Let us verify the "zero-cost" claim. Consider:
+Let us verify the claim:
 
 ```cpp
 auto add_ids(Strong<PassengerTag> a, Strong<PassengerTag> b) -> Strong<PassengerTag> {
@@ -197,7 +232,7 @@ auto add_ints(int a, int b) -> int {
 }
 ```
 
-At `-O2`, both functions compile to identical x86:
+At `-O2`, both compile to identical x86:
 
 ```asm
 add_ids:
@@ -209,13 +244,11 @@ add_ints:
     ret
 ```
 
-Same instruction. Same registers. The phantom tag, the struct wrapper, the explicit constructor — all gone. The compiler sees through the abstraction completely. You pay nothing at runtime for the type safety you gain at compile time.
-
-This is not always the case with every wrapper pattern. ABI considerations can introduce overhead in some calling conventions. But for inlined code — and small structs are almost always inlined — the abstraction is free.
+The phantom tag, the struct wrapper, the explicit constructor — all gone. The compiler sees through the abstraction completely. You pay nothing at runtime for compile-time type safety.
 
 ## Phantom Types in Loom
 
-Loom uses phantom types extensively. The `StrongType` template from the [strong types post](/post/strong-types) is exactly this pattern:
+Loom uses this pattern extensively. The `StrongType` template:
 
 ```cpp
 template<typename Tag, typename T>
@@ -230,46 +263,22 @@ using Content = StrongType<struct ContentTag, std::string>;
 using PostId  = StrongType<struct PostIdTag, std::string>;
 ```
 
-Four types. All strings underneath. All distinct in the type system. A function that expects a `Slug` will never accidentally receive a `Title`, because the phantom tags differ. The tags themselves — `SlugTag`, `TitleTag` — are empty structs that exist only as type parameters and compile away to nothing.
-
-The theme system goes further. `Color` and `FontStack` are both strings, but they are distinct phantom-tagged types:
-
-```cpp
-using Color     = StrongType<struct ColorTag, std::string>;
-using FontStack = StrongType<struct FontStackTag, std::string>;
-```
-
-A color cannot be used as a font stack. A font stack cannot be used as a color. The compiler knows the difference because the phantom tags are different, even though the runtime representation is identical.
-
-## The Newtype Pattern
-
-The phantom type approach is an instance of a broader pattern known as **newtype** (borrowed from Haskell): creating a new, distinct type that wraps an existing type with identical runtime representation.
-
-The essence of newtype is:
-
-1. The wrapper adds no data beyond the wrapped value
-2. The wrapper creates a distinct type that does not implicitly convert
-3. The wrapper can selectively expose operations from the underlying type
-4. The wrapper is erased at runtime — same size, same layout, same machine code
-
-In Haskell, `newtype` is a language feature. In Rust, tuple structs (`struct Meters(f64)`) serve the same purpose. In C++, we build it with templates and phantom tags. The mechanism differs, but the type-theoretic idea is the same: **semantic distinctions encoded as type distinctions, at zero runtime cost**.
+Four types. All strings underneath. All distinct in the type system. A function that expects a `Slug` cannot accidentally receive a `Title`. The phantom tags compile away to nothing.
 
 ## When Not to Use Phantom Types
 
-Phantoms are not always the right tool:
+**When the types need genuinely different data.** If a `Circle` has a radius and a `Rectangle` has width and height, they are structurally different types. Use a sum type (variant), not phantom tags on a shared struct.
 
-**When the types need genuinely different data.** If a `Circle` has a radius and a `Rectangle` has width and height, they are not the same type with different tags — they are structurally different types. Use a sum type (variant), not phantom tags on a shared struct.
+**When the distinction is transient.** If you need to distinguish "sorted" from "unsorted" within a single function scope, a comment suffices. Phantom types pay off when the distinction crosses function boundaries.
 
-**When the distinction is transient.** If you need to distinguish "sorted" from "unsorted" within a single function scope, a phantom type is overkill. A comment or a local variable name suffices. Phantom types pay off when the distinction crosses function boundaries.
-
-**When you need runtime discrimination.** A phantom type cannot be inspected at runtime — `if (is_validated)` does not work because the tag is not stored. If you need runtime branching on the distinction, use a variant or an enum.
+**When you need runtime discrimination.** A phantom type cannot be inspected at runtime. If you need `if (is_validated)`, use a variant or enum. The phantom tag is not stored — it exists only in the type checker's reasoning.
 
 ## Closing: What the Compiler Cannot See, It Cannot Protect
 
-The compiler is powerful but literal. It enforces exactly the rules you give it. If two semantically different things have the same type, the compiler sees them as interchangeable. Every accidental swap, every misplaced argument, every unit mismatch sails through compilation without a warning.
-
 Phantom types are how you tell the compiler about distinctions it cannot infer on its own. They are cheap (zero cost), easy (one-line type aliases), and preventive (they catch errors at the point of misuse, not at the point of failure).
+
+The theoretical foundation is parametricity: code that is generic in the phantom tag cannot observe or violate it. The practical consequence is representation independence: the runtime behavior depends only on the underlying data, not on the tag. The type-theoretic framing is proof witnesses: a phantom tag is a compile-time proof that a property holds.
 
 The general principle: **if two things should not be interchangeable, they should not have the same type.** Phantom types make that possible even when the underlying representation is identical.
 
-In the [next post](/post/typestate-programming), we take this further. Instead of tagging values with *what they are*, we tag them with *what has happened to them* — encoding entire state machines in the type system.
+In the [next post](/post/typestate-programming), we take this further. Instead of tagging values with *what they are*, we tag them with *what has happened to them* — encoding entire state machines in the type system, grounded in the theory of linear logic and substructural types.
