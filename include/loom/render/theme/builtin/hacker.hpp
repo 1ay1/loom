@@ -238,6 +238,38 @@ inline const ThemeDef hacker = {
             | margin_left(2_px)
             | prop("animation", raw("blink 1s infinite")),
 
+        // ── Pagination ──
+        ".pagination"_s | border_top(1_px, dashed, gray) | margin_top(20_px) | padding_top(12_px),
+        ".page-num"_s | color(dim_txt) | font_size(13_px) | min_width(28_px) | height(28_px)
+                       | border_radius(0_px),
+        ".page-num:hover"_s | bg(dark_g) | color(phosphor),
+        ".page-num.current"_s | bg(dark_g) | color(phosphor) | border(1_px, dashed, dim_p),
+        ".page-prev,.page-next"_s | color(dim_p) | font_size(13_px),
+        ".page-prev:hover,.page-next:hover"_s | color(phosphor),
+
+        // ── Featured ──
+        ".featured-posts"_s | border_bottom(1_px, dashed, gray) | margin_bottom(16_px)
+                            | padding_bottom(16_px),
+        ".featured-posts h2"_s | color(dim_p) | font_size(13_px) | font_weight(400)
+                               | letter_spacing(1_px),
+
+        // ── Search ──
+        "#searchInput"_s | bg(raw("#060d06")) | color(phosphor) | border(1_px, dashed, gray)
+                         | border_radius(0_px) | font_size(13_px) | padding(8_px, 12_px)
+                         | prop("font-family", raw("inherit")),
+        "#searchInput:focus"_s | border_color(dim_p),
+        "#searchInput::placeholder"_s | color(dim_txt),
+        ".search-empty"_s | color(dim_txt),
+
+        // ── Series cards ──
+        ".series-card"_s | border(1_px, dashed, gray) | border_radius(0_px) | padding(12_px),
+        ".series-card:hover"_s | bg(dark_g),
+        ".series-card h3"_s | font_size(14_px) | font_weight(400),
+        ".series-card h3 a"_s | color(phosphor),
+        ".series-card h3 a:hover"_s | color(raw("#50ff80")),
+        ".series-meta"_s | color(dim_txt) | font_size(12_px),
+        ".series-latest"_s | color(dim_txt) | font_size(12_px),
+
         // ── Selection ──
         "::selection"_s | bg(phosphor) | color(black)
     ),
@@ -296,13 +328,24 @@ inline const ThemeDef hacker = {
 
         .index = [](const Index& props, const Ctx& ctx, Children) {
             if (!props.posts) return empty();
+
+            auto featured_node = (props.featured && !props.featured->empty())
+                ? ctx(FeaturedSection{.posts = props.featured})
+                : empty();
+
+            auto pagination_node = props.pagination
+                ? ctx(Pagination{.info = *props.pagination})
+                : empty();
+
             return section(
+                featured_node,
                 h2(dom::raw("~/ &nbsp;<span style='color:#5a9a5a;font-weight:400;"
                     "text-transform:none;letter-spacing:0'>" +
                     std::to_string(props.posts->size()) + " posts</span>")),
                 each(*props.posts, [&](const PostSummary& p) {
                     return ctx(PostListing{.post = &p});
-                }));
+                }),
+                pagination_node);
         },
     }),
 };

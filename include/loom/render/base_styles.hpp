@@ -545,7 +545,10 @@ inline css::Sheet base_tag_cloud()
             | display(raw("flex")) | prop("flex-wrap", raw("wrap"))
             | gap(px(8)) | prop("align-items", baseline),
         ".tag-cloud .tag"_s
-            | transition(raw("font-size 0.2s, color 0.15s"))
+            | transition(raw("font-size 0.2s, color 0.15s")),
+        ".sidebar .tag-cloud"_s
+            | max_height(raw("200px")) | overflow_y(raw("auto"))
+            | padding_right(px(4))
     );
 }
 
