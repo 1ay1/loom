@@ -1,6 +1,6 @@
 ---
 title: "Sum Types and Product Types — The Algebra of C++ Types"
-date: 2026-04-05
+date: 2026-03-29
 slug: algebraic-data-types
 tags: [c++20, type-theory, variant, tuple, algebraic-types]
 excerpt: "Every type is an algebraic expression. Product types multiply possibilities, sum types add them, and understanding this algebra transforms how you model domains in C++."

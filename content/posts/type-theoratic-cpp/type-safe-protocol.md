@@ -1,6 +1,6 @@
 ---
 title: "Building a Type-Safe Protocol — Putting It All Together"
-date: 2026-05-10
+date: 2026-03-29
 slug: type-safe-protocol
 tags: [c++20, type-theory, typestate, protocols, compile-time, capstone]
 excerpt: "We combine every technique from this series — phantom types, typestate, concepts, compile-time data — to build a compile-time verified protocol where misordering, missing steps, and invalid transitions are type errors, not runtime surprises."

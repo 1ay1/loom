@@ -1,6 +1,6 @@
 ---
 title: "Typestate Programming — When Types Remember What Happened"
-date: 2026-04-19
+date: 2026-03-29
 slug: typestate-programming
 tags: [c++20, type-theory, typestate, state-machines, protocols]
 excerpt: "A typestate system encodes a state machine in the type system. States are types. Transitions are functions that consume one type and produce another. The compiler enforces the protocol — calling things in the wrong order is not a runtime error, it is a type error."

@@ -1,6 +1,6 @@
 ---
 title: "Concepts as Logic — Propositions, Proofs, and Predicates"
-date: 2026-04-26
+date: 2026-03-29
 slug: concepts-as-logic
 tags: [c++20, type-theory, concepts, logic, curry-howard]
 excerpt: "C++20 concepts are more than template constraints. They are propositions about types. A requires-expression is a proof sketch. Concept composition follows the rules of propositional logic. This is the Curry-Howard correspondence, hiding in plain sight."

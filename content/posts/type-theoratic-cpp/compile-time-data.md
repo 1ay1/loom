@@ -1,6 +1,6 @@
 ---
 title: "Compile-Time Data — When Values Become Types"
-date: 2026-05-03
+date: 2026-03-29
 slug: compile-time-data
 tags: [c++20, type-theory, constexpr, nttp, compile-time, dependent-types]
 excerpt: "C++20 lets you pass values as template parameters — strings, structs, even user-defined literals. When data enters the type system, the boundary between types and values dissolves, and the compiler becomes a computation engine."
