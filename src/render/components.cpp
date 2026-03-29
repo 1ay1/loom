@@ -605,8 +605,8 @@ Node SeriesNav::render(const SeriesNav& props, const Ctx&, Children)
                       + std::to_string(total) + " in <strong>"
                       + props.series_name + "</strong>";
 
-    return nav(class_("series-nav"),
-        p_(class_("series-label"), raw(label)),
+    return dom::details(class_("series-nav"),
+        dom::summary(class_("series-label"), raw(label)),
         ol(class_("series-list"),
             each(*props.posts, [&](const PostSummary& sp) -> Node {
                 if (sp.slug.get() == props.current_slug)
@@ -940,8 +940,9 @@ Node TableOfContents::render(const TableOfContents& props, const Ctx&, Children)
     if (!props.entries || props.entries->size() < 3)
         return Node{Node::Fragment, {}, {}, {}, {}};
 
-    return nav(class_("toc"), aria_label("Table of Contents"),
-        p_(class_("toc-title"), "Contents"),
+    return dom::details(class_("toc"),
+        dom::summary(class_("toc-title"),
+            "Contents (" + std::to_string(props.entries->size()) + ")"),
         ul(class_("toc-list"),
             each(*props.entries, [](const TocEntry& e) {
                 return li(class_(e.level == 3 ? "toc-h3" : "toc-h2"),

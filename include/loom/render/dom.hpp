@@ -277,6 +277,8 @@ template<typename... A> Node header(A&&... a)      { return elem("header", std::
 template<typename... A> Node footer(A&&... a)      { return elem("footer", std::forward<A>(a)...); }
 template<typename... A> Node main_(A&&... a)       { return elem("main", std::forward<A>(a)...); }
 template<typename... A> Node aside(A&&... a)       { return elem("aside", std::forward<A>(a)...); }
+template<typename... A> Node details(A&&... a)     { return elem("details", std::forward<A>(a)...); }
+template<typename... A> Node summary(A&&... a)     { return elem("summary", std::forward<A>(a)...); }
 template<typename... A> Node ul(A&&... a)          { return elem("ul", std::forward<A>(a)...); }
 template<typename... A> Node ol(A&&... a)          { return elem("ol", std::forward<A>(a)...); }
 template<typename... A> Node li(A&&... a)          { return elem("li", std::forward<A>(a)...); }

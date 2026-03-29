@@ -478,7 +478,9 @@ inline css::Sheet base_series()
             | font_size(px(14))
             | bg(raw("color-mix(in srgb, var(--accent) 3%, var(--bg))")),
         ".series-label"_s
-            | margin_bottom(px(10)) | font_size(px(13)) | color(raw("var(--muted)")),
+            | font_size(px(13)) | color(raw("var(--muted)"))
+            | prop("cursor", pointer) | prop("user-select", none),
+        ".series-nav[open] .series-label"_s | margin_bottom(px(10)),
         ".series-list"_s | margin_left(px(20)) | margin_bottom(px(0)),
         ".series-list li"_s | margin_bottom(px(4)),
         ".series-list a"_s | color(raw("var(--accent)")) | text_decoration(none),
@@ -625,7 +627,8 @@ inline css::Sheet base_toc()
         ".toc-title"_s
             | font_size(px(13)) | font_weight(600) | color(raw("var(--muted)"))
             | text_transform(uppercase) | letter_spacing(raw("0.5px"))
-            | margin_bottom(px(8)),
+            | prop("cursor", pointer) | prop("user-select", none),
+        ".toc[open] .toc-title"_s | margin_bottom(px(8)),
         ".toc-list"_s
             | prop("list-style", none) | padding_left(px(0)) | margin(px(0)),
         ".toc-list li"_s
