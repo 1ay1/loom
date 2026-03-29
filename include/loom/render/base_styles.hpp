@@ -986,28 +986,27 @@ inline css::Sheet base_post_graph()
 {
     return sheet(
         ".post-graph-section"_s
-            | margin_bottom(px(32))
-            | padding(raw("20px 0")),
+            | margin_bottom(px(32)),
         ".post-graph-section h3"_s
             | font_size(px(13)) | font_weight(600) | color(raw("var(--muted)"))
             | text_transform(uppercase) | letter_spacing(raw("1px"))
-            | margin_bottom(px(16)),
+            | margin_bottom(px(12)),
         ".post-graph"_s
             | width(raw("100%")) | height(raw("auto"))
-            | margin_bottom(px(20))
-            | prop("border-radius", raw("var(--border-radius)"))
-            | bg(raw("color-mix(in srgb, var(--text) 3%, var(--bg))"))
-            | border(1_px, solid, raw("var(--border)")),
+            | margin_bottom(px(16)),
         ".post-graph-node"_s
-            | transition(raw("r 0.2s ease, fill-opacity 0.2s ease")),
-        ".post-graph a:hover circle"_s
-            | prop("r", raw("10")) | prop("fill-opacity", raw("1")),
-        ".post-graph a:hover text"_s
-            | prop("fill", raw("var(--accent)")) | font_weight(600),
+            | transition(raw("r 0.15s ease, fill-opacity 0.15s ease"))
+            | prop("cursor", raw("pointer")),
+        // Labels hidden by default, appear on hover
         ".post-graph-label"_s
-            | font_size(px(11)) | prop("fill", raw("var(--muted)"))
+            | font_size(px(11)) | prop("fill", raw("var(--text)"))
             | prop("font-family", raw("var(--font)"))
-            | transition(raw("fill 0.2s ease"))
+            | opacity(0) | transition(raw("opacity 0.15s ease"))
+            | prop("pointer-events", none),
+        ".post-graph-node-group:hover .post-graph-label"_s
+            | opacity(1),
+        ".post-graph-node-group:hover circle"_s
+            | prop("fill-opacity", raw("1"))
     );
 }
 

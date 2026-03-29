@@ -1195,9 +1195,6 @@ static const char* CODE_COPY_JS = R"JS(
 )JS";
 
 // ── PostGraph: force-directed tag-relationship SVG ──
-//
-// Build-time spring simulation: related posts cluster together,
-// unrelated posts drift apart. Much more readable than a circle layout.
 
 Node PostGraph::render(const PostGraph& props, const Ctx&, Children)
 {
@@ -1205,14 +1202,12 @@ Node PostGraph::render(const PostGraph& props, const Ctx&, Children)
         return Node{Node::Fragment, {}, {}, {}, {}};
 
     const auto& posts = *props.posts;
-    auto n = std::min(posts.size(), size_t(25));
+    auto n = std::min(posts.size(), size_t(20));
     constexpr double PI = 3.14159265358979;
 
-    // ── Build adjacency (shared tag counts) ──
+    // ── Build full adjacency ──
     struct Edge { size_t a, b; int weight; };
-    std::vector<Edge> edges;
-    // degree[i] = total edge weight for node i (used for node sizing)
-    std::vector<int> degree(n, 0);
+    std::vector<std::vector<std::pair<size_t, int>>> adj(n); // adj[i] = {(j, weight), ...}
 
     for (size_t i = 0; i < n; ++i)
     {
@@ -1222,51 +1217,89 @@ Node PostGraph::render(const PostGraph& props, const Ctx&, Children)
             for (const auto& ti : posts[i].tags)
                 for (const auto& tj : posts[j].tags)
                     if (ti.get() == tj.get()) ++shared;
-            // Only keep edges with 2+ shared tags to reduce clutter
             if (shared >= 2)
             {
-                edges.push_back({i, j, shared});
-                degree[i] += shared;
-                degree[j] += shared;
+                adj[i].push_back({j, shared});
+                adj[j].push_back({i, shared});
             }
         }
     }
 
-    // ── Force-directed layout (simple spring simulation) ──
-    int w = 800, h = 420;
+    // Collect all candidate edges, sort by weight descending
+    std::vector<Edge> all_edges;
+    for (size_t i = 0; i < n; ++i)
+        for (const auto& [j, w] : adj[i])
+            if (i < j) all_edges.push_back({i, j, w});
+    std::sort(all_edges.begin(), all_edges.end(),
+        [](const Edge& a, const Edge& b) { return a.weight > b.weight; });
+
+    // Kruskal-style: take strongest edges first, but cap at n-1+extra
+    // so the graph is sparse. Union-find to track components.
+    std::vector<size_t> parent(n);
+    for (size_t i = 0; i < n; ++i) parent[i] = i;
+    std::function<size_t(size_t)> find = [&](size_t x) -> size_t {
+        return parent[x] == x ? x : (parent[x] = find(parent[x]));
+    };
+
+    std::vector<Edge> edges;
+    size_t max_edges = std::min(n + n / 3, all_edges.size()); // ~1.3x nodes
+
+    for (const auto& e : all_edges)
+    {
+        if (edges.size() >= max_edges) break;
+        size_t ra = find(e.a), rb = find(e.b);
+        // Always take if it connects two components (spanning tree)
+        // or if we haven't hit the cap yet (extra strong edges)
+        if (ra != rb)
+        {
+            parent[ra] = rb;
+            edges.push_back(e);
+        }
+        else if (edges.size() < max_edges && e.weight >= 3)
+        {
+            edges.push_back(e);
+        }
+    }
+
+    // Compute degree from kept edges
+    std::vector<int> degree(n, 0);
+    for (const auto& e : edges)
+    {
+        degree[e.a] += e.weight;
+        degree[e.b] += e.weight;
+    }
+
+    // ── Force-directed layout ──
+    int w = 800, h = 380;
     double cx = w / 2.0, cy = h / 2.0;
-    double pad = 60.0;
+    double pad = 40.0;
 
     struct FNode { double x, y, vx, vy; };
     std::vector<FNode> pos(n);
 
-    // Initial positions: spread on a circle with jitter
     for (size_t i = 0; i < n; ++i)
     {
         double angle = (2.0 * PI * i) / n;
-        double r = std::min(cx, cy) - pad;
-        pos[i] = {
-            cx + r * std::cos(angle) + ((double)(i % 7) - 3.0) * 5.0,
-            cy + r * std::sin(angle) + ((double)(i % 5) - 2.0) * 5.0,
-            0, 0
-        };
+        double r = 140.0;
+        pos[i] = { cx + r * std::cos(angle), cy + r * std::sin(angle), 0, 0 };
     }
 
-    // Run simulation: 80 iterations
-    for (int iter = 0; iter < 80; ++iter)
+    // 120 iterations with strong repulsion to prevent clumping
+    for (int iter = 0; iter < 120; ++iter)
     {
-        double temp = 2.0 * (1.0 - iter / 80.0); // cooling
+        double temp = 1.5 * (1.0 - (double)iter / 120.0);
 
-        // Repulsion between all pairs (Coulomb)
+        // Repulsion — very strong to keep nodes well separated
         for (size_t i = 0; i < n; ++i)
         {
             for (size_t j = i + 1; j < n; ++j)
             {
                 double dx = pos[i].x - pos[j].x;
                 double dy = pos[i].y - pos[j].y;
-                double dist = std::sqrt(dx * dx + dy * dy);
-                if (dist < 1.0) dist = 1.0;
-                double force = 8000.0 / (dist * dist);
+                double dist2 = dx * dx + dy * dy;
+                if (dist2 < 1.0) dist2 = 1.0;
+                double dist = std::sqrt(dist2);
+                double force = 20000.0 / dist2;
                 double fx = (dx / dist) * force * temp;
                 double fy = (dy / dist) * force * temp;
                 pos[i].vx += fx;  pos[i].vy += fy;
@@ -1274,45 +1307,70 @@ Node PostGraph::render(const PostGraph& props, const Ctx&, Children)
             }
         }
 
-        // Attraction along edges (spring)
+        // Attraction along edges — gentle
         for (const auto& e : edges)
         {
             double dx = pos[e.b].x - pos[e.a].x;
             double dy = pos[e.b].y - pos[e.a].y;
             double dist = std::sqrt(dx * dx + dy * dy);
             if (dist < 1.0) dist = 1.0;
-            double ideal = 100.0 / e.weight; // stronger edges → closer
-            double force = (dist - ideal) * 0.04 * temp;
+            double ideal = 120.0;
+            double force = (dist - ideal) * 0.02 * temp;
             double fx = (dx / dist) * force;
             double fy = (dy / dist) * force;
             pos[e.a].vx += fx;  pos[e.a].vy += fy;
             pos[e.b].vx -= fx;  pos[e.b].vy -= fy;
         }
 
-        // Gentle gravity toward center
+        // Gravity toward center
         for (size_t i = 0; i < n; ++i)
         {
-            pos[i].vx += (cx - pos[i].x) * 0.003 * temp;
-            pos[i].vy += (cy - pos[i].y) * 0.003 * temp;
+            pos[i].vx += (cx - pos[i].x) * 0.005 * temp;
+            pos[i].vy += (cy - pos[i].y) * 0.005 * temp;
         }
 
-        // Apply velocity with damping
+        // Apply with damping
         for (size_t i = 0; i < n; ++i)
         {
-            pos[i].x += pos[i].vx * 0.4;
-            pos[i].y += pos[i].vy * 0.4;
-            pos[i].vx *= 0.5;
-            pos[i].vy *= 0.5;
-            // Keep within bounds
+            pos[i].x += pos[i].vx * 0.3;
+            pos[i].y += pos[i].vy * 0.3;
+            pos[i].vx *= 0.4;
+            pos[i].vy *= 0.4;
             pos[i].x = std::max(pad, std::min((double)w - pad, pos[i].x));
             pos[i].y = std::max(pad, std::min((double)h - pad, pos[i].y));
         }
     }
 
+    // Post-process: enforce minimum distance between all node pairs
+    for (int pass = 0; pass < 10; ++pass)
+    {
+        for (size_t i = 0; i < n; ++i)
+        {
+            for (size_t j = i + 1; j < n; ++j)
+            {
+                double dx = pos[j].x - pos[i].x;
+                double dy = pos[j].y - pos[i].y;
+                double dist = std::sqrt(dx * dx + dy * dy);
+                double min_dist = 50.0;
+                if (dist < min_dist && dist > 0.1)
+                {
+                    double push = (min_dist - dist) / 2.0;
+                    double px = (dx / dist) * push;
+                    double py = (dy / dist) * push;
+                    pos[i].x -= px; pos[i].y -= py;
+                    pos[j].x += px; pos[j].y += py;
+                    pos[i].x = std::max(pad, std::min((double)w - pad, pos[i].x));
+                    pos[i].y = std::max(pad, std::min((double)h - pad, pos[i].y));
+                    pos[j].x = std::max(pad, std::min((double)w - pad, pos[j].x));
+                    pos[j].y = std::max(pad, std::min((double)h - pad, pos[j].y));
+                }
+            }
+        }
+    }
+
     // ── Generate SVG ──
     auto d2s = [](double v) {
-        char buf[16];
-        std::snprintf(buf, sizeof(buf), "%.1f", v);
+        char buf[16]; std::snprintf(buf, sizeof(buf), "%.1f", v);
         return std::string(buf);
     };
 
@@ -1321,52 +1379,37 @@ Node PostGraph::render(const PostGraph& props, const Ctx&, Children)
     svg += std::to_string(w) + " " + std::to_string(h);
     svg += "\" xmlns=\"http://www.w3.org/2000/svg\">";
 
-    // Edges — curved lines for visual interest
+    // Edges — straight lines, opacity by weight
     for (const auto& e : edges)
     {
-        auto& a = pos[e.a];
-        auto& b = pos[e.b];
+        std::string opacity = e.weight >= 4 ? "0.45" : (e.weight >= 3 ? "0.3" : "0.15");
+        std::string sw = e.weight >= 4 ? "2" : (e.weight >= 3 ? "1.5" : "1");
 
-        // Slight curve via quadratic bezier offset
-        double mx = (a.x + b.x) / 2.0;
-        double my = (a.y + b.y) / 2.0;
-        double dx = b.x - a.x, dy = b.y - a.y;
-        double len = std::sqrt(dx * dx + dy * dy);
-        double offset = len * 0.08;
-        double nx = -dy / len * offset, ny = dx / len * offset;
-
-        std::string opacity, stroke_w;
-        if (e.weight >= 4) { opacity = "0.5"; stroke_w = "2.5"; }
-        else if (e.weight >= 3) { opacity = "0.35"; stroke_w = "2"; }
-        else { opacity = "0.18"; stroke_w = "1.2"; }
-
-        svg += "<path d=\"M" + d2s(a.x) + " " + d2s(a.y)
-             + " Q" + d2s(mx + nx) + " " + d2s(my + ny)
-             + " " + d2s(b.x) + " " + d2s(b.y) + "\""
-             + " fill=\"none\" stroke=\"var(--accent)\""
-             + " stroke-opacity=\"" + opacity + "\""
-             + " stroke-width=\"" + stroke_w + "\"/>";
+        svg += "<line x1=\"" + d2s(pos[e.a].x) + "\" y1=\"" + d2s(pos[e.a].y)
+             + "\" x2=\"" + d2s(pos[e.b].x) + "\" y2=\"" + d2s(pos[e.b].y)
+             + "\" stroke=\"var(--accent)\" stroke-opacity=\"" + opacity
+             + "\" stroke-width=\"" + sw + "\"/>";
     }
 
-    // Nodes — size reflects connectivity
+    // Nodes — label hidden by default, shown on hover via CSS
     for (size_t i = 0; i < n; ++i)
     {
         auto& nd = pos[i];
-        double r = 4.0 + std::min(degree[i], 10) * 0.8;
+        double r = 5.0 + std::min(degree[i], 12) * 0.5;
+        double opacity = degree[i] > 0 ? 0.7 : 0.3;
 
-        svg += "<a href=\"/post/" + posts[i].slug.get() + "\">"
+        std::string title = posts[i].title.get();
+        if (title.size() > 35) title = title.substr(0, 33) + "..";
+
+        auto anchor = (nd.x > cx) ? "start" : "end";
+        double label_dx = (nd.x > cx) ? (r + 8) : -(r + 8);
+
+        svg += "<a href=\"/post/" + posts[i].slug.get() + "\" class=\"post-graph-node-group\">"
                "<circle cx=\"" + d2s(nd.x) + "\" cy=\"" + d2s(nd.y)
              + "\" r=\"" + d2s(r) + "\" fill=\"var(--accent)\""
-             + " fill-opacity=\"" + (degree[i] > 0 ? "0.75" : "0.35") + "\""
-             + " class=\"post-graph-node\"/>";
-
-        // Label — position to avoid overlap
-        std::string title = posts[i].title.get();
-        if (title.size() > 28) title = title.substr(0, 26) + "..";
-        auto anchor = (nd.x > cx) ? "start" : "end";
-        int label_dx = (nd.x > cx) ? (int)(r + 6) : -(int)(r + 6);
-
-        svg += "<text x=\"" + d2s(nd.x + label_dx) + "\" y=\"" + d2s(nd.y + 3.5)
+             + " fill-opacity=\"" + d2s(opacity) + "\""
+             + " class=\"post-graph-node\"/>"
+             + "<text x=\"" + d2s(nd.x + label_dx) + "\" y=\"" + d2s(nd.y + 4)
              + "\" text-anchor=\"" + anchor + "\" class=\"post-graph-label\">"
              + title + "</text></a>";
     }
