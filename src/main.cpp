@@ -376,6 +376,7 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
             pctx.series_name = post.series;
             pctx.series_posts = engine.posts_in_series(post.series);
         }
+        pctx.toc = c::extract_toc(post.content.get());
 
         cache->pages["/post/" + post.slug.get()] = make_cached(
             render_page(meta, ctx(c::PostFull{.post = &post, .context = &pctx})));
@@ -441,8 +442,9 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         meta.title = page.title.get();
         meta.canonical_path = "/" + page.slug.get();
         meta.og_image = page.image;
+        auto page_toc = c::extract_toc(page.content.get());
         cache->pages["/" + page.slug.get()] = make_cached(
-            render_page(meta, ctx(c::PageView{.page = &page})));
+            render_page(meta, ctx(c::PageView{.page = &page, .toc = std::move(page_toc)})));
     }
 
     // 404

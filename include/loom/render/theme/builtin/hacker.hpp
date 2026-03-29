@@ -270,6 +270,19 @@ inline const ThemeDef hacker = {
         ".series-meta"_s | color(dim_txt) | font_size(12_px),
         ".series-latest"_s | color(dim_txt) | font_size(12_px),
 
+        // ── Table of contents ──
+        ".toc"_s | border(1_px, dashed, gray) | bg(raw("#060d06")) | border_radius(0_px),
+        ".toc-title"_s | color(dim_txt),
+        ".toc-list a"_s | color(dim_p) | font_size(13_px),
+        ".toc-list a:hover"_s | color(phosphor),
+        ".toc-h3 a"_s | color(dim_txt) | font_size(12_px),
+
+        // ── Reading progress ──
+        ".reading-progress-fill"_s | bg(dim_p),
+
+        // ── Page info ──
+        ".page-info"_s | color(dim_txt) | font_size(12_px),
+
         // ── Selection ──
         "::selection"_s | bg(phosphor) | color(black)
     ),

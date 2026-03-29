@@ -271,8 +271,8 @@ Post GitSource::load_git_post(const std::string& rel_path, const std::string& se
         std::string tag;
         while (std::getline(ss, tag, ','))
         {
-            auto start = tag.find_first_not_of(" \t");
-            auto end = tag.find_last_not_of(" \t");
+            auto start = tag.find_first_not_of(" \t[");
+            auto end = tag.find_last_not_of(" \t]");
             if (start != std::string::npos)
                 tags.push_back(Tag(tag.substr(start, end - start + 1)));
         }

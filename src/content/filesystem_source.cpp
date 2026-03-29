@@ -390,8 +390,8 @@ static Post load_post(const std::string& path, const std::string& series_name, i
         std::string tag;
         while (std::getline(ss, tag, ','))
         {
-            auto start = tag.find_first_not_of(" \t");
-            auto end = tag.find_last_not_of(" \t");
+            auto start = tag.find_first_not_of(" \t[");
+            auto end = tag.find_last_not_of(" \t]");
             if (start != std::string::npos)
                 tags.push_back(Tag(tag.substr(start, end - start + 1)));
         }

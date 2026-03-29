@@ -560,6 +560,7 @@ inline css::Sheet base_pagination()
         ".pagination"_s
             | display(raw("flex")) | prop("justify-content", center)
             | prop("align-items", center) | gap(px(8))
+            | prop("flex-wrap", raw("wrap"))
             | margin_top(px(32)) | padding_top(px(20))
             | prop("border-top", raw("1px solid var(--border)")),
         ".page-numbers"_s
@@ -581,7 +582,11 @@ inline css::Sheet base_pagination()
             | color(raw("var(--muted)")) | text_decoration(none)
             | font_size(px(14)) | transition(raw("color 0.15s")),
         ".page-prev:hover,.page-next:hover"_s
-            | color(raw("var(--accent)"))
+            | color(raw("var(--accent)")),
+        ".page-info"_s
+            | color(raw("var(--muted)")) | font_size(px(12))
+            | display(block) | width(raw("100%"))
+            | text_align(center) | margin_top(px(8))
     );
 }
 
@@ -604,6 +609,52 @@ inline css::Sheet base_search()
             | border_color(raw("var(--accent)")),
         ".search-empty"_s
             | color(raw("var(--muted)")) | font_style(italic)
+    );
+}
+
+// ── Table of contents ──
+
+inline css::Sheet base_toc()
+{
+    return sheet(
+        ".toc"_s
+            | margin(raw("16px 0 24px")) | padding(raw("12px 16px"))
+            | border(px(1), solid, raw("var(--border)"))
+            | border_radius(raw("var(--border-radius)"))
+            | bg(raw("color-mix(in srgb, var(--text) 2%, var(--bg))")),
+        ".toc-title"_s
+            | font_size(px(13)) | font_weight(600) | color(raw("var(--muted)"))
+            | text_transform(uppercase) | letter_spacing(raw("0.5px"))
+            | margin_bottom(px(8)),
+        ".toc-list"_s
+            | prop("list-style", none) | padding_left(px(0)) | margin(px(0)),
+        ".toc-list li"_s
+            | margin_bottom(px(4)) | line_height(raw("1.4")),
+        ".toc-list a"_s
+            | color(raw("var(--text)")) | text_decoration(none) | font_size(px(14)),
+        ".toc-list a:hover"_s
+            | color(raw("var(--accent)")),
+        ".toc-h3"_s
+            | padding_left(px(16)),
+        ".toc-h3 a"_s
+            | font_size(px(13)) | color(raw("var(--muted)")),
+        ".toc-h3 a:hover"_s | color(raw("var(--accent)"))
+    );
+}
+
+// ── Reading progress bar ──
+
+inline css::Sheet base_reading_progress()
+{
+    return sheet(
+        ".reading-progress-bar"_s
+            | position(fixed) | top(px(0)) | left_(px(0))
+            | width(raw("100%")) | height(px(3)) | z_index(9998)
+            | bg(transparent),
+        ".reading-progress-fill"_s
+            | height(raw("100%")) | width(raw("0%"))
+            | bg(raw("var(--accent)"))
+            | transition(raw("width 0.1s linear"))
     );
 }
 
@@ -705,6 +756,8 @@ inline std::string compile_base_styles()
              + base_tag_cloud()
              + base_pagination()
              + base_search()
+             + base_toc()
+             + base_reading_progress()
              + base_responsive();
 
     return all.compile();

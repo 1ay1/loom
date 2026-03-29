@@ -67,12 +67,22 @@ struct PostNavigation
     std::optional<PostSummary> next;
 };
 
+struct TocEntry
+{
+    int level = 2;
+    std::string id;
+    std::string text;
+};
+
+std::vector<TocEntry> extract_toc(const std::string& html);
+
 struct PostContext
 {
     PostNavigation nav;
     std::vector<PostSummary> related;
     std::vector<PostSummary> series_posts;
     Series series_name{""};
+    std::vector<TocEntry> toc;
 };
 
 struct PaginationInfo
@@ -139,9 +149,11 @@ struct TagIndex        { const std::vector<TagInfo>* tag_infos = nullptr; static
 struct Archives        { const std::map<int, std::vector<PostSummary>, std::greater<int>>* by_year = nullptr; static Node render(const Archives&, const Ctx&, Children); };
 struct SeriesPage      { Series series{""}; const std::vector<PostSummary>* posts = nullptr; static Node render(const SeriesPage&, const Ctx&, Children); };
 struct SeriesIndex     { const std::vector<SeriesInfo>* all_series_info = nullptr; static Node render(const SeriesIndex&, const Ctx&, Children); };
-struct PageView        { const Page* page = nullptr; static Node render(const PageView&, const Ctx&, Children); };
+struct PageView        { const Page* page = nullptr; std::vector<TocEntry> toc; static Node render(const PageView&, const Ctx&, Children); };
 struct NotFound        { static Node render(const NotFound&, const Ctx&, Children); };
 struct SearchPage      { static Node render(const SearchPage&, const Ctx&, Children); };
+struct TableOfContents { const std::vector<TocEntry>* entries = nullptr; static Node render(const TableOfContents&, const Ctx&, Children); };
+struct ReadingProgress { static Node render(const ReadingProgress&, const Ctx&, Children); };
 
 // ─────────────────────────────────────────────────────────────────────
 //  ComponentOverrides — one std::function slot per component
@@ -180,6 +192,8 @@ struct ComponentOverrides
     RenderFn<SeriesPage> series_page{}; RenderFn<SeriesIndex>     series_index{};
     RenderFn<PageView>   page_view{};   RenderFn<NotFound>        not_found{};
     RenderFn<SearchPage> search_page{};
+    RenderFn<TableOfContents> table_of_contents{};
+    RenderFn<ReadingProgress> reading_progress{};
 
     // Type-safe lookup — resolves component type to the correct slot
     template<typename C>
@@ -221,6 +235,8 @@ struct ComponentOverrides
         else if constexpr (std::is_same_v<C, PageView>)          return page_view;
         else if constexpr (std::is_same_v<C, NotFound>)          return not_found;
         else if constexpr (std::is_same_v<C, SearchPage>)        return search_page;
+        else if constexpr (std::is_same_v<C, TableOfContents>)  return table_of_contents;
+        else if constexpr (std::is_same_v<C, ReadingProgress>)  return reading_progress;
     }
 };
 
@@ -377,6 +393,9 @@ using component::SeriesIndex;
 using component::PageView;
 using component::NotFound;
 using component::SearchPage;
+using component::TableOfContents;
+using component::ReadingProgress;
+using component::TocEntry;
 
 // DOM elements (the ones theme authors actually use)
 using dom::div;

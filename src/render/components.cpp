@@ -79,6 +79,53 @@ static std::string apply_external_new_tab(const std::string& html)
     return result;
 }
 
+std::vector<TocEntry> extract_toc(const std::string& html)
+{
+    std::vector<TocEntry> entries;
+    size_t pos = 0;
+    while (pos < html.size())
+    {
+        // Find <h2 or <h3
+        size_t h = html.find("<h", pos);
+        if (h == std::string::npos) break;
+        if (h + 3 >= html.size()) break;
+        char level_ch = html[h + 2];
+        if (level_ch != '2' && level_ch != '3') { pos = h + 3; continue; }
+        int level = level_ch - '0';
+
+        // Extract id="..."
+        size_t id_start = html.find("id=\"", h);
+        size_t tag_end = html.find('>', h);
+        if (id_start == std::string::npos || tag_end == std::string::npos || id_start > tag_end)
+        { pos = h + 3; continue; }
+        id_start += 4;
+        size_t id_end = html.find('"', id_start);
+        if (id_end == std::string::npos) { pos = h + 3; continue; }
+        std::string id = html.substr(id_start, id_end - id_start);
+
+        // Extract text content (strip inner tags)
+        size_t content_start = tag_end + 1;
+        std::string close_tag = "</h" + std::string(1, level_ch) + ">";
+        size_t content_end = html.find(close_tag, content_start);
+        if (content_end == std::string::npos) { pos = h + 3; continue; }
+
+        std::string text;
+        bool in_tag = false;
+        for (size_t i = content_start; i < content_end; ++i)
+        {
+            if (html[i] == '<') { in_tag = true; continue; }
+            if (html[i] == '>') { in_tag = false; continue; }
+            if (!in_tag) text += html[i];
+        }
+
+        if (!id.empty() && !text.empty())
+            entries.push_back({level, std::move(id), std::move(text)});
+
+        pos = content_end + close_tag.size();
+    }
+    return entries;
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  Static assets
 // ═══════════════════════════════════════════════════════════════════════
@@ -548,9 +595,18 @@ Node SeriesNav::render(const SeriesNav& props, const Ctx&, Children)
     if (props.series_name.empty() || !props.posts || props.posts->size() <= 1)
         return Node{Node::Fragment, {}, {}, {}, {}};
 
+    int current_part = 0;
+    int total = static_cast<int>(props.posts->size());
+    for (int i = 0; i < total; ++i)
+        if ((*props.posts)[i].slug.get() == props.current_slug)
+        { current_part = i + 1; break; }
+
+    std::string label = "Part " + std::to_string(current_part) + " of "
+                      + std::to_string(total) + " in <strong>"
+                      + props.series_name + "</strong>";
+
     return nav(class_("series-nav"),
-        p_(class_("series-label"),
-            raw("Part of series: <strong>" + props.series_name + "</strong>")),
+        p_(class_("series-label"), raw(label)),
         ol(class_("series-list"),
             each(*props.posts, [&](const PostSummary& sp) -> Node {
                 if (sp.slug.get() == props.current_slug)
@@ -568,6 +624,7 @@ Node PostFull::render(const PostFull& props, const Ctx& ctx, Children ch)
     const auto  pctx   = props.context ? *props.context : PostContext{};
 
     return article(class_("post-full"),
+        ctx(ReadingProgress{}),
         h1(post.title.get()),
         ctx(PostMeta{.post = props.post}),
         when(layout.show_post_tags && !post.tags.empty(),
@@ -578,6 +635,7 @@ Node PostFull::render(const PostFull& props, const Ctx& ctx, Children ch)
             .posts       = &pctx.series_posts,
             .current_slug = post.slug.get()
         }),
+        ctx(TableOfContents{.entries = &pctx.toc}),
         ctx(PostContent{.post = props.post}),
         ctx(PostNav{.navigation = &pctx.nav}),
         ctx(RelatedPosts{.posts = &pctx.related}),
@@ -665,7 +723,9 @@ Node Pagination::render(const Pagination& props, const Ctx&, Children)
             a(class_("page-prev"), href(info.prev_url()), raw("&larr; Prev"))),
         div(class_("page-numbers"), component::fragment(std::move(page_links))),
         when(info.has_next(),
-            a(class_("page-next"), href(info.next_url()), raw("Next &rarr;")))
+            a(class_("page-next"), href(info.next_url()), raw("Next &rarr;"))),
+        span(class_("page-info"),
+            "Page " + std::to_string(info.current_page) + " of " + std::to_string(info.total_pages))
     );
 }
 
@@ -798,11 +858,13 @@ Node SeriesIndex::render(const SeriesIndex& props, const Ctx& ctx, Children)
     );
 }
 
-Node PageView::render(const PageView& props, const Ctx&, Children ch)
+Node PageView::render(const PageView& props, const Ctx& ctx, Children ch)
 {
     if (!props.page) return Node{Node::Fragment, {}, {}, {}, {}};
     return article(class_("page"),
+        ctx(ReadingProgress{}),
         h1(props.page->title.get()),
+        ctx(TableOfContents{.entries = &props.toc}),
         div(class_("page-content"), raw(props.page->content.get())),
         component::fragment(std::move(ch))
     );
@@ -870,6 +932,48 @@ Node SearchPage::render(const SearchPage&, const Ctx&, Children)
                 attr("autofocus", ""))),
         div(id("searchResults")),
         script(raw(SEARCH_JS))
+    );
+}
+
+Node TableOfContents::render(const TableOfContents& props, const Ctx&, Children)
+{
+    if (!props.entries || props.entries->size() < 3)
+        return Node{Node::Fragment, {}, {}, {}, {}};
+
+    return nav(class_("toc"), aria_label("Table of Contents"),
+        p_(class_("toc-title"), "Contents"),
+        ul(class_("toc-list"),
+            each(*props.entries, [](const TocEntry& e) {
+                return li(class_(e.level == 3 ? "toc-h3" : "toc-h2"),
+                    a(href("#" + e.id), e.text));
+            }))
+    );
+}
+
+static const char* PROGRESS_JS = R"JS(
+(function(){
+    var bar = document.getElementById('readingProgress');
+    if (!bar) return;
+    var article = document.querySelector('.post-content,.page-content');
+    if (!article) return;
+    function update() {
+        var rect = article.getBoundingClientRect();
+        var total = rect.height - window.innerHeight;
+        if (total <= 0) { bar.style.width = '100%'; return; }
+        var pct = Math.min(100, Math.max(0, (-rect.top / total) * 100));
+        bar.style.width = pct + '%';
+    }
+    window.addEventListener('scroll', update, {passive: true});
+    update();
+})();
+)JS";
+
+Node ReadingProgress::render(const ReadingProgress&, const Ctx&, Children)
+{
+    return dom::fragment(
+        div(class_("reading-progress-bar"),
+            div(class_("reading-progress-fill"), id("readingProgress"))),
+        script(raw(PROGRESS_JS))
     );
 }
 
