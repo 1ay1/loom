@@ -986,22 +986,28 @@ inline css::Sheet base_post_graph()
 {
     return sheet(
         ".post-graph-section"_s
-            | margin_bottom(px(32)),
+            | margin_bottom(px(32))
+            | padding(raw("20px 0")),
         ".post-graph-section h3"_s
-            | font_size(px(14)) | font_weight(600) | color(raw("var(--muted)"))
-            | text_transform(uppercase) | letter_spacing(raw("0.5px"))
-            | margin_bottom(px(12)),
+            | font_size(px(13)) | font_weight(600) | color(raw("var(--muted)"))
+            | text_transform(uppercase) | letter_spacing(raw("1px"))
+            | margin_bottom(px(16)),
         ".post-graph"_s
             | width(raw("100%")) | height(raw("auto"))
-            | max_height(px(300))
-            | margin_bottom(px(20)),
+            | margin_bottom(px(20))
+            | prop("border-radius", raw("var(--border-radius)"))
+            | bg(raw("color-mix(in srgb, var(--text) 3%, var(--bg))"))
+            | border(1_px, solid, raw("var(--border)")),
         ".post-graph-node"_s
-            | transition(raw("r 0.2s, fill 0.2s")),
+            | transition(raw("r 0.2s ease, fill-opacity 0.2s ease")),
         ".post-graph a:hover circle"_s
-            | prop("r", raw("7")) | prop("fill-opacity", raw("0.8")),
+            | prop("r", raw("10")) | prop("fill-opacity", raw("1")),
+        ".post-graph a:hover text"_s
+            | prop("fill", raw("var(--accent)")) | font_weight(600),
         ".post-graph-label"_s
-            | font_size(px(10)) | prop("fill", raw("var(--muted)"))
+            | font_size(px(11)) | prop("fill", raw("var(--muted)"))
             | prop("font-family", raw("var(--font)"))
+            | transition(raw("fill 0.2s ease"))
     );
 }
 
