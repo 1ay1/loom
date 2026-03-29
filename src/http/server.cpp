@@ -21,12 +21,6 @@ namespace loom
         g_running.store(false);
     }
 
-    static void set_nonblocking(int fd)
-    {
-        int flags = fcntl(fd, F_GETFL, 0);
-        fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-    }
-
     // ── ServerSocket typestate transitions ────────────────────────
     //
     // Each transition is a linear implication (A ⊸ B): it consumes
@@ -35,7 +29,8 @@ namespace loom
 
     auto create_server_socket() -> ServerSocket<Unbound>
     {
-        int fd = socket(AF_INET6, SOCK_STREAM, 0);
+        // SOCK_NONBLOCK from the start — no separate fcntl
+        int fd = socket(AF_INET6, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
         if (fd < 0)
             throw std::runtime_error("socket() failed");
 
@@ -66,7 +61,17 @@ namespace loom
         if (::listen(fd_.get(), SOMAXCONN) < 0)
             throw std::runtime_error("listen() failed");
 
-        set_nonblocking(fd_.get());
+        // TCP_DEFER_ACCEPT: don't wake on SYN-ACK, wait until client
+        // sends actual data. Saves one event loop round-trip per connection.
+        int defer = 5; // seconds to wait for data before dropping
+        setsockopt(fd_.get(), IPPROTO_TCP, TCP_DEFER_ACCEPT, &defer, sizeof(defer));
+
+        // TCP_FASTOPEN: allow data in SYN packet for repeat visitors.
+        // Queue length of 128 pending TFO connections.
+        int qlen = 128;
+        setsockopt(fd_.get(), IPPROTO_TCP, TCP_FASTOPEN, &qlen, sizeof(qlen));
+
+        // Socket is already non-blocking from create_server_socket()
 
         return ServerSocket<Listening>{std::move(fd_)};
     }
@@ -104,7 +109,10 @@ namespace loom
     {
         while (true)
         {
-            int client_fd = accept(server_fd_.get(), nullptr, nullptr);
+            // accept4: one syscall gives us non-blocking + cloexec.
+            // Old path was accept() + fcntl(GETFL) + fcntl(SETFL) = 3 syscalls.
+            int client_fd = accept4(server_fd_.get(), nullptr, nullptr,
+                                     SOCK_NONBLOCK | SOCK_CLOEXEC);
             if (client_fd < 0)
             {
                 if (errno == EAGAIN || errno == EWOULDBLOCK)
@@ -114,8 +122,6 @@ namespace loom
                 perror("accept");
                 break;
             }
-
-            set_nonblocking(client_fd);
 
             int flag = 1;
             setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
@@ -289,13 +295,10 @@ namespace loom
         auto* write = std::get_if<WritePhase>(&conn.phase);
         if (!write) return;
 
-        // TCP_CORK: coalesce small writes into fewer TCP segments.
-        // Headers + body in one packet instead of two.
-        int cork = 1;
-        setsockopt(fd, IPPROTO_TCP, TCP_CORK, &cork, sizeof(cork));
+        // No TCP_CORK needed — response is a single contiguous buffer
+        // and TCP_NODELAY is already set, so it goes out immediately.
+        // TCP_CORK was adding 2 unnecessary setsockopt syscalls per response.
 
-        // std::visit over OwnedWrite | ViewWrite — both share the
-        // cursor/remaining/advance interface via structural typing
         while (true)
         {
             auto remaining = std::visit(
@@ -332,10 +335,6 @@ namespace loom
             close_connection(fd);
             return;
         }
-
-        // Uncork: flush any remaining buffered data immediately
-        cork = 0;
-        setsockopt(fd, IPPROTO_TCP, TCP_CORK, &cork, sizeof(cork));
 
         // Write complete
         conn.last_activity_ms = now_ms();
@@ -378,7 +377,7 @@ namespace loom
         signal(SIGTERM, signal_handler);
         signal(SIGPIPE, SIG_IGN);
 
-        epoll_fd_ = FileDescriptor{epoll_create1(0)};
+        epoll_fd_ = FileDescriptor{epoll_create1(EPOLL_CLOEXEC)};
         if (!epoll_fd_)
         {
             perror("epoll_create1");
