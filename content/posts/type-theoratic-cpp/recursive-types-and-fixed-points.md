@@ -1,6 +1,6 @@
 ---
 title: "Recursive Types and Fixed Points — The Algebra of Data"
-date: 2026-04-06
+date: 2026-03-28
 slug: recursive-types-and-fixed-points
 tags: [c++20, type-theory, recursive-types, fixed-points, f-algebras, catamorphisms]
 excerpt: "A list contains lists. A tree contains trees. How do you define a type in terms of itself? Fixed points, F-algebras, and catamorphisms — the formal machinery behind every fold, every visitor, and every recursive data structure."

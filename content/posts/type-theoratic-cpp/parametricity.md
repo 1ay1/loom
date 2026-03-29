@@ -1,6 +1,6 @@
 ---
 title: "Parametricity — Theorems for Free"
-date: 2026-04-04
+date: 2026-03-26
 slug: parametricity
 tags: [c++20, type-theory, parametricity, free-theorems, polymorphism]
 excerpt: "If a function works for any type and never inspects it, its behavior is constrained by the type signature alone. You get theorems without proofs. This is parametricity — and it explains why phantom types, generic algorithms, and templates are more powerful than they look."

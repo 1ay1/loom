@@ -1,6 +1,6 @@
 ---
 title: "Phantom Types — Making the Compiler See What Isn't There"
-date: 2026-03-31
+date: 2026-03-22
 slug: phantom-types
 tags: [c++20, type-theory, phantom-types, templates, zero-cost, parametricity]
 excerpt: "A phantom type parameter exists only in the type system — it carries no data, occupies no memory, and vanishes in the binary. Parametricity guarantees it works. Representation independence makes it free."

@@ -1,6 +1,6 @@
 ---
 title: "Typestate Programming — When Types Remember What Happened"
-date: 2026-04-01
+date: 2026-03-23
 slug: typestate-programming
 tags: [c++20, type-theory, typestate, state-machines, linear-logic, protocols]
 excerpt: "States as types. Transitions as functions that consume and produce. Grounded in linear logic — where every resource must be used exactly once — typestate turns protocol violations into compile errors."

@@ -1,6 +1,6 @@
 ---
 title: "A Program Is a Theory — Foundations of Type-Theoretic C++"
-date: 2026-03-29
+date: 2026-03-20
 slug: type-theoretic-foundations
 tags: [c++20, type-theory, compile-time, design, foundations]
 excerpt: "Type judgments, formation rules, Curry-Howard, and the lambda cube — real type theory, made concrete in modern C++. A program is a formal system, and the compiler is its first reviewer."

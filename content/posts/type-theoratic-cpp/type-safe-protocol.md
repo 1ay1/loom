@@ -1,6 +1,6 @@
 ---
 title: "Building a Type-Safe Protocol — The Grand Synthesis"
-date: 2026-04-07
+date: 2026-03-29
 slug: type-safe-protocol
 tags: [c++20, type-theory, typestate, protocols, compile-time, capstone]
 excerpt: "We combine every technique from this series — algebraic types, phantom types, typestate, concepts, compile-time data, parametricity, linear logic, F-algebras — to build a compile-time verified protocol where violations are type errors, not runtime surprises."

@@ -1,6 +1,6 @@
 ---
 title: "Sum Types and Product Types — The Algebra of C++ Types"
-date: 2026-03-30
+date: 2026-03-21
 slug: algebraic-data-types
 tags: [c++20, type-theory, variant, tuple, algebraic-types, initial-algebras]
 excerpt: "Types form a semiring. Products multiply, sums add, and the distributive law lets you factor types like polynomials. Initial algebras, catamorphisms, and the deep reason why std::visit is the only operation you need."
