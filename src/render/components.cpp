@@ -954,7 +954,7 @@ static const char* SEARCH_JS = R"JS(
 })();
 )JS";
 
-Node SearchPage::render(const SearchPage&, const Ctx&, Children)
+Node SearchPage::render(const SearchPage& props, const Ctx& ctx, Children)
 {
     return section(class_("search-page"),
         h2("Search"),
@@ -964,7 +964,8 @@ Node SearchPage::render(const SearchPage&, const Ctx&, Children)
                 attr("autocomplete", "off"),
                 attr("autofocus", ""))),
         div(id("searchResults")),
-        script(raw(SEARCH_JS))
+        script(raw(SEARCH_JS)),
+        ctx(PostGraph{.posts = props.posts})
     );
 }
 

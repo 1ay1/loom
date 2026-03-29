@@ -579,7 +579,7 @@ static std::shared_ptr<const SiteCache> build_cache(Source& source)
         meta.title = "Search";
         meta.canonical_path = "/search";
         cache->pages["/search"] = make_cached_html(
-            render_page(meta, ctx(c::SearchPage{})), link_preload);
+            render_page(meta, ctx(c::SearchPage{.posts = &sidebar_data.recent_posts})), link_preload);
     }
 
     // Search JSON index

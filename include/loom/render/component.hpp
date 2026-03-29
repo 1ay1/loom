@@ -151,7 +151,7 @@ struct SeriesPage      { Series series{""}; const std::vector<PostSummary>* post
 struct SeriesIndex     { const std::vector<SeriesInfo>* all_series_info = nullptr; static Node render(const SeriesIndex&, const Ctx&, Children); };
 struct PageView        { const Page* page = nullptr; std::vector<TocEntry> toc; static Node render(const PageView&, const Ctx&, Children); };
 struct NotFound        { static Node render(const NotFound&, const Ctx&, Children); };
-struct SearchPage      { static Node render(const SearchPage&, const Ctx&, Children); };
+struct SearchPage      { const std::vector<PostSummary>* posts = nullptr; static Node render(const SearchPage&, const Ctx&, Children); };
 struct TableOfContents { const std::vector<TocEntry>* entries = nullptr; static Node render(const TableOfContents&, const Ctx&, Children); };
 struct ReadingProgress { static Node render(const ReadingProgress&, const Ctx&, Children); };
 struct PostGraph       { const std::vector<PostSummary>* posts = nullptr; static Node render(const PostGraph&, const Ctx&, Children); };
