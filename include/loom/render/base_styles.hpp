@@ -1037,11 +1037,15 @@ inline css::Sheet base_post_graph()
             | color(raw("var(--text)"))
             | prop("pointer-events", none)
             | prop("z-index", raw("10001"))
-            | prop("max-width", raw("280px"))
-            | prop("white-space", raw("nowrap"))
+            | prop("max-width", raw("min(400px, 60vw)"))
+            | overflow(hidden)
+            | prop("text-overflow", raw("ellipsis"))
             | prop("box-shadow", raw("0 2px 8px color-mix(in srgb, var(--text) 10%, transparent)")),
         ".post-graph-tip strong"_s
-            | display(block) | color(raw("var(--accent)")),
+            | display(block) | color(raw("var(--accent)"))
+            | prop("white-space", raw("nowrap"))
+            | overflow(hidden)
+            | prop("text-overflow", raw("ellipsis")),
         ".post-graph-tip-conn"_s
             | font_size(px(11)) | color(raw("var(--muted)"))
             | display(block) | margin_top(px(2)),
