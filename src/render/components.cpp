@@ -1320,8 +1320,9 @@ function unhighlight(){
     c.setAttribute('fill-opacity',N[j].d>0?'0.7':'0.3');
     c.setAttribute('r',N[j].r);
   });
-  labelEls.forEach(function(t){
-    t.style.opacity=zoom>=1.5?'1':'0';
+  labelEls.forEach(function(t,i){
+    var isHub=N[i].d>=5;
+    t.style.opacity=(zoom>=1.4||isHub)?'1':'0';
   });
   edgeEls.forEach(function(line){
     var w=E.find(function(e){return e.a==+line.dataset.a&&e.b==+line.dataset.b});
@@ -1332,11 +1333,13 @@ function unhighlight(){
   });
 }
 
-// Semantic zoom: show labels when zoomed in enough
+// Semantic zoom: hub labels visible at default zoom, all labels when zoomed
 function updateLabels(){
   if(activeNode>=0)return;
-  var show=zoom>=1.5;
-  labelEls.forEach(function(t){t.style.opacity=show?'1':'0'});
+  labelEls.forEach(function(t,i){
+    var isHub=N[i].d>=5;
+    t.style.opacity=(zoom>=1.4||isHub)?'1':'0';
+  });
 }
 
 // Zoom with wheel — zoom toward cursor position
@@ -1426,6 +1429,7 @@ svg.addEventListener('dblclick',function(ev){
 
 svg.style.cursor='grab';
 updateTransform();
+updateLabels();
 })();
 )JS";
 
@@ -1483,70 +1487,92 @@ Node PostGraph::render(const PostGraph& props, const Ctx&, Children)
     std::vector<int> degree(n, 0);
     for (const auto& e : edges) { degree[e.a] += e.weight; degree[e.b] += e.weight; }
 
-    // ── Force-directed layout ──
-    int w = 900, h = 500;
-    double cx = w / 2.0, cy = h / 2.0, pad = 50.0;
+    // ── Force-directed layout (unconstrained → normalize) ──
+    //
+    // Key insight: DO NOT clamp positions during simulation. Let the
+    // physics determine the natural layout, then scale to fit the canvas.
+    // Clamping during simulation creates artificial clusters at boundaries.
 
     struct FNode { double x, y, vx, vy; };
     std::vector<FNode> pos(n);
     for (size_t i = 0; i < n; ++i)
     {
         double angle = (2.0 * PI * i) / n;
-        pos[i] = { cx + 160.0 * std::cos(angle), cy + 160.0 * std::sin(angle), 0, 0 };
+        pos[i] = { 200.0 * std::cos(angle), 200.0 * std::sin(angle), 0, 0 };
     }
 
-    for (int iter = 0; iter < 150; ++iter)
+    for (int iter = 0; iter < 200; ++iter)
     {
-        double temp = 1.5 * (1.0 - (double)iter / 150.0);
+        double temp = 2.0 * (1.0 - (double)iter / 200.0);
+
+        // Repulsion (Coulomb)
         for (size_t i = 0; i < n; ++i)
             for (size_t j = i + 1; j < n; ++j)
             {
                 double dx = pos[i].x - pos[j].x, dy = pos[i].y - pos[j].y;
-                double d2 = dx * dx + dy * dy; if (d2 < 1) d2 = 1;
-                double d = std::sqrt(d2), f = 25000.0 / d2;
+                double d2 = dx * dx + dy * dy;
+                if (d2 < 1) d2 = 1;
+                double d = std::sqrt(d2);
+                double f = 30000.0 / d2;
                 double fx = dx / d * f * temp, fy = dy / d * f * temp;
                 pos[i].vx += fx; pos[i].vy += fy;
                 pos[j].vx -= fx; pos[j].vy -= fy;
             }
+
+        // Attraction along edges (spring to ideal length)
         for (const auto& e : edges)
         {
             double dx = pos[e.b].x - pos[e.a].x, dy = pos[e.b].y - pos[e.a].y;
-            double d = std::sqrt(dx * dx + dy * dy); if (d < 1) d = 1;
-            double f = (d - 130.0) * 0.015 * temp;
+            double d = std::sqrt(dx * dx + dy * dy);
+            if (d < 1) d = 1;
+            double ideal = 100.0;
+            double f = (d - ideal) * 0.02 * temp;
             double fx = dx / d * f, fy = dy / d * f;
             pos[e.a].vx += fx; pos[e.a].vy += fy;
             pos[e.b].vx -= fx; pos[e.b].vy -= fy;
         }
+
+        // Gentle gravity toward origin
         for (size_t i = 0; i < n; ++i)
         {
-            pos[i].vx += (cx - pos[i].x) * 0.004 * temp;
-            pos[i].vy += (cy - pos[i].y) * 0.004 * temp;
-            pos[i].x += pos[i].vx * 0.3; pos[i].y += pos[i].vy * 0.3;
-            pos[i].vx *= 0.4; pos[i].vy *= 0.4;
-            pos[i].x = std::max(pad, std::min((double)w - pad, pos[i].x));
-            pos[i].y = std::max(pad, std::min((double)h - pad, pos[i].y));
+            pos[i].vx -= pos[i].x * 0.002 * temp;
+            pos[i].vy -= pos[i].y * 0.002 * temp;
+            pos[i].x += pos[i].vx * 0.3;
+            pos[i].y += pos[i].vy * 0.3;
+            pos[i].vx *= 0.4;
+            pos[i].vy *= 0.4;
+            // NO clamping — let the layout breathe
         }
     }
 
-    // Min-distance enforcement
-    for (int pass = 0; pass < 15; ++pass)
-        for (size_t i = 0; i < n; ++i)
-            for (size_t j = i + 1; j < n; ++j)
-            {
-                double dx = pos[j].x - pos[i].x, dy = pos[j].y - pos[i].y;
-                double d = std::sqrt(dx * dx + dy * dy);
-                if (d < 55.0 && d > 0.1)
-                {
-                    double p = (55.0 - d) / 2.0;
-                    double px = dx / d * p, py = dy / d * p;
-                    pos[i].x -= px; pos[i].y -= py;
-                    pos[j].x += px; pos[j].y += py;
-                    pos[i].x = std::max(pad, std::min((double)w - pad, pos[i].x));
-                    pos[i].y = std::max(pad, std::min((double)h - pad, pos[i].y));
-                    pos[j].x = std::max(pad, std::min((double)w - pad, pos[j].x));
-                    pos[j].y = std::max(pad, std::min((double)h - pad, pos[j].y));
-                }
-            }
+    // Normalize: compute bounding box → scale to fit canvas with padding
+    int w = 960, h = 500;
+    double pad = 60.0;
+
+    double minx = pos[0].x, maxx = pos[0].x, miny = pos[0].y, maxy = pos[0].y;
+    for (size_t i = 1; i < n; ++i)
+    {
+        minx = std::min(minx, pos[i].x); maxx = std::max(maxx, pos[i].x);
+        miny = std::min(miny, pos[i].y); maxy = std::max(maxy, pos[i].y);
+    }
+
+    double rangex = maxx - minx, rangey = maxy - miny;
+    if (rangex < 1) rangex = 1;
+    if (rangey < 1) rangey = 1;
+    double scale = std::min((w - 2 * pad) / rangex, (h - 2 * pad) / rangey);
+
+    for (size_t i = 0; i < n; ++i)
+    {
+        pos[i].x = pad + (pos[i].x - minx) * scale;
+        pos[i].y = pad + (pos[i].y - miny) * scale;
+    }
+
+    // Center the layout in the canvas
+    double cx2 = 0, cy2 = 0;
+    for (size_t i = 0; i < n; ++i) { cx2 += pos[i].x; cy2 += pos[i].y; }
+    cx2 /= n; cy2 /= n;
+    double shiftx = w / 2.0 - cx2, shifty = h / 2.0 - cy2;
+    for (size_t i = 0; i < n; ++i) { pos[i].x += shiftx; pos[i].y += shifty; }
 
     // ── Emit JSON data for client-side rendering ──
     auto d2s = [](double v) {
