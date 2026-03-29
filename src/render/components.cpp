@@ -1194,7 +1194,240 @@ static const char* CODE_COPY_JS = R"JS(
 })();
 )JS";
 
-// ── PostGraph: force-directed tag-relationship SVG ──
+// ── PostGraph: interactive force-directed graph ──
+//
+// Server-side: force layout + MST edge selection → JSON data
+// Client-side: SVG rendering, pan/zoom, hover highlighting, semantic labels
+
+static const char* POSTGRAPH_JS = R"JS(
+(function(){
+var el=document.getElementById('post-graph-container');
+if(!el)return;
+var data=JSON.parse(document.getElementById('post-graph-data').textContent);
+var N=data.nodes,E=data.edges;
+var W=data.w,H=data.h;
+
+// Create SVG
+var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+svg.setAttribute('viewBox','0 0 '+W+' '+H);
+svg.setAttribute('class','post-graph');
+svg.style.width='100%';
+svg.style.height='100%';
+el.appendChild(svg);
+
+// Transform group for pan/zoom
+var g=document.createElementNS('http://www.w3.org/2000/svg','g');
+svg.appendChild(g);
+
+// State
+var zoom=1,panX=0,panY=0,dragging=false,dragX=0,dragY=0;
+var activeNode=-1;
+
+// Build adjacency for highlight lookup
+var adj={};
+E.forEach(function(e){
+  if(!adj[e.a])adj[e.a]=[];
+  if(!adj[e.b])adj[e.b]=[];
+  adj[e.a].push(e.b);
+  adj[e.b].push(e.a);
+});
+
+function updateTransform(){
+  g.setAttribute('transform','translate('+panX+','+panY+') scale('+zoom+')');
+}
+
+// Draw edges
+var edgeEls=[];
+E.forEach(function(e){
+  var line=document.createElementNS('http://www.w3.org/2000/svg','line');
+  line.setAttribute('x1',N[e.a].x);line.setAttribute('y1',N[e.a].y);
+  line.setAttribute('x2',N[e.b].x);line.setAttribute('y2',N[e.b].y);
+  line.setAttribute('stroke','var(--accent)');
+  line.setAttribute('stroke-width',e.w>=4?'2':e.w>=3?'1.5':'1');
+  line.setAttribute('stroke-opacity',e.w>=4?'0.4':e.w>=3?'0.25':'0.12');
+  line.dataset.a=e.a;line.dataset.b=e.b;
+  g.appendChild(line);edgeEls.push(line);
+});
+
+// Draw nodes
+var nodeEls=[],labelEls=[];
+N.forEach(function(nd,i){
+  var gr=document.createElementNS('http://www.w3.org/2000/svg','g');
+  gr.style.cursor='pointer';
+  gr.dataset.idx=i;
+
+  var c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+  c.setAttribute('cx',nd.x);c.setAttribute('cy',nd.y);
+  c.setAttribute('r',nd.r);
+  c.setAttribute('fill','var(--accent)');
+  c.setAttribute('fill-opacity',nd.d>0?'0.7':'0.3');
+  gr.appendChild(c);
+
+  var t=document.createElementNS('http://www.w3.org/2000/svg','text');
+  var anchor=nd.x>W/2?'start':'end';
+  var dx=nd.x>W/2?(nd.r+8):-(nd.r+8);
+  t.setAttribute('x',nd.x+dx);t.setAttribute('y',nd.y+4);
+  t.setAttribute('text-anchor',anchor);
+  t.setAttribute('class','post-graph-label');
+  t.textContent=nd.t;
+  gr.appendChild(t);
+
+  gr.addEventListener('mouseenter',function(){highlight(i)});
+  gr.addEventListener('mouseleave',function(){unhighlight()});
+  gr.addEventListener('click',function(ev){
+    ev.preventDefault();window.location='/post/'+nd.s;
+  });
+
+  // Touch: tap to highlight, double-tap to navigate
+  var lastTap=0;
+  gr.addEventListener('touchend',function(ev){
+    var now=Date.now();
+    if(now-lastTap<300){window.location='/post/'+nd.s}
+    else{highlight(i)}
+    lastTap=now;
+    ev.preventDefault();
+  });
+
+  g.appendChild(gr);
+  nodeEls.push(c);labelEls.push(t);
+});
+
+function highlight(i){
+  if(activeNode===i)return;
+  activeNode=i;
+  var connected=adj[i]||[];
+  var connSet={};connSet[i]=1;
+  connected.forEach(function(j){connSet[j]=1});
+
+  nodeEls.forEach(function(c,j){
+    c.setAttribute('fill-opacity',connSet[j]?'1':'0.08');
+    if(j===i)c.setAttribute('r',parseFloat(c.getAttribute('r'))*1.4);
+  });
+  labelEls.forEach(function(t,j){
+    t.style.opacity=connSet[j]?'1':'0';
+  });
+  edgeEls.forEach(function(line){
+    var a=+line.dataset.a,b=+line.dataset.b;
+    var on=(a===i||b===i);
+    line.setAttribute('stroke-opacity',on?'0.7':'0.03');
+    line.setAttribute('stroke-width',on?'2.5':'0.5');
+  });
+}
+
+function unhighlight(){
+  activeNode=-1;
+  nodeEls.forEach(function(c,j){
+    c.setAttribute('fill-opacity',N[j].d>0?'0.7':'0.3');
+    c.setAttribute('r',N[j].r);
+  });
+  labelEls.forEach(function(t){
+    t.style.opacity=zoom>=1.5?'1':'0';
+  });
+  edgeEls.forEach(function(line){
+    var w=E.find(function(e){return e.a==+line.dataset.a&&e.b==+line.dataset.b});
+    if(w){
+      line.setAttribute('stroke-opacity',w.w>=4?'0.4':w.w>=3?'0.25':'0.12');
+      line.setAttribute('stroke-width',w.w>=4?'2':w.w>=3?'1.5':'1');
+    }
+  });
+}
+
+// Semantic zoom: show labels when zoomed in enough
+function updateLabels(){
+  if(activeNode>=0)return;
+  var show=zoom>=1.5;
+  labelEls.forEach(function(t){t.style.opacity=show?'1':'0'});
+}
+
+// Zoom with wheel — zoom toward cursor position
+svg.addEventListener('wheel',function(ev){
+  ev.preventDefault();
+  var rect=svg.getBoundingClientRect();
+  var mx=(ev.clientX-rect.left)/rect.width*W;
+  var my=(ev.clientY-rect.top)/rect.height*H;
+
+  var oldZ=zoom;
+  var delta=ev.deltaY>0?0.9:1.1;
+  zoom=Math.max(0.5,Math.min(8,zoom*delta));
+
+  // Zoom toward cursor
+  panX=mx-(mx-panX)*(zoom/oldZ);
+  panY=my-(my-panY)*(zoom/oldZ);
+  updateTransform();updateLabels();
+},{passive:false});
+
+// Pan with mouse drag
+svg.addEventListener('mousedown',function(ev){
+  if(ev.button!==0)return;
+  dragging=true;dragX=ev.clientX;dragY=ev.clientY;
+  svg.style.cursor='grabbing';
+  ev.preventDefault();
+});
+window.addEventListener('mousemove',function(ev){
+  if(!dragging)return;
+  var rect=svg.getBoundingClientRect();
+  var scaleX=W/rect.width,scaleY=H/rect.height;
+  panX+=(ev.clientX-dragX)*scaleX;
+  panY+=(ev.clientY-dragY)*scaleY;
+  dragX=ev.clientX;dragY=ev.clientY;
+  updateTransform();
+});
+window.addEventListener('mouseup',function(){
+  dragging=false;svg.style.cursor='grab';
+});
+
+// Touch pan/pinch zoom
+var touches={};
+svg.addEventListener('touchstart',function(ev){
+  for(var i=0;i<ev.changedTouches.length;i++){
+    var t=ev.changedTouches[i];
+    touches[t.identifier]={x:t.clientX,y:t.clientY};
+  }
+},{passive:true});
+svg.addEventListener('touchmove',function(ev){
+  ev.preventDefault();
+  var keys=Object.keys(touches);
+  if(keys.length===1&&ev.touches.length===1){
+    // Pan
+    var t=ev.touches[0],prev=touches[t.identifier];
+    if(prev){
+      var rect=svg.getBoundingClientRect();
+      panX+=(t.clientX-prev.x)*(W/rect.width);
+      panY+=(t.clientY-prev.y)*(H/rect.height);
+      touches[t.identifier]={x:t.clientX,y:t.clientY};
+      updateTransform();
+    }
+  }else if(ev.touches.length===2){
+    // Pinch zoom
+    var t1=ev.touches[0],t2=ev.touches[1];
+    var dist=Math.sqrt(Math.pow(t1.clientX-t2.clientX,2)+Math.pow(t1.clientY-t2.clientY,2));
+    if(touches._pinch){
+      var delta=dist/touches._pinch;
+      zoom=Math.max(0.5,Math.min(8,zoom*delta));
+      updateTransform();updateLabels();
+    }
+    touches._pinch=dist;
+    touches[t1.identifier]={x:t1.clientX,y:t1.clientY};
+    touches[t2.identifier]={x:t2.clientX,y:t2.clientY};
+  }
+},{passive:false});
+svg.addEventListener('touchend',function(ev){
+  for(var i=0;i<ev.changedTouches.length;i++)
+    delete touches[ev.changedTouches[i].identifier];
+  if(ev.touches.length<2)delete touches._pinch;
+},{passive:true});
+
+// Double-click to reset view
+svg.addEventListener('dblclick',function(ev){
+  ev.preventDefault();
+  zoom=1;panX=0;panY=0;
+  updateTransform();updateLabels();
+});
+
+svg.style.cursor='grab';
+updateTransform();
+})();
+)JS";
 
 Node PostGraph::render(const PostGraph& props, const Ctx&, Children)
 {
@@ -1202,15 +1435,14 @@ Node PostGraph::render(const PostGraph& props, const Ctx&, Children)
         return Node{Node::Fragment, {}, {}, {}, {}};
 
     const auto& posts = *props.posts;
-    auto n = std::min(posts.size(), size_t(20));
+    auto n = std::min(posts.size(), size_t(30));
     constexpr double PI = 3.14159265358979;
 
-    // ── Build full adjacency ──
+    // ── Build adjacency ──
     struct Edge { size_t a, b; int weight; };
-    std::vector<std::vector<std::pair<size_t, int>>> adj(n); // adj[i] = {(j, weight), ...}
+    std::vector<std::vector<std::pair<size_t, int>>> adj(n);
 
     for (size_t i = 0; i < n; ++i)
-    {
         for (size_t j = i + 1; j < n; ++j)
         {
             int shared = 0;
@@ -1223,9 +1455,8 @@ Node PostGraph::render(const PostGraph& props, const Ctx&, Children)
                 adj[j].push_back({i, shared});
             }
         }
-    }
 
-    // Collect all candidate edges, sort by weight descending
+    // MST + strong extras for sparse graph
     std::vector<Edge> all_edges;
     for (size_t i = 0; i < n; ++i)
         for (const auto& [j, w] : adj[i])
@@ -1233,8 +1464,6 @@ Node PostGraph::render(const PostGraph& props, const Ctx&, Children)
     std::sort(all_edges.begin(), all_edges.end(),
         [](const Edge& a, const Edge& b) { return a.weight > b.weight; });
 
-    // Kruskal-style: take strongest edges first, but cap at n-1+extra
-    // so the graph is sparse. Union-find to track components.
     std::vector<size_t> parent(n);
     for (size_t i = 0; i < n; ++i) parent[i] = i;
     std::function<size_t(size_t)> find = [&](size_t x) -> size_t {
@@ -1242,121 +1471,74 @@ Node PostGraph::render(const PostGraph& props, const Ctx&, Children)
     };
 
     std::vector<Edge> edges;
-    size_t max_edges = std::min(n + n / 3, all_edges.size()); // ~1.3x nodes
-
+    size_t max_edges = std::min(n + n / 3, all_edges.size());
     for (const auto& e : all_edges)
     {
         if (edges.size() >= max_edges) break;
         size_t ra = find(e.a), rb = find(e.b);
-        // Always take if it connects two components (spanning tree)
-        // or if we haven't hit the cap yet (extra strong edges)
-        if (ra != rb)
-        {
-            parent[ra] = rb;
-            edges.push_back(e);
-        }
-        else if (edges.size() < max_edges && e.weight >= 3)
-        {
-            edges.push_back(e);
-        }
+        if (ra != rb) { parent[ra] = rb; edges.push_back(e); }
+        else if (edges.size() < max_edges && e.weight >= 3) edges.push_back(e);
     }
 
-    // Compute degree from kept edges
     std::vector<int> degree(n, 0);
-    for (const auto& e : edges)
-    {
-        degree[e.a] += e.weight;
-        degree[e.b] += e.weight;
-    }
+    for (const auto& e : edges) { degree[e.a] += e.weight; degree[e.b] += e.weight; }
 
     // ── Force-directed layout ──
-    int w = 800, h = 380;
-    double cx = w / 2.0, cy = h / 2.0;
-    double pad = 40.0;
+    int w = 900, h = 500;
+    double cx = w / 2.0, cy = h / 2.0, pad = 50.0;
 
     struct FNode { double x, y, vx, vy; };
     std::vector<FNode> pos(n);
-
     for (size_t i = 0; i < n; ++i)
     {
         double angle = (2.0 * PI * i) / n;
-        double r = 140.0;
-        pos[i] = { cx + r * std::cos(angle), cy + r * std::sin(angle), 0, 0 };
+        pos[i] = { cx + 160.0 * std::cos(angle), cy + 160.0 * std::sin(angle), 0, 0 };
     }
 
-    // 120 iterations with strong repulsion to prevent clumping
-    for (int iter = 0; iter < 120; ++iter)
+    for (int iter = 0; iter < 150; ++iter)
     {
-        double temp = 1.5 * (1.0 - (double)iter / 120.0);
-
-        // Repulsion — very strong to keep nodes well separated
+        double temp = 1.5 * (1.0 - (double)iter / 150.0);
         for (size_t i = 0; i < n; ++i)
-        {
             for (size_t j = i + 1; j < n; ++j)
             {
-                double dx = pos[i].x - pos[j].x;
-                double dy = pos[i].y - pos[j].y;
-                double dist2 = dx * dx + dy * dy;
-                if (dist2 < 1.0) dist2 = 1.0;
-                double dist = std::sqrt(dist2);
-                double force = 20000.0 / dist2;
-                double fx = (dx / dist) * force * temp;
-                double fy = (dy / dist) * force * temp;
-                pos[i].vx += fx;  pos[i].vy += fy;
-                pos[j].vx -= fx;  pos[j].vy -= fy;
+                double dx = pos[i].x - pos[j].x, dy = pos[i].y - pos[j].y;
+                double d2 = dx * dx + dy * dy; if (d2 < 1) d2 = 1;
+                double d = std::sqrt(d2), f = 25000.0 / d2;
+                double fx = dx / d * f * temp, fy = dy / d * f * temp;
+                pos[i].vx += fx; pos[i].vy += fy;
+                pos[j].vx -= fx; pos[j].vy -= fy;
             }
-        }
-
-        // Attraction along edges — gentle
         for (const auto& e : edges)
         {
-            double dx = pos[e.b].x - pos[e.a].x;
-            double dy = pos[e.b].y - pos[e.a].y;
-            double dist = std::sqrt(dx * dx + dy * dy);
-            if (dist < 1.0) dist = 1.0;
-            double ideal = 120.0;
-            double force = (dist - ideal) * 0.02 * temp;
-            double fx = (dx / dist) * force;
-            double fy = (dy / dist) * force;
-            pos[e.a].vx += fx;  pos[e.a].vy += fy;
-            pos[e.b].vx -= fx;  pos[e.b].vy -= fy;
+            double dx = pos[e.b].x - pos[e.a].x, dy = pos[e.b].y - pos[e.a].y;
+            double d = std::sqrt(dx * dx + dy * dy); if (d < 1) d = 1;
+            double f = (d - 130.0) * 0.015 * temp;
+            double fx = dx / d * f, fy = dy / d * f;
+            pos[e.a].vx += fx; pos[e.a].vy += fy;
+            pos[e.b].vx -= fx; pos[e.b].vy -= fy;
         }
-
-        // Gravity toward center
         for (size_t i = 0; i < n; ++i)
         {
-            pos[i].vx += (cx - pos[i].x) * 0.005 * temp;
-            pos[i].vy += (cy - pos[i].y) * 0.005 * temp;
-        }
-
-        // Apply with damping
-        for (size_t i = 0; i < n; ++i)
-        {
-            pos[i].x += pos[i].vx * 0.3;
-            pos[i].y += pos[i].vy * 0.3;
-            pos[i].vx *= 0.4;
-            pos[i].vy *= 0.4;
+            pos[i].vx += (cx - pos[i].x) * 0.004 * temp;
+            pos[i].vy += (cy - pos[i].y) * 0.004 * temp;
+            pos[i].x += pos[i].vx * 0.3; pos[i].y += pos[i].vy * 0.3;
+            pos[i].vx *= 0.4; pos[i].vy *= 0.4;
             pos[i].x = std::max(pad, std::min((double)w - pad, pos[i].x));
             pos[i].y = std::max(pad, std::min((double)h - pad, pos[i].y));
         }
     }
 
-    // Post-process: enforce minimum distance between all node pairs
-    for (int pass = 0; pass < 10; ++pass)
-    {
+    // Min-distance enforcement
+    for (int pass = 0; pass < 15; ++pass)
         for (size_t i = 0; i < n; ++i)
-        {
             for (size_t j = i + 1; j < n; ++j)
             {
-                double dx = pos[j].x - pos[i].x;
-                double dy = pos[j].y - pos[i].y;
-                double dist = std::sqrt(dx * dx + dy * dy);
-                double min_dist = 50.0;
-                if (dist < min_dist && dist > 0.1)
+                double dx = pos[j].x - pos[i].x, dy = pos[j].y - pos[i].y;
+                double d = std::sqrt(dx * dx + dy * dy);
+                if (d < 55.0 && d > 0.1)
                 {
-                    double push = (min_dist - dist) / 2.0;
-                    double px = (dx / dist) * push;
-                    double py = (dy / dist) * push;
+                    double p = (55.0 - d) / 2.0;
+                    double px = dx / d * p, py = dy / d * p;
                     pos[i].x -= px; pos[i].y -= py;
                     pos[j].x += px; pos[j].y += py;
                     pos[i].x = std::max(pad, std::min((double)w - pad, pos[i].x));
@@ -1365,60 +1547,45 @@ Node PostGraph::render(const PostGraph& props, const Ctx&, Children)
                     pos[j].y = std::max(pad, std::min((double)h - pad, pos[j].y));
                 }
             }
-        }
-    }
 
-    // ── Generate SVG ──
+    // ── Emit JSON data for client-side rendering ──
     auto d2s = [](double v) {
         char buf[16]; std::snprintf(buf, sizeof(buf), "%.1f", v);
         return std::string(buf);
     };
 
-    std::string svg;
-    svg += "<svg class=\"post-graph\" viewBox=\"0 0 ";
-    svg += std::to_string(w) + " " + std::to_string(h);
-    svg += "\" xmlns=\"http://www.w3.org/2000/svg\">";
-
-    // Edges — straight lines, opacity by weight
-    for (const auto& e : edges)
-    {
-        std::string opacity = e.weight >= 4 ? "0.45" : (e.weight >= 3 ? "0.3" : "0.15");
-        std::string sw = e.weight >= 4 ? "2" : (e.weight >= 3 ? "1.5" : "1");
-
-        svg += "<line x1=\"" + d2s(pos[e.a].x) + "\" y1=\"" + d2s(pos[e.a].y)
-             + "\" x2=\"" + d2s(pos[e.b].x) + "\" y2=\"" + d2s(pos[e.b].y)
-             + "\" stroke=\"var(--accent)\" stroke-opacity=\"" + opacity
-             + "\" stroke-width=\"" + sw + "\"/>";
-    }
-
-    // Nodes — label hidden by default, shown on hover via CSS
+    std::string json = "{\"w\":" + std::to_string(w) + ",\"h\":" + std::to_string(h) + ",\"nodes\":[";
     for (size_t i = 0; i < n; ++i)
     {
-        auto& nd = pos[i];
+        if (i > 0) json += ',';
         double r = 5.0 + std::min(degree[i], 12) * 0.5;
-        double opacity = degree[i] > 0 ? 0.7 : 0.3;
-
         std::string title = posts[i].title.get();
-        if (title.size() > 35) title = title.substr(0, 33) + "..";
-
-        auto anchor = (nd.x > cx) ? "start" : "end";
-        double label_dx = (nd.x > cx) ? (r + 8) : -(r + 8);
-
-        svg += "<a href=\"/post/" + posts[i].slug.get() + "\" class=\"post-graph-node-group\">"
-               "<circle cx=\"" + d2s(nd.x) + "\" cy=\"" + d2s(nd.y)
-             + "\" r=\"" + d2s(r) + "\" fill=\"var(--accent)\""
-             + " fill-opacity=\"" + d2s(opacity) + "\""
-             + " class=\"post-graph-node\"/>"
-             + "<text x=\"" + d2s(nd.x + label_dx) + "\" y=\"" + d2s(nd.y + 4)
-             + "\" text-anchor=\"" + anchor + "\" class=\"post-graph-label\">"
-             + title + "</text></a>";
+        // Escape for JSON
+        std::string esc_title;
+        for (char c : title)
+        {
+            if (c == '"') esc_title += "\\\"";
+            else if (c == '\\') esc_title += "\\\\";
+            else esc_title += c;
+        }
+        json += "{\"x\":" + d2s(pos[i].x) + ",\"y\":" + d2s(pos[i].y)
+              + ",\"r\":" + d2s(r) + ",\"d\":" + std::to_string(degree[i])
+              + ",\"s\":\"" + posts[i].slug.get() + "\",\"t\":\"" + esc_title + "\"}";
     }
-
-    svg += "</svg>";
+    json += "],\"edges\":[";
+    for (size_t i = 0; i < edges.size(); ++i)
+    {
+        if (i > 0) json += ',';
+        json += "{\"a\":" + std::to_string(edges[i].a) + ",\"b\":" + std::to_string(edges[i].b)
+              + ",\"w\":" + std::to_string(edges[i].weight) + "}";
+    }
+    json += "]}";
 
     return section(class_("post-graph-section"),
         h3("Post Connections"),
-        raw(svg)
+        div(id("post-graph-container")),
+        script(attr("type", "application/json"), id("post-graph-data"), raw(json)),
+        script(raw(POSTGRAPH_JS))
     );
 }
 

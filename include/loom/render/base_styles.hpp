@@ -990,23 +990,23 @@ inline css::Sheet base_post_graph()
         ".post-graph-section h3"_s
             | font_size(px(13)) | font_weight(600) | color(raw("var(--muted)"))
             | text_transform(uppercase) | letter_spacing(raw("1px"))
-            | margin_bottom(px(12)),
+            | margin_bottom(px(8)),
+        "#post-graph-container"_s
+            | width(raw("100%")) | height(px(420))
+            | prop("border-radius", raw("var(--border-radius)"))
+            | border(1_px, solid, raw("var(--border)"))
+            | overflow(hidden)
+            | prop("touch-action", none),
         ".post-graph"_s
-            | width(raw("100%")) | height(raw("auto"))
-            | margin_bottom(px(16)),
-        ".post-graph-node"_s
-            | transition(raw("r 0.15s ease, fill-opacity 0.15s ease"))
-            | prop("cursor", raw("pointer")),
-        // Labels hidden by default, appear on hover
+            | width(raw("100%")) | height(raw("100%"))
+            | display(block),
+        ".post-graph line"_s
+            | transition(raw("stroke-opacity 0.15s, stroke-width 0.15s")),
         ".post-graph-label"_s
             | font_size(px(11)) | prop("fill", raw("var(--text)"))
             | prop("font-family", raw("var(--font)"))
             | opacity(0) | transition(raw("opacity 0.15s ease"))
-            | prop("pointer-events", none),
-        ".post-graph-node-group:hover .post-graph-label"_s
-            | opacity(1),
-        ".post-graph-node-group:hover circle"_s
-            | prop("fill-opacity", raw("1"))
+            | prop("pointer-events", none)
     );
 }
 
