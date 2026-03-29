@@ -1206,7 +1206,6 @@ if(!el)return;
 var data=JSON.parse(document.getElementById('post-graph-data').textContent);
 var N=data.nodes,E=data.edges;
 var W=data.w,H=data.h;
-var FS=6; // base font size in SVG units
 
 var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
 svg.setAttribute('viewBox','0 0 '+W+' '+H);
@@ -1215,11 +1214,18 @@ el.appendChild(svg);
 
 var hint=document.createElement('div');
 hint.className='post-graph-hint';
-hint.textContent='Click to explore';
+hint.textContent='Click to explore \u2022 Hover nodes to see connections';
 el.appendChild(hint);
 
 var g=document.createElementNS('http://www.w3.org/2000/svg','g');
 svg.appendChild(g);
+
+// Tooltip: single HTML div positioned over the SVG, not SVG text.
+// HTML text never scales with the viewBox — always readable.
+var tip=document.createElement('div');
+tip.className='post-graph-tip';
+tip.style.display='none';
+el.appendChild(tip);
 
 var zoom=1,panX=0,panY=0,dragging=false,dragX=0,dragY=0;
 var activeNode=-1,expanded=false;
@@ -1236,12 +1242,20 @@ function updateTransform(){
   g.setAttribute('transform','translate('+panX+','+panY+') scale('+zoom+')');
 }
 
+// Convert SVG coords to container pixel coords
+function svgToScreen(sx,sy){
+  var rect=svg.getBoundingClientRect();
+  var px=(sx*zoom+panX)/W*rect.width;
+  var py=(sy*zoom+panY)/H*rect.height;
+  return {x:px,y:py};
+}
+
 // ── Expand / Collapse ──
 
 function expand(){
   if(expanded)return;
   expanded=true;
-  hint.style.opacity='0';
+  hint.style.display='none';
   el.classList.add('expanded');
   var close=document.createElement('button');
   close.className='post-graph-close';
@@ -1250,7 +1264,6 @@ function expand(){
   close.addEventListener('click',function(ev){ev.stopPropagation();collapse()});
   el.appendChild(close);
   el._close=close;
-  showLabels();
   document.body.style.overflow='hidden';
 }
 
@@ -1261,10 +1274,11 @@ function collapse(){
   if(el._close){el._close.remove();el._close=null}
   zoom=1;panX=0;panY=0;
   updateTransform();
-  hideLabels();
   document.body.style.overflow='';
   activeNode=-1;
   resetStyles();
+  tip.style.display='none';
+  hint.style.display='';
 }
 
 document.addEventListener('keydown',function(ev){
@@ -1282,140 +1296,89 @@ E.forEach(function(e){
   line.setAttribute('x1',N[e.a].x);line.setAttribute('y1',N[e.a].y);
   line.setAttribute('x2',N[e.b].x);line.setAttribute('y2',N[e.b].y);
   line.setAttribute('stroke','var(--accent)');
-  line.setAttribute('stroke-width',e.w>=4?'1.8':e.w>=3?'1.2':'0.8');
-  line.setAttribute('stroke-opacity',e.w>=4?'0.35':e.w>=3?'0.2':'0.1');
+  line.setAttribute('stroke-width',e.w>=4?'1.5':e.w>=3?'1':'0.6');
+  line.setAttribute('stroke-opacity',e.w>=4?'0.3':e.w>=3?'0.18':'0.08');
   line.dataset.a=e.a;line.dataset.b=e.b;
   g.appendChild(line);edgeEls.push(line);
 });
 
-// ── Draw nodes + labels ──
+// ── Draw nodes (no SVG labels — use HTML tooltip instead) ──
 
-var nodeEls=[],labelEls=[],labelBoxes=[];
+var nodeEls=[];
 N.forEach(function(nd,i){
-  var gr=document.createElementNS('http://www.w3.org/2000/svg','g');
-  gr.style.cursor='pointer';
-
   var c=document.createElementNS('http://www.w3.org/2000/svg','circle');
   c.setAttribute('cx',nd.x);c.setAttribute('cy',nd.y);
   c.setAttribute('r',nd.r);
   c.setAttribute('fill','var(--accent)');
-  c.setAttribute('fill-opacity',nd.d>0?'0.7':'0.3');
-  gr.appendChild(c);
+  c.setAttribute('fill-opacity',nd.d>0?'0.65':'0.25');
+  c.style.cursor='pointer';
+  c.style.transition='fill-opacity 0.12s,r 0.12s';
 
-  var t=document.createElementNS('http://www.w3.org/2000/svg','text');
-  t.setAttribute('font-size',FS);
-  t.setAttribute('fill','var(--text)');
-  t.setAttribute('font-family','var(--font)');
-  t.style.opacity='0';
-  t.style.pointerEvents='none';
-  t.textContent=nd.t;
-  gr.appendChild(t);
-
-  gr.addEventListener('mouseenter',function(){maybeExpand();highlight(i)});
-  gr.addEventListener('mouseleave',function(){unhighlight()});
-  gr.addEventListener('click',function(ev){
+  c.addEventListener('mouseenter',function(ev){
+    maybeExpand();highlight(i);showTip(i,ev);
+  });
+  c.addEventListener('mousemove',function(ev){showTip(i,ev)});
+  c.addEventListener('mouseleave',function(){unhighlight();tip.style.display='none'});
+  c.addEventListener('click',function(ev){
     ev.preventDefault();
-    if(!expanded){expand();return}
+    if(!expanded){expand();highlight(i);return}
     window.location='/post/'+nd.s;
   });
   var lastTap=0;
-  gr.addEventListener('touchend',function(ev){
+  c.addEventListener('touchend',function(ev){
     ev.preventDefault();
     if(!expanded){expand();return}
     var now=Date.now();
     if(now-lastTap<300) window.location='/post/'+nd.s;
-    else highlight(i);
+    else {highlight(i);showTipAt(i)}
     lastTap=now;
   });
 
-  g.appendChild(gr);
-  nodeEls.push(c);labelEls.push(t);
+  g.appendChild(c);
+  nodeEls.push(c);
 });
 
-// ── Label collision resolution ──
-// After all labels are in the DOM, measure their bounding boxes with
-// getBBox() and nudge overlapping labels. Runs once on init and uses
-// the resolved positions for all future show/hide.
+// ── Tooltip ──
 
-function resolveLabels(){
-  // Temporarily show all labels so getBBox works
-  labelEls.forEach(function(t){t.style.opacity='1'});
-
-  // Initial placement: right of node by default
-  var placements=[];
-  N.forEach(function(nd,i){
-    var t=labelEls[i];
-    var right=nd.x<=W*0.75; // prefer right unless node is far right
-    var dx=right?(nd.r+4):-(nd.r+4);
-    t.setAttribute('text-anchor',right?'start':'end');
-    t.setAttribute('x',nd.x+dx);
-    t.setAttribute('y',nd.y+2);
-    var bb=t.getBBox();
-    placements.push({i:i,x:bb.x,y:bb.y,w:bb.width,h:bb.height,
-                     nx:nd.x,ny:nd.y,nr:nd.r,right:right});
-  });
-
-  // Sort by y for efficient overlap checking
-  function boxesOverlap(a,b){
-    return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y;
+function showTip(i,ev){
+  var nd=N[i];
+  var conn=adj[i]||[];
+  var html='<strong>'+nd.t+'</strong>';
+  if(conn.length>0){
+    html+='<span class="post-graph-tip-conn">';
+    html+=conn.length+' connection'+(conn.length>1?'s':'');
+    html+='</span>';
   }
+  tip.innerHTML=html;
+  tip.style.display='block';
+  // Position near cursor
+  var rect=el.getBoundingClientRect();
+  var tx=ev.clientX-rect.left+12;
+  var ty=ev.clientY-rect.top-10;
+  // Keep in bounds
+  if(tx+200>rect.width) tx=ev.clientX-rect.left-212;
+  if(ty<0) ty=ev.clientY-rect.top+20;
+  tip.style.left=tx+'px';
+  tip.style.top=ty+'px';
+}
 
-  // Multi-pass collision resolution
-  for(var pass=0;pass<8;pass++){
-    var moved=false;
-    for(var i=0;i<placements.length;i++){
-      var a=placements[i];
-      for(var j=i+1;j<placements.length;j++){
-        var b=placements[j];
-        if(!boxesOverlap(a,b))continue;
-        moved=true;
-
-        // Strategy 1: flip the label to the other side of its node
-        var p=a.h<b.h?a:b; // flip the smaller label
-        p.right=!p.right;
-        var dx=p.right?(p.nr+4):-(p.nr+4);
-        var t=labelEls[p.i];
-        t.setAttribute('text-anchor',p.right?'start':'end');
-        t.setAttribute('x',p.nx+dx);
-        var bb=t.getBBox();
-        p.x=bb.x;p.y=bb.y;p.w=bb.width;p.h=bb.height;
-
-        // If still overlapping, push vertically
-        if(boxesOverlap(a,b)){
-          var overlap_y=Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y);
-          var shift=(overlap_y/2)+1;
-          if(a.ny<b.ny){
-            a.y-=shift;b.y+=shift;
-          }else{
-            a.y+=shift;b.y-=shift;
-          }
-          labelEls[a.i].setAttribute('y',a.y+a.h-1);
-          labelEls[b.i].setAttribute('y',b.y+b.h-1);
-          var bba=labelEls[a.i].getBBox();
-          a.x=bba.x;a.y=bba.y;a.w=bba.width;a.h=bba.height;
-          var bbb=labelEls[b.i].getBBox();
-          b.x=bbb.x;b.y=bbb.y;b.w=bbb.width;b.h=bbb.height;
-        }
-      }
-    }
-    if(!moved)break;
+function showTipAt(i){
+  var nd=N[i];
+  var conn=adj[i]||[];
+  var html='<strong>'+nd.t+'</strong>';
+  if(conn.length>0){
+    html+='<span class="post-graph-tip-conn">';
+    html+=conn.length+' connection'+(conn.length>1?'s':'');
+    html+='</span>';
   }
-
-  // Store final positions, then hide
-  labelEls.forEach(function(t){t.style.opacity='0'});
+  tip.innerHTML=html;
+  tip.style.display='block';
+  var p=svgToScreen(nd.x,nd.y);
+  tip.style.left=(p.x+15)+'px';
+  tip.style.top=(p.y-10)+'px';
 }
 
-// Run after a frame so SVG is laid out
-requestAnimationFrame(function(){requestAnimationFrame(resolveLabels)});
-
-// ── Show/hide helpers ──
-
-function showLabels(){
-  labelEls.forEach(function(t){t.style.opacity='1'});
-}
-function hideLabels(){
-  labelEls.forEach(function(t){t.style.opacity='0'});
-}
+// ── Highlight: show hovered node + neighbors ──
 
 function highlight(i){
   if(activeNode===i)return;
@@ -1425,17 +1388,19 @@ function highlight(i){
   connected.forEach(function(j){connSet[j]=1});
 
   nodeEls.forEach(function(c,j){
-    c.setAttribute('fill-opacity',connSet[j]?'1':'0.06');
-    if(j===i)c.setAttribute('r',N[j].r*1.4);
-  });
-  labelEls.forEach(function(t,j){
-    t.style.opacity=connSet[j]?'1':'0';
-    t.setAttribute('font-weight',j===i?'bold':'normal');
+    if(j===i){
+      c.setAttribute('fill-opacity','1');
+      c.setAttribute('r',N[j].r*1.5);
+    }else if(connSet[j]){
+      c.setAttribute('fill-opacity','0.9');
+    }else{
+      c.setAttribute('fill-opacity','0.05');
+    }
   });
   edgeEls.forEach(function(line){
     var a=+line.dataset.a,b=+line.dataset.b;
     var on=(a===i||b===i);
-    line.setAttribute('stroke-opacity',on?'0.7':'0.02');
+    line.setAttribute('stroke-opacity',on?'0.6':'0.015');
     line.setAttribute('stroke-width',on?'2':'0.3');
   });
 }
@@ -1448,18 +1413,14 @@ function unhighlight(){
 
 function resetStyles(){
   nodeEls.forEach(function(c,j){
-    c.setAttribute('fill-opacity',N[j].d>0?'0.7':'0.3');
+    c.setAttribute('fill-opacity',N[j].d>0?'0.65':'0.25');
     c.setAttribute('r',N[j].r);
-  });
-  labelEls.forEach(function(t){
-    t.style.opacity=expanded?'1':'0';
-    t.setAttribute('font-weight','normal');
   });
   edgeEls.forEach(function(line){
     var e=E.find(function(e){return e.a==+line.dataset.a&&e.b==+line.dataset.b});
     if(e){
-      line.setAttribute('stroke-opacity',e.w>=4?'0.35':e.w>=3?'0.2':'0.1');
-      line.setAttribute('stroke-width',e.w>=4?'1.8':e.w>=3?'1.2':'0.8');
+      line.setAttribute('stroke-opacity',e.w>=4?'0.3':e.w>=3?'0.18':'0.08');
+      line.setAttribute('stroke-width',e.w>=4?'1.5':e.w>=3?'1':'0.6');
     }
   });
 }
@@ -1472,7 +1433,7 @@ svg.addEventListener('wheel',function(ev){
   var mx=(ev.clientX-rect.left)/rect.width*W;
   var my=(ev.clientY-rect.top)/rect.height*H;
   var oldZ=zoom;
-  zoom=Math.max(0.3,Math.min(10,zoom*(ev.deltaY>0?0.9:1.1)));
+  zoom=Math.max(0.5,Math.min(8,zoom*(ev.deltaY>0?0.9:1.1)));
   panX=mx-(mx-panX)*(zoom/oldZ);
   panY=my-(my-panY)*(zoom/oldZ);
   updateTransform();
@@ -1518,7 +1479,7 @@ svg.addEventListener('touchmove',function(ev){
     var t1=ev.touches[0],t2=ev.touches[1];
     var dist=Math.hypot(t1.clientX-t2.clientX,t1.clientY-t2.clientY);
     if(touches._pinch){
-      zoom=Math.max(0.3,Math.min(10,zoom*dist/touches._pinch));
+      zoom=Math.max(0.5,Math.min(8,zoom*dist/touches._pinch));
       updateTransform();
     }
     touches._pinch=dist;

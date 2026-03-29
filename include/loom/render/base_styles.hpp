@@ -994,13 +994,12 @@ inline css::Sheet base_post_graph()
 
         // Inline preview
         "#post-graph-container"_s
-            | width(raw("100%")) | height(px(280))
+            | width(raw("100%")) | height(px(260))
             | prop("border-radius", raw("var(--border-radius)"))
             | border(1_px, solid, raw("var(--border)"))
             | overflow(hidden)
             | prop("touch-action", none)
-            | position(relative)
-            | transition(raw("all 0.3s ease")),
+            | position(relative),
 
         // Expanded: fill the viewport
         "#post-graph-container.expanded"_s
@@ -1015,31 +1014,48 @@ inline css::Sheet base_post_graph()
             | width(raw("100%")) | height(raw("100%"))
             | display(block),
         ".post-graph line"_s
-            | transition(raw("stroke-opacity 0.15s, stroke-width 0.15s")),
-        ".post-graph-label"_s
-            | transition(raw("opacity 0.12s ease")),
+            | transition(raw("stroke-opacity 0.12s, stroke-width 0.12s")),
 
-        // Hint overlay
+        // Hint
         ".post-graph-hint"_s
-            | position(absolute) | prop("bottom", raw("12px")) | prop("left", raw("50%"))
+            | position(absolute) | prop("bottom", raw("10px")) | prop("left", raw("50%"))
             | prop("transform", raw("translateX(-50%)"))
             | font_size(px(12)) | color(raw("var(--muted)"))
             | padding(raw("4px 14px"))
             | prop("border-radius", raw("20px"))
             | bg(raw("color-mix(in srgb, var(--text) 8%, var(--bg))"))
+            | prop("pointer-events", none),
+
+        // Tooltip (HTML, not SVG — never scales with zoom)
+        ".post-graph-tip"_s
+            | position(absolute)
+            | bg(raw("var(--bg)"))
+            | border(1_px, solid, raw("var(--border)"))
+            | prop("border-radius", raw("var(--border-radius)"))
+            | padding(raw("6px 10px"))
+            | font_size(px(13))
+            | color(raw("var(--text)"))
             | prop("pointer-events", none)
-            | transition(raw("opacity 0.3s ease")),
+            | prop("z-index", raw("10001"))
+            | prop("max-width", raw("280px"))
+            | prop("white-space", raw("nowrap"))
+            | prop("box-shadow", raw("0 2px 8px color-mix(in srgb, var(--text) 10%, transparent)")),
+        ".post-graph-tip strong"_s
+            | display(block) | color(raw("var(--accent)")),
+        ".post-graph-tip-conn"_s
+            | font_size(px(11)) | color(raw("var(--muted)"))
+            | display(block) | margin_top(px(2)),
 
         // Close button
         ".post-graph-close"_s
             | position(absolute) | prop("top", raw("16px")) | prop("right", raw("16px"))
-            | prop("z-index", raw("10000"))
-            | width(px(40)) | height(px(40))
+            | prop("z-index", raw("10002"))
+            | width(px(36)) | height(px(36))
             | prop("border-radius", raw("50%"))
             | border(1_px, solid, raw("var(--border)"))
             | bg(raw("var(--bg)"))
             | color(raw("var(--text)"))
-            | font_size(px(22)) | prop("cursor", raw("pointer"))
+            | font_size(px(20)) | prop("cursor", raw("pointer"))
             | display(raw("flex")) | prop("align-items", raw("center")) | prop("justify-content", raw("center"))
             | padding(px(0)) | prop("line-height", raw("1"))
     );
