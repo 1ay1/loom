@@ -3,20 +3,24 @@ title: "Iteration at Compile Time — Parameter Packs, Fold Expressions, and Rec
 date: 2026-02-11
 slug: iteration-at-compile-time
 tags: compile-time-cpp, parameter-packs, fold-expressions, recursive-templates, variadic
-excerpt: The compile-time language doesn't have for loops. It has something better — parameter packs that expand into exactly the code you need.
+excerpt: The compile-time language doesn't have for loops. It has something weirder — parameter packs that expand into exactly the code you need, like a copy-paste machine controlled by the compiler.
 ---
 
-At runtime, you iterate over collections. You have a vector of ints, you write a `for` loop, you process each element. The pattern is so fundamental it barely registers as a concept — it's just what you do.
+At runtime, iterating is as natural as breathing. You have a vector. You write a `for` loop. You process each element. Done. You don't even think about it — it's the first thing they teach you after "hello world."
 
-At compile time, there are no runtime collections. There's no `std::vector` you can loop over, because the data you want to process isn't data at all — it's types, or values baked into template parameters. A variadic template might receive `int, double, std::string` as its parameter pack. That's not a container. It's a list of types known to the compiler at instantiation time. You can't index into it. You can't write a `for` loop over it.
+Now try to do that at compile time. Go ahead. I'll wait.
 
-So how do you iterate?
+You can't. Because what would you even iterate *over*? There's no `std::vector` at compile time. The data you want to process isn't data at all — it's types, or values baked into template parameters. A variadic template might receive `int, double, std::string` as its parameter pack. That's not a container. It's three types known to the compiler during instantiation. You can't index into it. You can't write a `for` loop over it. You can't call `.begin()` on it.
 
-You expand.
+So how does the compile-time language iterate?
 
-## Parameter Packs
+It doesn't loop. It *expands*.
 
-A parameter pack is the compile-time language's answer to a list. You declare one with `...`:
+Think of it like a really smart copy-paste. You write a pattern once, and the compiler stamps it out for each element in your list. No counter incrementing. No condition checking. No loop body executing repeatedly. The compiler just... generates all the code, in one shot, as if you'd written each piece by hand.
+
+## Parameter Packs: The Compile-Time List
+
+A parameter pack is the compile-time language's version of a list. You declare one with `...`:
 
 ```cpp
 template<typename... Ts>
@@ -26,25 +30,25 @@ template<auto... Vs>
 struct ValueList {};
 ```
 
-`typename... Ts` declares a type parameter pack — zero or more types. `auto... Vs` declares a non-type parameter pack — zero or more values. When someone writes `TypeList<int, double, char>`, the pack `Ts` holds `int, double, char`.
+`typename... Ts` declares a type parameter pack — zero or more types. `auto... Vs` declares a value parameter pack — zero or more values. When someone writes `TypeList<int, double, char>`, the pack `Ts` holds `int, double, char`.
 
-You can query the size:
+You can ask how big it is:
 
 ```cpp
 template<typename... Ts>
 constexpr std::size_t count = sizeof...(Ts);
 
 static_assert(count<int, double, char> == 3);
-static_assert(count<> == 0);
+static_assert(count<> == 0);  // empty pack is fine
 ```
 
-But that's about all you can do with a pack directly. You can't write `Ts[0]` to get the first type. You can't assign to it or mutate it. The only real operation is **expansion** — turning the pack into a comma-separated sequence wherever the language allows one.
+But that's about all you can do with a pack *directly*. You can't write `Ts[0]` to get the first type. You can't assign to it. You can't mutate it. The only real operation is **expansion** — and expansion is where all the magic happens.
 
-## Pack Expansion
+## Pack Expansion: The Copy-Paste Machine
 
-The `...` operator, when placed after an expression containing a pack, expands that expression once for each element. This is the core mechanism. Everything else builds on it.
+The `...` operator, when placed after an expression containing a pack, expands that expression once for each element. This is the entire mechanism. Everything else in this post builds on it.
 
-The simplest expansion passes each element as a function argument:
+The simplest example:
 
 ```cpp
 template<typename... Args>
@@ -53,11 +57,17 @@ void forward_all(Args&&... args) {
 }
 ```
 
-When called with three arguments, the expansion produces `target(std::forward<Arg0>(arg0), std::forward<Arg1>(arg1), std::forward<Arg2>(arg2))`. The pattern `std::forward<Args>(args)` is applied to each element, and the results are comma-separated.
+When called with three arguments, this expands into:
 
-This works in several contexts:
+```cpp
+target(std::forward<Arg0>(arg0), std::forward<Arg1>(arg1), std::forward<Arg2>(arg2));
+```
 
-**Function arguments:**
+The pattern `std::forward<Args>(args)` is stamped out for each element. The results are comma-separated. It's like the compiler has a copy-paste machine that duplicates the pattern once per element and fills in the blanks.
+
+This works in several contexts, and each one is useful:
+
+**Function arguments** — call a function with processed arguments:
 
 ```cpp
 template<typename... Args>
@@ -66,14 +76,17 @@ void call(Args... args) {
 }
 ```
 
-**Template arguments:**
+**Template arguments** — create types derived from each element:
 
 ```cpp
 template<typename... Ts>
-using PointerTuple = std::tuple<Ts*...>;  // std::tuple<int*, double*, char*>
+using PointerTuple = std::tuple<Ts*...>;
+// PointerTuple<int, double, char> = std::tuple<int*, double*, char*>
 ```
 
-**Initializer lists:**
+Look at that. `Ts*...` expands to `int*, double*, char*`. You added a pointer to every type in one expression. No loop. No recursion. Just pattern expansion.
+
+**Initializer lists** — the pre-C++17 hack for side effects:
 
 ```cpp
 template<typename... Args>
@@ -83,42 +96,44 @@ void print_all(Args... args) {
 }
 ```
 
-This initializer list trick was the pre-C++17 way to execute a side effect for each pack element. Each element expands into `(std::cout << arg << '\n', 0)` — the comma operator evaluates the print, discards the result, and yields `0` to initialize the array. Ugly, but it works.
+This one deserves explanation because it's gloriously ugly. Each element expands to `(std::cout << arg << '\n', 0)` — the comma operator evaluates the print, discards the result, and yields `0` to fill the array. The array exists only to give the expansion somewhere to live. We immediately cast it to `void` to suppress "unused variable" warnings. It's a hack. It works. C++17 killed it with fold expressions (thank goodness).
 
-**Base class lists:**
+**Base class lists** — inherit from multiple types at once:
 
 ```cpp
 template<typename... Mixins>
 struct Combined : Mixins... {
-    using Mixins::operator()...;  // C++17: using-declaration with pack expansion
+    using Mixins::operator()...;  // bring in all operator() from all bases
 };
 ```
 
-Pack expansion is not iteration in the runtime sense. No counter increments. No loop body executes repeatedly. The compiler stamps out the expanded form in one shot, as if you'd written it all by hand. The result is code that is exactly as efficient as the non-variadic version — there's nothing to optimize away, because there was never a loop.
+This is how `std::overloaded` works (or the commonly-written equivalent). You inherit from multiple lambda types and use pack expansion to bring all their `operator()` methods into scope. The compiler resolves which one to call based on the argument type. It's compile-time dispatch through inheritance and overloading, and it's remarkably elegant.
 
-## Recursive Templates: The Old For Loop
+The mental model: pack expansion is not iteration. There's no loop in the generated code. There's no counter. There's no branch. The compiler stamps out the expanded form in one shot, as if you'd written it all by hand. The result is code that's exactly as efficient as the non-variadic version — because there's nothing to optimize away. There was never a loop.
 
-Before C++17 gave us fold expressions, the only way to "iterate" a parameter pack with any logic was recursion. You'd peel off the first element, process it, and recurse on the rest. Base case to stop.
+## Recursive Templates: The Old-School For Loop
 
-This is the compile-time language's equivalent of a `for` loop, and it looks like functional programming because it is functional programming — no mutation, just new values derived from old ones.
+Before C++17 gave us fold expressions, the only way to "iterate" a parameter pack with any logic was recursion. Peel off the first element, process it, recurse on the rest. Base case to stop.
+
+If you've ever written recursive functions in a functional language, this will feel natural. If you haven't — imagine a `for` loop, but instead of incrementing a counter, you call yourself with a shorter list.
 
 **Counting types that satisfy a predicate:**
 
 ```cpp
-// Base case: empty pack
+// Base case: empty pack, nothing to count
 template<template<typename> class Pred>
 constexpr int count_if() {
     return 0;
 }
 
-// Recursive case: peel off T, recurse on Rest
+// Recursive case: check the first type, add 0 or 1, recurse on the rest
 template<template<typename> class Pred, typename T, typename... Rest>
 constexpr int count_if() {
     return (Pred<T>::value ? 1 : 0) + count_if<Pred, Rest...>();
 }
 ```
 
-Each instantiation peels one type off the pack. When the pack is empty, the base case returns 0. The compiler generates a chain of instantiations — `count_if<Pred, int, double, char>` calls `count_if<Pred, double, char>` calls `count_if<Pred, char>` calls `count_if<Pred>`. Each one is a distinct function, fully resolved at compile time.
+Each call peels one type off the front of the pack. When the pack is empty, the base case returns 0. The compiler generates a chain of instantiations — `count_if<Pred, int, double, char>` calls `count_if<Pred, double, char>` calls `count_if<Pred, char>` calls `count_if<Pred>` (base case). Each one is a distinct function instantiation, fully resolved at compile time. The optimizer typically inlines the entire chain into a single constant.
 
 **Finding a type in a pack:**
 
@@ -131,73 +146,48 @@ constexpr int find() {
 template<typename Target, typename T, typename... Rest>
 constexpr int find() {
     if constexpr (std::is_same_v<Target, T>) {
-        return 0;
+        return 0;  // found it!
     } else {
         constexpr int result = find<Target, Rest...>();
         return result == -1 ? -1 : 1 + result;
     }
 }
 
-static_assert(find<double, int, double, char>() == 1);
-static_assert(find<float, int, double, char>() == -1);
+static_assert(find<double, int, double, char>() == 1);  // double is at index 1
+static_assert(find<float, int, double, char>() == -1);  // float not found
 ```
 
-**Transforming each type:**
+Compile-time `indexOf`. The compiler searches through a list of types and tells you where the target is. The search happens during compilation. The binary just contains the number.
 
-```cpp
-template<typename... Ts>
-struct AddPointer {
-    using type = std::tuple<Ts*...>;  // pack expansion handles this directly
-};
-```
+The downside of recursive templates is compile-time cost. Each recursion level instantiates a new template. A pack of 100 types means 100 instantiations. Compilers have instantiation depth limits (typically 256 or 1024). For simple reductions, fold expressions eliminated this problem entirely.
 
-That last one doesn't even need recursion — pack expansion in a type context handles it. But for more complex transforms (say, conditionally wrapping types), recursion was the only option before C++17.
+## Fold Expressions: The Modern For Loop (C++17)
 
-The downside of recursive templates is compile-time cost. Each recursion level instantiates a new template. A pack of 100 types means 100 instantiations. Compilers have instantiation depth limits (typically 256 or 1024). For simple operations, fold expressions eliminated this entirely.
+C++17 introduced fold expressions, and they're beautiful. They reduce a parameter pack with a binary operator in a single expression. No recursion. No helper functions. No dummy arrays. Just... the thing you wanted to say.
 
-## Fold Expressions: The Modern For Loop
-
-C++17 introduced fold expressions — a way to reduce a parameter pack with a binary operator in a single expression, no recursion needed.
-
-There are four forms:
+There are four forms, but don't panic — they all do the same basic thing (reduce a pack with an operator), just with different parenthesization:
 
 ```cpp
 // Unary right fold: (pack op ...)
 // Expands to: a1 op (a2 op (a3 op a4))
 template<typename... Args>
-auto sum_r(Args... args) {
+auto sum(Args... args) {
     return (args + ...);
 }
 
-// Unary left fold: (... op pack)
-// Expands to: ((a1 op a2) op a3) op a4
-template<typename... Args>
-auto sum_l(Args... args) {
-    return (... + args);
-}
-
-// Binary right fold: (pack op ... op init)
-// Expands to: a1 op (a2 op (a3 op init))
-template<typename... Args>
-auto sum_ri(Args... args) {
-    return (args + ... + 0);
-}
-
-// Binary left fold: (init op ... op pack)
+// Binary left fold with initial value: (init op ... op pack)
 // Expands to: ((init op a1) op a2) op a3
 template<typename... Args>
-auto sum_li(Args... args) {
-    return (0 + ... + args);
+auto sum_safe(Args... args) {
+    return (0 + ... + args);  // works even if args is empty!
 }
 ```
 
-The binary forms are essential when the pack might be empty. A unary fold over an empty pack is ill-formed for most operators (the exception: unary fold over `&&` gives `true`, `||` gives `false`, and `,` gives `void()`). The binary forms provide an identity element.
+The binary forms are essential when the pack might be empty. A unary fold over an empty pack is an error for most operators. The binary form provides an identity element — `0` for addition, `true` for `&&`, `false` for `||`.
 
-For associative operations like addition, the fold direction doesn't matter. For non-associative ones like subtraction, it absolutely does. `(args - ...)` with values `1, 2, 3` gives `1 - (2 - 3)` = `2`. `(... - args)` gives `(1 - 2) - 3` = `-4`.
+### The Comma Fold: Your New Best Friend
 
-### The Comma Fold Trick
-
-The most useful fold pattern in practice is the comma fold. It replaces the ugly initializer-list hack entirely:
+The most useful fold pattern in practice is the comma fold. It replaces the grotesque initializer-list hack entirely:
 
 ```cpp
 template<typename... Args>
@@ -206,9 +196,15 @@ void print_all(const Args&... args) {
 }
 ```
 
-This expands to `(std::cout << a1 << '\n'), (std::cout << a2 << '\n'), (std::cout << a3 << '\n')`. Each sub-expression executes as a side effect. The comma operator sequences them left to right.
+This expands to:
 
-You can do anything in there — call functions, accumulate into a local variable, push into a container:
+```cpp
+(std::cout << a1 << '\n'), (std::cout << a2 << '\n'), (std::cout << a3 << '\n');
+```
+
+Each sub-expression executes as a side effect. The comma operator sequences them left to right. Clean, readable, no dummy arrays.
+
+You can put *anything* in a comma fold:
 
 ```cpp
 template<typename... Ts>
@@ -219,18 +215,20 @@ auto type_names() {
 }
 ```
 
-## Index Sequences
+Push a value into a container for each type in the pack. One line. No recursion. No helper functions.
 
-Sometimes you need the index, not just the element. Maybe you're iterating a `std::tuple`, and you need to call `std::get<I>` for each position. Packs don't carry indices, so you manufacture them.
+## Index Sequences: When You Need the Position
+
+Sometimes you need the index, not just the element. "Give me the 0th, 1st, 2nd, 3rd element" — not just "give me each element." This comes up constantly when working with `std::tuple`, because `std::get<I>` requires a compile-time index.
 
 `std::index_sequence` is a type that holds a compile-time sequence of integers:
 
 ```cpp
-// std::index_sequence<0, 1, 2> holds the values 0, 1, 2
 // std::make_index_sequence<3> produces std::index_sequence<0, 1, 2>
+// Think of it as: range(3) but at compile time
 ```
 
-The standard pattern uses a helper function that takes the index sequence as a parameter, deducing the indices as a pack:
+The standard pattern uses a helper function that deduces the indices as a pack:
 
 ```cpp
 template<typename Tuple, std::size_t... Is>
@@ -244,7 +242,7 @@ void print_tuple(const std::tuple<Ts...>& t) {
 }
 ```
 
-`make_index_sequence<3>` produces `index_sequence<0, 1, 2>`. The helper deduces `Is` as the pack `0, 1, 2`. Now you can use `Is` in a fold expression or pack expansion to index into the tuple.
+`make_index_sequence<3>` produces `index_sequence<0, 1, 2>`. The helper deduces `Is` as the pack `0, 1, 2`. Now you can use `Is` in a fold expression to index into the tuple.
 
 This is how `std::apply` works internally — it unpacks a tuple into function arguments:
 
@@ -253,53 +251,35 @@ template<typename F, typename Tuple, std::size_t... Is>
 decltype(auto) apply_impl(F&& f, Tuple&& t, std::index_sequence<Is...>) {
     return std::forward<F>(f)(std::get<Is>(std::forward<Tuple>(t))...);
 }
-
-template<typename F, typename Tuple>
-decltype(auto) apply(F&& f, Tuple&& t) {
-    constexpr auto size = std::tuple_size_v<std::remove_reference_t<Tuple>>;
-    return apply_impl(std::forward<F>(f), std::forward<Tuple>(t),
-                      std::make_index_sequence<size>{});
-}
 ```
 
-The expansion `std::get<Is>(std::forward<Tuple>(t))...` produces `std::get<0>(t), std::get<1>(t), std::get<2>(t)` — each tuple element as a separate function argument. This is the bridge between compile-time type-level data (the tuple) and runtime function calls.
+The expansion `std::get<Is>(t)...` produces `std::get<0>(t), std::get<1>(t), std::get<2>(t)` — each tuple element becomes a separate function argument. This is the bridge between compile-time type-level data (the tuple) and runtime function calls.
 
-## constexpr Loops vs Pack Expansion
+## When to Use What
 
-C++20 made `constexpr` functions powerful enough to use real loops over compile-time data:
+**Use pack expansion** when your inputs are types or heterogeneous values. If you have a parameter pack of different types, you can't put them in a `constexpr` array. Pack expansion is the natural tool.
 
-```cpp
-constexpr int sum(std::initializer_list<int> vals) {
-    int total = 0;
-    for (int v : vals)
-        total += v;
-    return total;
-}
+**Use `constexpr` loops** when your inputs are homogeneous values. If everything is an `int`, a `constexpr` function with a `for` loop is way clearer than template recursion.
 
-static_assert(sum({1, 2, 3, 4}) == 10);
-```
+**Use fold expressions** for reductions over packs. Summing a value pack, ANDing conditions, ORing checks — fold expressions handle these in one line.
 
-So when do you use a `constexpr` loop versus pack expansion?
+**Avoid recursive templates** unless you need logic that can't be expressed as a fold or expansion. They're slower to compile and harder to read. They were necessary before C++17. They're rarely the best choice after it.
 
-**Use pack expansion when your inputs are types or heterogeneous values.** If you have a parameter pack of different types, you can't shove them into a `constexpr` array. Pack expansion is the natural tool.
+In practice, a lot of compile-time code mixes all three. You might use `make_index_sequence` to generate indices, expand them in a fold expression, and call `constexpr` functions inside the expansion. The tools compose beautifully.
 
-**Use `constexpr` loops when your inputs are homogeneous values.** If everything is an `int`, a `constexpr` function with a `for` loop is clearer and compiles faster than template recursion.
+## Practical Examples: Things You Can Actually Build
 
-**Use fold expressions for reductions over packs.** Summing a value pack, ANDing a list of conditions, ORing a list of checks — fold expressions handle these in one line with no recursion overhead.
-
-In practice, a lot of compile-time code mixes all three. You might use `make_index_sequence` to generate indices, expand them in a fold expression, and call `constexpr` functions inside the expansion. The tools compose.
-
-## Practical Examples
-
-### Compile-time sum of a value pack
+### Compile-time sum of values
 
 ```cpp
 template<auto... Vs>
 constexpr auto sum = (Vs + ... + 0);
 
 static_assert(sum<1, 2, 3, 4, 5> == 15);
-static_assert(sum<> == 0);
+static_assert(sum<> == 0);  // empty fold with identity
 ```
+
+Two lines. A compile-time sum. The result is embedded in the binary as a constant.
 
 ### for_each on a type list
 
@@ -309,18 +289,15 @@ void for_each_type(F&& f) {
     (f.template operator()<Ts>(), ...);
 }
 
-// Usage:
-for_each_type<int, double, std::string>([](auto) {
-    // ...
-});
-
-// More practically, with a generic lambda:
+// Print the size of each type:
 for_each_type<int, double, std::string>([]<typename T>() {
     std::cout << typeid(T).name() << ": " << sizeof(T) << '\n';
 });
 ```
 
-### Transforming a tuple
+This calls the lambda once for each type, with a different `T` each time. The fold expression handles the iteration. The lambda gets to use `T` as a template parameter. It's `for_each`, but over types instead of values.
+
+### Transforming every element of a tuple
 
 ```cpp
 template<typename F, typename Tuple, std::size_t... Is>
@@ -334,13 +311,15 @@ auto transform_tuple(F&& f, const std::tuple<Ts...>& t) {
                           std::make_index_sequence<sizeof...(Ts)>{});
 }
 
-// Usage:
+// Double every element:
 auto doubled = transform_tuple([](auto x) { return x * 2; },
                                 std::make_tuple(1, 2.5, 3));
 // doubled is std::tuple<int, double, int>{2, 5.0, 6}
 ```
 
-### Processing variadic children
+Map over a tuple. Each element can be a different type. The lambda is called with each one. The result is a new tuple with the transformed values. All type-safe, all resolved at compile time.
+
+### Rendering variadic children in a tree
 
 ```cpp
 template<typename... Children>
@@ -362,16 +341,16 @@ struct Node {
 };
 ```
 
-This pattern shows up constantly in compile-time DOM trees, expression templates, and ECS architectures. Each child can be a different type. The tuple stores them with zero overhead. `std::apply` unpacks them, and a fold expression iterates them — all resolved at compile time, with the compiler generating exactly the code you'd write by hand for each specific combination of children.
+This pattern shows up constantly in compile-time DOM trees, expression templates, and ECS architectures. Each child can be a different type. The tuple stores them with zero overhead. `std::apply` unpacks them, and a fold expression iterates them. All resolved at compile time, with the compiler generating exactly the code you'd write by hand for each specific combination of children.
 
 ## The Mental Model
 
 Runtime iteration is imperative: initialize a counter, check a condition, execute a body, increment, repeat. The compiler translates this to jumps and branches.
 
-Compile-time iteration is expansion: you write a pattern once, and the compiler stamps it out for each element in the pack. There's no loop in the generated code. There's no branch. There's just the expanded result, as if you'd written each call individually.
+Compile-time iteration is *expansion*: you write a pattern once, and the compiler stamps it out for each element. There's no loop in the generated code. There's no branch. There's no counter. Just the expanded result, as if you'd written each call individually.
 
-Fold expressions add reduction — collapsing a pack into a single value with an operator. Index sequences add positional access — letting you use integers to reach into tuples and packs. Recursive templates add arbitrary logic — anything you can express as a base case and a recursive case.
+Fold expressions add *reduction* — collapsing a pack into a single value with an operator. Index sequences add *positional access* — letting you use integers to reach into tuples. Recursive templates add *arbitrary logic* — anything you can express as a base case and a recursive step.
 
-Together, these give you full iteration capability at compile time. Not by looping, but by expanding, folding, and recurring. Different mechanics, same expressive power.
+Together, these give you full iteration capability at compile time. Not by looping, but by expanding, folding, and recursing. Different mechanics, same expressive power. And in the generated code? No loops at all. Just the exact operations you needed, stamped out precisely, with zero overhead.
 
-Next post: we look at compile-time branching beyond `if constexpr` — tag dispatch, SFINAE, and concepts as the compile-time language's pattern matching.
+That's the compile-time way. Don't repeat yourself — let the compiler do the repeating for you.
