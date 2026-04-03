@@ -1,6 +1,6 @@
 ---
 title: "Double Buffering and Frame Lifecycle"
-date: 2026-04-01
+date: 2026-03-21
 slug: double-buffering-frame-lifecycle
 tags: c++23, double-buffering, frame-lifecycle, synchronized-output, event-driven, claude-code
 excerpt: "Two buffers. Swap every frame. Clear, render, replay, diff, emit, swap. The complete lifecycle of a single frame, from event trigger to terminal update, in ~230 microseconds."

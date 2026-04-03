@@ -1,6 +1,6 @@
 ---
 title: "Cell Packing — Fitting a Universe into 8 Bytes"
-date: 2026-04-01
+date: 2026-03-07
 slug: cell-packing-eight-bytes
 tags: c++23, bit-packing, phantom-types, static-assert, memory-layout, claude-code
 excerpt: "How do you fit a character, a style, a width, and type safety into exactly 8 bytes? Claude Code uses bitfield surgery. We use phantom-tagged IDs and static_assert. Both compile to one cmp instruction."

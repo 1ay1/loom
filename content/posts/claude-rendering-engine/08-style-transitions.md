@@ -1,6 +1,6 @@
 ---
 title: "Style Transitions — The Transition Cache"
-date: 2026-04-01
+date: 2026-03-17
 slug: style-transitions-transition-cache
 tags: c++23, style-transition, ansi-sgr, cache, optimization, terminal-rendering, claude-code
 excerpt: "The single highest-leverage optimization in the entire pipeline. Computing the minimal ANSI to go from style A to style B, caching it forever, and never computing it again. 30-50% reduction in terminal output with one hash map."

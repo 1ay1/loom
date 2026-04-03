@@ -1,6 +1,6 @@
 ---
 title: "Thread Safety — The Compositor"
-date: 2026-04-01
+date: 2026-03-23
 slug: thread-safety-compositor
 tags: c++23, compositor, mutex, thread-safety, signal-handling, self-pipe, claude-code
 excerpt: "The spinner thread and the main thread both want stdout. They can't have it. The Compositor is the bouncer: one lock, one writer, zero corruption. Plus the self-pipe trick, mutable regions, and why the mutex must cover the write() syscall."

@@ -1,6 +1,6 @@
 ---
 title: "The Problem — Why Terminals Are Broken"
-date: 2026-04-01
+date: 2026-03-03
 slug: the-problem-terminals-are-broken
 tags: c++23, terminal, tui, ansi-escape, race-condition, claude-code
 excerpt: Two threads. One stdout. Total corruption. This is the bug that sent me reverse-engineering Claude Code's binary — and the fundamental reason every serious TUI needs a rendering engine.

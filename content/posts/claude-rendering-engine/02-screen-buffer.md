@@ -1,6 +1,6 @@
 ---
 title: "The Screen Buffer — A 2D Cell Grid"
-date: 2026-04-01
+date: 2026-03-05
 slug: screen-buffer-2d-cell-grid
 tags: c++23, terminal-rendering, screen-buffer, memory-layout, simd, claude-code
 excerpt: Every terminal UI, no matter how complex, reduces to filling a 2D grid of cells and diffing it against the previous frame. Claude Code uses a dual-view memory trick to make this fast. In C++, we don't need the trick.

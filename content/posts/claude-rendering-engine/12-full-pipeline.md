@@ -1,6 +1,6 @@
 ---
 title: "Putting It All Together — Building a Compile-Time DSL from Scratch"
-date: 2026-03-01
+date: 2026-03-24
 slug: putting-it-all-together
 tags: compile-time-cpp, dsl, metaprogramming, compile-time-dsl, type-safe
 excerpt: Twelve posts of theory. Now we build. A complete, type-safe, zero-overhead query language — parsed and validated inside the compiler, compiled to bare-metal loops. Here's the full program. Copy it. Compile it. Break it.

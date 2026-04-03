@@ -1,6 +1,6 @@
 ---
 title: "How I Ported Claude Code's Rendering Engine to Modern C++"
-date: 2026-04-01
+date: 2026-03-03
 slug: claude-rendering-engine
 tags: c++23, terminal-rendering, reverse-engineering, tui, claude-code, ansi
 excerpt: I decompiled Claude Code's binary, reverse-engineered its terminal rendering pipeline, and rebuilt the whole thing in C++23. This is the story of what I found inside — and how to build a flicker-free, 60fps terminal UI from scratch.

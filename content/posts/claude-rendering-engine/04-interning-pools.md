@@ -1,6 +1,6 @@
 ---
 title: "Interning Pools — Strings Are Integers Now"
-date: 2026-04-01
+date: 2026-03-09
 slug: interning-pools-strings-are-integers
 tags: c++23, interning, style-pool, transition-cache, constexpr, hash-map, claude-code
 excerpt: "The moment you intern a style, comparison becomes integer equality. The moment you cache the transition between two styles, rendering becomes a hash table lookup. This is where Claude Code's renderer goes from fast to unreasonably fast."

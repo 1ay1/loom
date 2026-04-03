@@ -1,6 +1,6 @@
 ---
 title: "Hardware Scroll — Moving Rows Without Rewriting"
-date: 2026-04-01
+date: 2026-03-19
 slug: hardware-scroll-moving-rows
 tags: c++23, hardware-scroll, csi-sequences, scroll-region, memmove, terminal-rendering, claude-code
 excerpt: "The terminal can shift rows for you. You just have to ask nicely with CSI sequences, and then lie to your own diff engine about what the previous frame looked like. Result: 99% reduction in scroll I/O."

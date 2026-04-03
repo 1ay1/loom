@@ -1,6 +1,6 @@
 ---
 title: "The Output Builder — Recording Before Rendering"
-date: 2026-04-01
+date: 2026-03-11
 slug: output-builder-recording-before-rendering
 tags: c++23, output-builder, variant, blit-optimization, damage-tracking, claude-code
 excerpt: "Claude Code doesn't render directly. It records what it wants to do, then replays the recording. This decoupling is what makes blit, clip, and scroll optimizations possible — and it's the reason 95% of the screen costs zero work per frame."

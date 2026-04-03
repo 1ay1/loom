@@ -1,6 +1,6 @@
 ---
 title: "The Diff Engine — Only Paint What Changed"
-date: 2026-04-01
+date: 2026-03-15
 slug: diff-engine-only-paint-what-changed
 tags: c++23, diff-engine, ansi-escape, cursor-optimization, damage-rect, claude-code
 excerpt: "The heart of the renderer: compare two screen buffers cell by cell, emit the minimal ANSI to transform one into the other. Every optimization upstream exists to make this loop faster. Every optimization here directly reduces bytes to stdout."

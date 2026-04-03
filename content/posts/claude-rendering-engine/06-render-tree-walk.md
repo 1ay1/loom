@@ -1,6 +1,6 @@
 ---
 title: "The Render Tree Walk — From Layout to Cells"
-date: 2026-04-01
+date: 2026-03-13
 slug: render-tree-walk-layout-to-cells
 tags: c++23, render-tree, yoga-layout, blit, dirty-flag, component-tree, claude-code
 excerpt: "The renderNode function is the most complex piece in the pipeline. It walks the component tree, decides what to re-render and what to skip, and orchestrates the entire frame. I extracted it from minified JavaScript, and the architecture is beautiful."
